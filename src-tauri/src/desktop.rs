@@ -11,8 +11,10 @@ pub const CLOSE_TO_TRAY_KEY: &str = "app.close_to_tray";
 pub const START_MINIMIZED_KEY: &str = "app.start_minimized";
 pub const AUTOSTART_ARG: &str = "--autostart";
 
+// `get_window`, not `get_webview_window`: with BROWSER tabs open the main
+// window hosts several webviews and is no longer a single-webview window.
 pub fn show_main(app: &AppHandle) {
-    if let Some(win) = app.get_webview_window("main") {
+    if let Some(win) = app.get_window("main") {
         let _ = win.unminimize();
         let _ = win.show();
         let _ = win.set_focus();
@@ -75,7 +77,7 @@ pub fn handle_window_event(window: &tauri::Window, event: &WindowEvent) {
 pub fn apply_launch_mode(app: &AppHandle) {
     let autostarted = std::env::args().any(|a| a == AUTOSTART_ARG);
     if autostarted && bool_setting(app, START_MINIMIZED_KEY, true) {
-        if let Some(win) = app.get_webview_window("main") {
+        if let Some(win) = app.get_window("main") {
             let _ = win.hide();
         }
     }

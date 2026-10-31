@@ -4,6 +4,7 @@ import { useSetting } from "@/stores/settings";
 import { formatBytes, formatRate } from "@/utils/format";
 import { Sampling } from "./common";
 import type { WidgetProps } from "./registry";
+import type { ConfigOf, NETWORK_SETTINGS } from "./settings";
 import { usePolled } from "@/hooks/usePolled";
 import { api } from "@/services/api";
 
@@ -36,7 +37,7 @@ function ConnectivityLine() {
   );
 }
 
-export default function NetworkWidget(_: WidgetProps) {
+export default function NetworkWidget({ config: c }: WidgetProps<ConfigOf<typeof NETWORK_SETTINGS>>) {
   const { snapshot, history } = useSystemSnapshot();
   const interval = useSetting("monitor.interval_ms");
   if (!snapshot) return <Sampling />;
@@ -68,15 +69,20 @@ export default function NetworkWidget(_: WidgetProps) {
           </div>
         </div>
       </div>
-      <Sparkline
-        values={history.rx}
-        capacity={HISTORY_LENGTH}
-        format={(v) => `↓ ${formatRate(v)}`}
-        intervalSecs={interval / 1000}
-        label="Download rate"
-      />
+      {c.graph && (
+        <Sparkline
+          values={history.rx}
+          capacity={HISTORY_LENGTH}
+          format={(v) => `↓ ${formatRate(v)}`}
+          intervalSecs={interval / 1000}
+          label="Download rate"
+        />
+      )}
       <div className="net__list">
-        {net.interfaces.slice(0, 4).map((i) => (
+        {net.interfaces
+          .filter((i) => !c.activeOnly || i.addresses.length > 0)
+          .slice(0, c.adapters)
+          .map((i) => (
           <div key={i.name} className="net__iface">
             <span className="truncate" title={i.name}>
               {i.name}
@@ -88,7 +94,7 @@ export default function NetworkWidget(_: WidgetProps) {
           </div>
         ))}
       </div>
-      <ConnectivityLine />
+      {c.connectivity && <ConnectivityLine />}
     </div>
   );
 }

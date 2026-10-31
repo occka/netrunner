@@ -12,6 +12,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (2, include_str!("../../migrations/0002_overlays_automation.sql")),
     (3, include_str!("../../migrations/0003_automation_launch_program.sql")),
     (4, include_str!("../../migrations/0004_neural_history.sql")),
+    (5, include_str!("../../migrations/0005_browser_widget_settings.sql")),
 ];
 
 pub const LATEST_VERSION: i64 = MIGRATIONS[MIGRATIONS.len() - 1].0;

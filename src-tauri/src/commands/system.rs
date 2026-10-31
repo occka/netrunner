@@ -81,3 +81,18 @@ pub async fn system_power_set_plan(state: State<'_, AppState>, guid: String) -> 
 pub async fn network_status() -> AppResult<network::NetworkStatus> {
     Ok(network::status())
 }
+
+/// Blocking WinRT calls: run on a worker thread.
+#[tauri::command]
+pub async fn media_status() -> AppResult<crate::system::media::MediaStatus> {
+    tauri::async_runtime::spawn_blocking(crate::system::media::status)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn media_control(app_id: String, action: String) -> AppResult<()> {
+    tauri::async_runtime::spawn_blocking(move || crate::system::media::control(&app_id, &action))
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+}

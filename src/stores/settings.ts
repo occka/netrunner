@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { create } from "zustand";
 import { api } from "@/services/api";
 import { DEFAULT_THEME, sanitizeTheme, type ThemeColors } from "@/styles/theme";
+import { applyAppearance, DEFAULT_BACKGROUND, FONTS, sanitizeBackground, type BackgroundSpec, type UiFont } from "@/styles/appearance";
 
 /** Every persisted setting with its default. Keys follow `area.name`. */
 export interface SettingsSchema {
@@ -16,6 +18,35 @@ export interface SettingsSchema {
   "app.start_minimized": boolean;
   /** Check GitHub releases for an update at startup. */
   "app.update_check": boolean;
+  // BROWSER: read by the backend (browser/mod.rs `Prefs`). Changing one reloads them.
+  "browser.adblock": boolean;
+  "browser.cosmetic": boolean;
+  "browser.https_only": boolean;
+  "browser.gpc": boolean;
+  "browser.tracking": "strict" | "balanced" | "basic";
+  "browser.history": boolean;
+  "browser.autofill": boolean;
+  "browser.search": string;
+  "browser.adblock_lists": string[];
+  "browser.adblock_exceptions": string[];
+  /** Applies to tabs opened after a NETRUNNER restart (WebView2 environment option). */
+  "browser.webrtc_protect": boolean;
+  /** Applies after restart. Loads unpacked extensions from the extensions folder. */
+  "browser.extensions": boolean;
+  "browser.home": string;
+  // Appearance (styles/appearance.ts).
+  "appearance.background": BackgroundSpec;
+  "appearance.dashboard_background": BackgroundSpec;
+  /** Panel and chrome opacity in %, so a background shows through. */
+  "appearance.panel_opacity": number;
+  "appearance.panel_blur": number;
+  "appearance.radius": number;
+  "appearance.font": UiFont;
+  /** Interface zoom of the main window in %. */
+  "appearance.scale": number;
+  "appearance.scanlines": boolean;
+  "appearance.glow": boolean;
+  "appearance.vignette": boolean;
 }
 
 export const SETTINGS_DEFAULTS: SettingsSchema = {
@@ -28,6 +59,29 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "app.close_to_tray": true,
   "app.start_minimized": true,
   "app.update_check": true,
+  "browser.adblock": true,
+  "browser.cosmetic": true,
+  "browser.https_only": true,
+  "browser.gpc": true,
+  "browser.tracking": "strict",
+  "browser.history": true,
+  "browser.autofill": false,
+  "browser.search": "duckduckgo",
+  "browser.adblock_lists": ["easylist", "easyprivacy", "ublock", "ublock-privacy", "ublock-badware", "peterlowe", "ruadlist"],
+  "browser.adblock_exceptions": [],
+  "browser.webrtc_protect": true,
+  "browser.extensions": false,
+  "browser.home": "",
+  "appearance.background": DEFAULT_BACKGROUND,
+  "appearance.dashboard_background": DEFAULT_BACKGROUND,
+  "appearance.panel_opacity": 100,
+  "appearance.panel_blur": 0,
+  "appearance.radius": 2,
+  "appearance.font": "plex",
+  "appearance.scale": 100,
+  "appearance.scanlines": false,
+  "appearance.glow": false,
+  "appearance.vignette": false,
 };
 
 export type SettingKey = keyof SettingsSchema;
@@ -55,6 +109,13 @@ function coerce(raw: Record<string, unknown>): SettingsSchema {
     }
   }
   values["monitor.interval_ms"] = Math.min(10000, Math.max(500, values["monitor.interval_ms"]));
+  values["appearance.background"] = sanitizeBackground(values["appearance.background"]);
+  values["appearance.dashboard_background"] = sanitizeBackground(values["appearance.dashboard_background"]);
+  values["appearance.panel_opacity"] = Math.min(100, Math.max(30, values["appearance.panel_opacity"]));
+  values["appearance.panel_blur"] = Math.min(24, Math.max(0, values["appearance.panel_blur"]));
+  values["appearance.radius"] = Math.min(16, Math.max(0, values["appearance.radius"]));
+  values["appearance.scale"] = Math.min(150, Math.max(70, values["appearance.scale"]));
+  if (!FONTS.some((f) => f.id === values["appearance.font"])) values["appearance.font"] = "plex";
   values["inspector.width"] = Math.min(520, Math.max(240, values["inspector.width"]));
   return values;
 }
@@ -92,4 +153,26 @@ export const useSettings = create<SettingsStore>((set, get) => ({
 
 export function useSetting<K extends SettingKey>(key: K): SettingsSchema[K] {
   return useSettings((s) => s.values[key]);
+}
+
+/** Applies the `appearance.*` settings (main window and overlays). */
+export function useAppearance(isOverlay = false) {
+  const v = useSettings((s) => s.values);
+  useEffect(
+    () =>
+      applyAppearance(
+        {
+          panelOpacity: v["appearance.panel_opacity"],
+          panelBlur: v["appearance.panel_blur"],
+          radius: v["appearance.radius"],
+          font: v["appearance.font"],
+          scale: v["appearance.scale"],
+          scanlines: v["appearance.scanlines"],
+          glow: v["appearance.glow"],
+          vignette: v["appearance.vignette"],
+        },
+        isOverlay,
+      ),
+    [v, isOverlay],
+  );
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { BrainCircuit, MousePointerClick, PanelRightClose, Pin, PinOff } from "lucide-react";
+import { WidgetSettingsForm } from "@/modules/command/WidgetSettingsForm";
 import { useShell } from "@/stores/shell";
 import { useSetting, useSettings } from "@/stores/settings";
 import { useQuickAccess } from "@/stores/quickAccess";
@@ -9,9 +10,10 @@ import { reportError } from "@/stores/notifications";
 import { resolveObject } from "@/objects/resolve";
 import { sameRef, type NrObject, type ObjectRef } from "@/objects/types";
 
-type Section = "overview" | "actions" | "details" | "ai";
+type Section = "overview" | "settings" | "actions" | "details" | "ai";
 const SECTIONS: { id: Section; label: string }[] = [
   { id: "overview", label: "Overview" },
+  { id: "settings", label: "Settings" },
   { id: "actions", label: "Actions" },
   { id: "details", label: "Details" },
   { id: "ai", label: "AI" },
@@ -37,8 +39,22 @@ export function Inspector() {
   const [section, setSection] = useState<Section>("overview");
   const ref = pinned ?? selection;
   const object = useNrObject(ref);
+  const requestedTab = useShell((s) => s.inspectorTab);
 
   useEffect(() => setWidth(storedWidth), [storedWidth]);
+
+  // A widget's gear button asks for SETTINGS; make sure the panel is visible too.
+  useEffect(() => {
+    if (!requestedTab) return;
+    setSection(requestedTab as Section);
+    useShell.setState({ inspectorTab: null });
+    if (!useSettings.getState().values["inspector.visible"]) {
+      useSettings
+        .getState()
+        .set("inspector.visible", true)
+        .catch((err) => reportError("Could not save inspector state", err));
+    }
+  }, [requestedTab]);
 
   const onResizeStart = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -65,6 +81,8 @@ export function Inspector() {
 
   if (!visible) return null;
 
+  // A previous object's SETTINGS tab falls back to OVERVIEW for objects without settings.
+  const shown: Section = section === "settings" && !object?.settings ? "overview" : section;
   const isPinned = !!pinned && !!object && sameRef(pinned, object.ref);
 
   return (
@@ -116,17 +134,27 @@ export function Inspector() {
             </div>
           </div>
           <div className="inspector__tabs" role="tablist">
-            {SECTIONS.map((s) => (
-              <button key={s.id} role="tab" aria-selected={section === s.id} onClick={() => setSection(s.id)}>
+            {SECTIONS.filter((s) => s.id !== "settings" || object.settings).map((s) => (
+              <button key={s.id} role="tab" aria-selected={shown === s.id} onClick={() => setSection(s.id)}>
                 {s.label}
               </button>
             ))}
           </div>
           <div className="inspector__body">
-            {section === "overview" && <Overview object={object} />}
-            {section === "actions" && <Actions object={object} />}
-            {section === "details" && <Details object={object} />}
-            {section === "ai" && <AiSection object={object} />}
+            {shown === "overview" && <Overview object={object} />}
+            {shown === "settings" &&
+              (object.settings ? (
+                <WidgetSettingsForm
+                  schema={object.settings.schema}
+                  config={object.settings.config}
+                  onChange={object.settings.onChange}
+                />
+              ) : (
+                <div className="empty">This object has no settings.</div>
+              ))}
+            {shown === "actions" && <Actions object={object} />}
+            {shown === "details" && <Details object={object} />}
+            {shown === "ai" && <AiSection object={object} />}
           </div>
         </>
       )}

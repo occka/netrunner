@@ -3,15 +3,26 @@ import { Meter } from "@/components/Meter";
 import { formatBytes } from "@/utils/format";
 import { Sampling } from "./common";
 import type { WidgetProps } from "./registry";
+import type { ConfigOf, STORAGE_SETTINGS } from "./settings";
 
-export default function StorageWidget(_: WidgetProps) {
+export default function StorageWidget({ config: c }: WidgetProps<ConfigOf<typeof STORAGE_SETTINGS>>) {
   const { snapshot } = useSystemSnapshot();
   if (!snapshot) return <Sampling />;
-  if (snapshot.disks.length === 0) return <div className="unavailable">No volumes reported by Windows.</div>;
+  const usedShare = (d: (typeof snapshot.disks)[number]) => (d.totalBytes ? (d.totalBytes - d.availableBytes) / d.totalBytes : 0);
+  const disks = snapshot.disks
+    .filter((d) => c.removable || !d.removable)
+    .sort((a, b) =>
+      c.sort === "used"
+        ? usedShare(b) - usedShare(a)
+        : c.sort === "free"
+          ? a.availableBytes - b.availableBytes
+          : a.mountPoint.localeCompare(b.mountPoint),
+    );
+  if (disks.length === 0) return <div className="unavailable">No volumes reported by Windows.</div>;
 
   return (
     <div className="disks">
-      {snapshot.disks.map((d) => {
+      {disks.map((d) => {
         const used = d.totalBytes - d.availableBytes;
         const pct = d.totalBytes ? (used / d.totalBytes) * 100 : null;
         return (
@@ -19,7 +30,7 @@ export default function StorageWidget(_: WidgetProps) {
             <div className="disk__head">
               <span className="disk__mount mono">{d.mountPoint}</span>
               <span className="disk__name truncate">{d.name || "Local disk"}</span>
-              <span className="tag">{d.kind === "Unknown" ? d.fileSystem : `${d.kind} · ${d.fileSystem}`}</span>
+              {c.details && <span className="tag">{d.kind === "Unknown" ? d.fileSystem : `${d.kind} · ${d.fileSystem}`}</span>}
               {d.removable && <span className="tag tag--info">Removable</span>}
             </div>
             <Meter percent={pct} thresholds={[85, 95]} label={`${d.mountPoint} used`} />

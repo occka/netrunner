@@ -11,6 +11,7 @@ components/*                                           ▼
 objects/*  (universal object model)              services/*  (domain logic, unit-tested)
 search/*   (local palette engine)                system/*   (sysinfo, PDH counters, startup, services, power, network)
 overlay/*  (overlay window root)                 dev/*      (workspace fs, ConPTY terminals, toolchains, git CLI, GitHub API)
+                                                 browser/*  (WebView2 tabs, content blocker, hardening)
                                                  security/* (command policy, target validation)
                                                  desktop.rs / overlay.rs / automation.rs (tray, windows, event engine)
                                                        │
@@ -40,9 +41,55 @@ On boot the frontend loads only settings, profiles and Quick Access entries. Eac
 
 `objects/types.ts` defines `ObjectRef` (a pointer such as `{type:"qa-entry", id}`) and `NrObject` (title, icon, tags, details, actions). `objects/resolve.ts` turns a ref into an `NrObject` from live store data. The Inspector (OVERVIEW / ACTIONS / DETAILS / AI), the context menu and the command palette all use this model, so a new object type plugs into every surface at once.
 
+## Widgets and windows
+
+```
+                    widgets/registry.ts  ── WidgetDef { type, component (lazy), settings: schema }
+                           │                         │
+                           │              widgets/settings.ts  (typed schema: toggle / select / range / text,
+                           │                                    FRAME_SETTINGS shared by all widgets)
+            ┌──────────────┼───────────────────────────┐
+            ▼              ▼                           ▼
+   COMMAND dashboard   OVERLAY window (overlay-<id>)   SYSTEM / NETWORK panels
+   WidgetFrame          OverlayApp                     (defaults only)
+   config: layout       config: overlays.config_json
+   widget.config
+            │              │
+            └──── <Body config={resolved} host="dashboard|overlay" /> ────┘
+
+   Editing: Inspector SETTINGS tab (dashboard) / OVERLAY settings dialog,
+   both render WidgetSettingsForm from the same schema with live preview.
+
+   Main window (React)          Overlay window (React)          Popup window
+   ├─ BROWSER chrome            ├─ title bar                    └─ web-popup-N
+   └─ child webviews web-N      └─ child webview web-N             (window.open with size)
+      (positioned over             (web overlays, or a tab
+       BrowserSurface)              moved here by reparent)
+```
+
+Widget settings store only values that differ from the defaults (`compactConfig`), so a later change to a default reaches every widget that never touched it. Invalid or unknown stored values fall back to defaults when resolved (`resolveConfig`); the backend checks only that `config` is an object under 8 KB. Outside EDIT LAYOUT a settings change is applied optimistically and saved after 400 ms through `profile_set_widget_config`, which replaces one widget's config without touching positions.
+
+## Browser
+
+`browser/mod.rs` owns tabs: each is a Tauri child webview (`unstable` feature) labelled `web-<n>` in a host window, with its own WebView2 user-data folder (`%LOCALAPPDATA%\com.netrunner.app\browser`). The React chrome is ordinary DOM; `BrowserSurface` measures an empty element every animation frame and calls `browser_set_bounds`, hiding the native view while a dialog, menu or the palette is open (HTML cannot draw over a native webview). Tabs are created on `about:blank`, hardened, then navigated, so the request filter is in place before the first request.
+
+Pitfalls found in testing:
+- A window that hosts a browser tab has several webviews, and `get_webview_window` returns `None` for it. Code that shows, hides or destroys `main` or `overlay-*` uses `get_window` / `windows()`.
+- Position and size are set with one `set_bounds` call (wry's separate setters re-read an asynchronously updated position). `BrowserSurface` re-sends its rectangle every second because a command that arrives while the native view is still being created is dropped.
+- Keys pressed inside a page never reach React; `AcceleratorKeyPressed` forwards Ctrl+T/W/L/K/R/Tab and F5 as `browser://shortcut`.
+- WebView2 publishes playing pages to Windows media sessions only with `--enable-features=HardwareMediaKeyHandling` (set for the browser profile), which the Music Player widget relies on.
+
+`browser/native.rs` uses the WebView2 COM API for what Tauri does not expose: `WebResourceRequested` (content blocking and GPC headers), tracking prevention, password/autofill, SmartScreen, external-URI blocking, history/favicon/fullscreen/audio events, mute and clearing the profile. `browser/blocker.rs` wraps Brave's `adblock` engine; lists are downloaded to `%APPDATA%\com.netrunner.app\adblock\`, refreshed when older than 4 days, and the engine is rebuilt off the UI thread and swapped atomically. Cosmetic filters run after page load: the page's class/id names are collected with `eval_with_callback` and matching hide rules are injected as a style element; pages never get a way to call back into NETRUNNER. Bookmarks, history and granted site permissions live in SQLite (`browser_*` tables, migration 5).
+
+The Music Player widget combines two sources. NETRUNNER's own tabs and web overlays are read through `browser/media_hook.js`, an init script that records the page's media elements and Media Session metadata/handlers and is queried with `eval_with_callback` (`browser_media`); controls call the page's own handlers (`browser_media_control`). Other apps come from Windows' Global System Media Transport Controls (`system/media.rs`). `widgets/musicSources.ts` merges them and holds on to the shown player: pausing never switches source; it changes only when the player disappears, the user picks another, or a higher-class player starts (NETRUNNER music site > other NETRUNNER tab > other app).
+
+## Appearance
+
+`appearance.*` settings (`styles/appearance.ts`) are applied as CSS variables and root attributes, like the theme: `--panel-alpha` / `--panel-backdrop` make panels and shell chrome translucent, `--radius`, `--font-body`, `data-fx-*` effects, and the main webview's zoom for interface scale (`BrowserSurface` multiplies its rectangle by it, since native views use window pixels). `components/Backdrop.tsx` renders an image or CSS pattern behind the shell (fixed) and behind the dashboard (absolute). Wallpapers are copied into `<data>/wallpapers/` by `services/appearance.rs` and served as data URLs, so no file or asset protocol is exposed to the UI or to browser pages.
+
 ## Dashboard
 
-A profile's `layout_json` is `{ version: 1, widgets: [{ id, type, x, y, w, h }] }` on a 12-column grid (`react-grid-layout`). EDIT LAYOUT copies the layout into a draft (`stores/dashboard.ts`), and only **Save** writes it back through `profile_save_layout`. The draft records its profile id, so a profile switch mid-edit discards the draft rather than saving it to the wrong profile. The backend validates the layout's shape but treats widget types as opaque; the frontend registry defines them.
+A profile's `layout_json` is `{ version: 1, widgets: [{ id, type, x, y, w, h, config? }] }` on a 12-column grid (`react-grid-layout`). EDIT LAYOUT copies the layout into a draft (`stores/dashboard.ts`), and only **Save** writes it back through `profile_save_layout`. The draft records its profile id, so a profile switch mid-edit discards the draft rather than saving it to the wrong profile. The backend validates the layout's shape but treats widget types as opaque; the frontend registry defines them.
 
 ## Launching
 

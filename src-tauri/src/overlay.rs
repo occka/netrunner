@@ -20,13 +20,14 @@ pub fn label(id: i64) -> String {
 }
 
 pub fn open(app: &AppHandle, o: &Overlay) -> AppResult<()> {
-    if let Some(win) = app.get_webview_window(&label(o.id)) {
+    // Web overlays hold a second (browser) webview, so look the window up as a plain window.
+    if let Some(win) = app.get_window(&label(o.id)) {
         let _ = win.show();
         return Ok(());
     }
     let url = WebviewUrl::App(format!("index.html?overlay={}", o.id).into());
     let win = WebviewWindowBuilder::new(app, label(o.id), url)
-        .title(format!("NETRUNNER overlay · {}", o.widget_type))
+        .title(format!("NETRUNNER overlay · {}", if o.title.is_empty() { &o.widget_type } else { &o.title }))
         .decorations(false)
         .transparent(true)
         .shadow(false)
@@ -45,7 +46,9 @@ pub fn open(app: &AppHandle, o: &Overlay) -> AppResult<()> {
 }
 
 pub fn close(app: &AppHandle, id: i64) {
-    if let Some(win) = app.get_webview_window(&label(id)) {
+    // Web overlays host a browser tab; forget it before its window goes away.
+    crate::browser::forget_host(app, &label(id));
+    if let Some(win) = app.get_window(&label(id)) {
         let _ = win.destroy();
     }
 }
@@ -53,7 +56,7 @@ pub fn close(app: &AppHandle, id: i64) {
 /// Applies lock state to an open window (locked = not resizable; dragging is
 /// disabled in the overlay page itself).
 pub fn apply(app: &AppHandle, o: &Overlay) {
-    if let Some(win) = app.get_webview_window(&label(o.id)) {
+    if let Some(win) = app.get_window(&label(o.id)) {
         let _ = win.set_resizable(!o.locked);
     }
 }
@@ -89,7 +92,7 @@ pub fn restore_on_startup(app: &AppHandle) {
 pub fn toggle_all(app: &AppHandle) {
     let hide = !HIDDEN.load(Ordering::Relaxed);
     HIDDEN.store(hide, Ordering::Relaxed);
-    for (label, win) in app.webview_windows() {
+    for (label, win) in app.windows() {
         if label.starts_with("overlay-") {
             let _ = if hide { win.hide() } else { win.show() };
         }

@@ -410,9 +410,43 @@
   letter-spacing: 0.02em;
 }
 .clock__sec {
-  margin-left: 6px;
-  font-size: var(--fs-lg);
+  margin-left: 0.16em;
+  font-size: max(var(--fs-lg), 0.42em);
   color: var(--c-primary);
+}
+.clock__ampm {
+  margin-left: 0.2em;
+  font-size: max(var(--fs-sm), 0.36em);
+  color: var(--c-muted);
+  letter-spacing: 0.06em;
+}
+.clock--center {
+  justify-items: center;
+  text-align: center;
+}
+.clock--center .cal {
+  width: 100%;
+  max-width: 320px;
+}
+.clock--fit {
+  container-type: inline-size;
+}
+.clock--fit .clock__time {
+  /* JetBrains Mono digits are ~0.6em wide. */
+  font-size: calc(100cqi / (var(--clock-chars) * 0.62));
+  white-space: nowrap;
+}
+.clock__zone {
+  margin-left: 8px;
+  color: var(--c-primary);
+}
+.cal--weeks {
+  grid-template-columns: auto repeat(7, 1fr);
+}
+.cal__week {
+  padding: 2px 6px 2px 0;
+  color: var(--c-muted);
+  opacity: 0.7;
 }
 .cal {
   display: grid;
@@ -524,4 +558,71 @@
 .tile--add .tile__icon {
   background: transparent;
   color: var(--c-muted);
+}
+
+/* ---------- Widget frame settings ---------- */
+.widget {
+  position: relative;
+}
+.widget--transparent:not([aria-selected="true"]) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.dash--editing .widget--transparent {
+  border-color: rgb(var(--c-primary-rgb) / 0.5);
+}
+.widget--headless .widget__body {
+  height: 100%;
+}
+.widget__float-gear {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.widget:hover .widget__float-gear,
+.widget__float-gear:focus-visible {
+  opacity: 1;
+}
+.widget__gear {
+  opacity: 0.55;
+}
+.widget:hover .widget__gear {
+  opacity: 1;
+}
+
+/* ---------- Widget settings form ---------- */
+.wsettings {
+  display: grid;
+  gap: 12px;
+}
+.wsettings__group {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 0 0;
+  border: 0;
+  border-top: 1px solid var(--c-line-soft);
+}
+.wsettings__group legend {
+  padding-right: 6px;
+  color: var(--c-primary);
+}
+.wsettings__field {
+  display: grid;
+  gap: 4px;
+}
+.wsettings__range-label {
+  display: flex;
+  justify-content: space-between;
+}
+.wsettings__field input[type="range"] {
+  width: 100%;
+  accent-color: var(--c-primary);
+}
+.wsettings__hint {
+  font-size: var(--fs-xs);
 }

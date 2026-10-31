@@ -2,6 +2,11 @@
 export const SETTINGS_SECTIONS = [
   { id: "theme", title: "Theme colors", keywords: ["palette", "accent", "color", "colour", "appearance", "theme"] },
   {
+    id: "appearance",
+    title: "Appearance: backgrounds, glass, font, scale",
+    keywords: ["wallpaper", "background", "image", "picture", "обои", "фон", "glass", "transparency", "blur", "font", "scale", "zoom", "glow", "scanlines", "customize"],
+  },
+  {
     id: "monitoring",
     title: "System monitoring interval",
     keywords: ["metrics", "polling", "refresh", "cpu", "temperature", "performance"],

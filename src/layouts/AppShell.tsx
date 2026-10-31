@@ -16,18 +16,23 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ContextMenuHost } from "@/components/ContextMenu";
 import { useBackendEvents } from "@/hooks/useBackendEvents";
 import { PromptHost } from "@/components/PromptHost";
+import { Backdrop } from "@/components/Backdrop";
+import { useSetting } from "@/stores/settings";
+import { backgroundActive } from "@/styles/appearance";
 
 export function AppShell() {
   const module = useShell((s) => s.module);
   const paletteOpen = useShell((s) => s.paletteOpen);
   const editor = useQuickAccess((s) => s.editor);
   const Module = moduleComponent(MODULE_BY_ID[module]);
+  const background = useSetting("appearance.background");
 
   useGlobalHotkeys();
   useBackendEvents();
 
   return (
-    <div className="shell">
+    <div className="shell" data-backdrop={backgroundActive(background) ? "on" : undefined}>
+      <Backdrop spec={background} className="backdrop--app" />
       <TopBar />
       <div className="shell__main">
         <NavRail />

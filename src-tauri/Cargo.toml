@@ -1,6 +1,6 @@
 [package]
 name = "netrunner"
-version = "0.4.1"
+version = "0.5.0"
 description = "NETRUNNER — industrial control environment for Windows"
 edition = "2021"
 rust-version = "1.80"
@@ -13,7 +13,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+# `unstable`: child webviews (BROWSER tabs inside NETRUNNER windows).
+tauri = { version = "2", features = ["tray-icon", "unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-log = "2"
 tauri-plugin-autostart = "2"
@@ -33,11 +34,24 @@ base64 = "0.22"
 tokio = { version = "1", default-features = false, features = ["time", "macros"] }
 portable-pty = "0.9"
 trash = "5"
+# Brave's content-blocking engine (EasyList / uBlock syntax). Without the
+# default `single-thread` feature the engine is Send + Sync.
+adblock = { version = "0.13", default-features = false, features = ["embedded-domain-resolver", "full-regex-handling"] }
 
 # NETRUNNER targets Windows only; these back the native integrations.
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
 keyring = { version = "3", features = ["windows-native"] }
+# Same versions as Tauri's WebView2 backend (BROWSER hardening, media sessions).
+webview2-com = "0.39"
+windows = { version = "0.62", features = [
+  "Foundation",
+  "Media_Control",
+  "Storage_Streams",
+  "Win32_System_Com",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging",
+] }
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
   "Win32_Graphics_Gdi",

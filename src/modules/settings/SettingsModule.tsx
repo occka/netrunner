@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { AppearanceSettings } from "./AppearanceSettings";
 import { api } from "@/services/api";
 import { refreshActivity } from "@/stores/activity";
 import { confirmAction } from "@/stores/confirm";
@@ -199,6 +200,8 @@ export default function SettingsModule() {
             </div>
           </div>
         </section>
+
+        <AppearanceSettings />
 
         <section className="panel settings-group" id="settings-monitoring">
           <header className="panel__header">

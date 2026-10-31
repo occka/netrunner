@@ -1,11 +1,12 @@
 import { Suspense, useMemo } from "react";
 import GridLayout, { WidthProvider, type Layout } from "react-grid-layout";
-import { GripHorizontal, Info, X } from "lucide-react";
+import { GripHorizontal, Info, Settings2, X } from "lucide-react";
 import { useDashboard } from "@/stores/dashboard";
 import { useShell } from "@/stores/shell";
 import { sameRef } from "@/objects/types";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { WIDGETS, WIDGET_STATUS_LABEL } from "./widgets/registry";
+import { WIDGETS, WIDGET_STATUS_LABEL, widgetConfig } from "./widgets/registry";
+import { accentStyle, frameStyle } from "./widgets/frame";
 import { Sampling } from "./widgets/common";
 import type { DashboardLayout, WidgetInstance } from "@/types/entities";
 
@@ -63,45 +64,64 @@ export function DashboardGrid({ layout, editing }: { layout: DashboardLayout; ed
 function WidgetFrame({ instance, editing }: { instance: WidgetInstance; editing: boolean }) {
   const def = WIDGETS[instance.type];
   const select = useShell((s) => s.select);
+  const inspect = useShell((s) => s.inspect);
   const selected = useShell((s) => sameRef(s.selection, { type: "widget", id: instance.id }));
   const removeWidget = useDashboard((s) => s.removeWidget);
   const Body = def?.component;
+  const config = useMemo(() => widgetConfig(def, instance.config), [def, instance.config]);
+  const title = (config["frame.title"] as string).trim() || def?.title || `Unknown widget: ${instance.type}`;
+  const header = editing || (config["frame.header"] as boolean);
+  const openSettings = () => inspect({ type: "widget", id: instance.id }, "settings");
 
   return (
     <section
-      className="panel widget"
+      className={`panel widget${config["frame.transparent"] ? " widget--transparent" : ""}${header ? "" : " widget--headless"}`}
       aria-selected={selected}
-      aria-label={def?.title ?? instance.type}
+      aria-label={title}
+      style={accentStyle(config)}
       onMouseDown={() => select({ type: "widget", id: instance.id })}
     >
-      <header className={`panel__header${editing ? " widget__drag" : ""}`}>
-        {editing && <GripHorizontal size={13} className="muted" />}
-        <h2 className="panel__title truncate">{def?.title ?? `Unknown widget: ${instance.type}`}</h2>
-        {def && def.status !== "live" && <span className="tag tag--warn">{WIDGET_STATUS_LABEL[def.status]}</span>}
-        <div className="panel__actions widget__nodrag">
-          {editing ? (
-            <button
-              className="icon-btn icon-btn--sm"
-              aria-label={`Remove ${def?.title ?? "widget"}`}
-              title="Remove from layout"
-              onClick={() => removeWidget(instance.id)}
-            >
-              <X size={13} />
-            </button>
-          ) : (
-            def && (
-              <span className="widget__info" title={def.dataSource}>
-                <Info size={12} />
-              </span>
-            )
-          )}
-        </div>
-      </header>
-      <div className={`panel__body widget__body${editing ? " widget__body--editing" : ""}`}>
+      {header ? (
+        <header className={`panel__header${editing ? " widget__drag" : ""}`}>
+          {editing && <GripHorizontal size={13} className="muted" />}
+          <h2 className="panel__title truncate">{title}</h2>
+          {def && def.status !== "live" && <span className="tag tag--warn">{WIDGET_STATUS_LABEL[def.status]}</span>}
+          <div className="panel__actions widget__nodrag">
+            {def && (
+              <button className="icon-btn icon-btn--sm widget__gear" title="Widget settings" aria-label={`${title} settings`} onClick={openSettings}>
+                <Settings2 size={12} />
+              </button>
+            )}
+            {editing ? (
+              <button
+                className="icon-btn icon-btn--sm"
+                aria-label={`Remove ${title}`}
+                title="Remove from layout"
+                onClick={() => removeWidget(instance.id)}
+              >
+                <X size={13} />
+              </button>
+            ) : (
+              def && (
+                <span className="widget__info" title={def.dataSource}>
+                  <Info size={12} />
+                </span>
+              )
+            )}
+          </div>
+        </header>
+      ) : (
+        def && (
+          <button className="icon-btn icon-btn--sm widget__float-gear" title="Widget settings" aria-label={`${title} settings`} onClick={openSettings}>
+            <Settings2 size={12} />
+          </button>
+        )
+      )}
+      <div className={`panel__body widget__body${editing ? " widget__body--editing" : ""}`} style={frameStyle(config)}>
         {Body ? (
           <ErrorBoundary compact>
             <Suspense fallback={<Sampling text="Loading…" />}>
-              <Body instanceId={instance.id} editing={editing} />
+              <Body instanceId={instance.id} editing={editing} config={config} host="dashboard" />
             </Suspense>
           </ErrorBoundary>
         ) : (

@@ -3,7 +3,7 @@ import { ModuleHeader } from "@/components/ModuleHeader";
 import { Tabs } from "@/components/Tabs";
 import { api } from "@/services/api";
 import { useShell } from "@/stores/shell";
-import { WIDGETS } from "@/modules/command/widgets/registry";
+import { WIDGETS, widgetConfig } from "@/modules/command/widgets/registry";
 import { Sampling } from "@/modules/command/widgets/common";
 import { ProcessesTab } from "./ProcessesTab";
 import { StartupTab } from "./StartupTab";
@@ -58,7 +58,7 @@ export default function SystemModule() {
                   </header>
                   <div className="panel__body">
                     <Suspense fallback={<Sampling />}>
-                      <Body instanceId={`system-${type}`} editing={false} />
+                      <Body instanceId={`system-${type}`} editing={false} config={widgetConfig(def, undefined)} host="dashboard" />
                     </Suspense>
                   </div>
                 </section>

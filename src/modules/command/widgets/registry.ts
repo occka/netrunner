@@ -11,6 +11,7 @@ import {
   Cpu,
   Gauge,
   HardDrive,
+  Image,
   ListTree,
   MemoryStick,
   Monitor,
@@ -20,10 +21,33 @@ import {
   Thermometer,
   type LucideIcon,
 } from "lucide-react";
+import {
+  ACTIVITY_SETTINGS,
+  CLOCK_SETTINGS,
+  CPU_SETTINGS,
+  FRAME_SETTINGS,
+  GPU_SETTINGS,
+  IMAGE_SETTINGS,
+  MUSIC_SETTINGS,
+  NETWORK_SETTINGS,
+  QUICK_ACCESS_SETTINGS,
+  RAM_SETTINGS,
+  STORAGE_SETTINGS,
+  SYSTEM_OVERVIEW_SETTINGS,
+  TASKS_SETTINGS,
+  resolveConfig,
+  type RawConfig,
+  type WidgetSchema,
+} from "./settings";
 
-export interface WidgetProps {
+/** `C` is the widget's resolved settings, e.g. `WidgetProps<ConfigOf<typeof CLOCK_SETTINGS>>`. */
+export interface WidgetProps<C = RawConfig> {
   instanceId: string;
   editing: boolean;
+  /** Stored settings merged over the schema defaults (never undefined values). */
+  config: C;
+  /** Where the widget is rendered; overlays are smaller and float over other apps. */
+  host: "dashboard" | "overlay";
 }
 
 /**
@@ -44,7 +68,10 @@ export interface WidgetDef {
   keywords: string[];
   defaultSize: { w: number; h: number };
   minSize: { w: number; h: number };
-  component?: LazyExoticComponent<ComponentType<WidgetProps>>;
+  /** Content settings (frame settings are added for every widget). */
+  settings?: WidgetSchema;
+  // `any`: each widget narrows its own config type.
+  component?: LazyExoticComponent<ComponentType<WidgetProps<any>>>;
 }
 
 export const WIDGET_STATUS_LABEL: Record<WidgetStatus, string> = {
@@ -64,6 +91,7 @@ const defs: WidgetDef[] = [
     keywords: ["hardware", "metrics", "performance", "temperature"],
     defaultSize: { w: 5, h: 9 },
     minSize: { w: 3, h: 6 },
+    settings: SYSTEM_OVERVIEW_SETTINGS,
     component: lazy(() => import("./SystemOverviewWidget")),
   },
   {
@@ -76,6 +104,7 @@ const defs: WidgetDef[] = [
     keywords: ["processor", "cores", "usage", "load"],
     defaultSize: { w: 4, h: 7 },
     minSize: { w: 3, h: 5 },
+    settings: CPU_SETTINGS,
     component: lazy(() => import("./CpuWidget")),
   },
   {
@@ -89,6 +118,7 @@ const defs: WidgetDef[] = [
     keywords: ["graphics", "video", "vram", "nvidia", "amd"],
     defaultSize: { w: 3, h: 6 },
     minSize: { w: 2, h: 4 },
+    settings: GPU_SETTINGS,
     component: lazy(() => import("./GpuWidget")),
   },
   {
@@ -101,6 +131,7 @@ const defs: WidgetDef[] = [
     keywords: ["memory", "swap", "page file"],
     defaultSize: { w: 4, h: 6 },
     minSize: { w: 3, h: 5 },
+    settings: RAM_SETTINGS,
     component: lazy(() => import("./RamWidget")),
   },
   {
@@ -113,6 +144,7 @@ const defs: WidgetDef[] = [
     keywords: ["disk", "drive", "ssd", "space", "volume"],
     defaultSize: { w: 5, h: 7 },
     minSize: { w: 3, h: 4 },
+    settings: STORAGE_SETTINGS,
     component: lazy(() => import("./StorageWidget")),
   },
   {
@@ -126,6 +158,7 @@ const defs: WidgetDef[] = [
     keywords: ["internet", "throughput", "bandwidth", "vpn", "adapter"],
     defaultSize: { w: 4, h: 7 },
     minSize: { w: 3, h: 5 },
+    settings: NETWORK_SETTINGS,
     component: lazy(() => import("./NetworkWidget")),
   },
   {
@@ -138,6 +171,7 @@ const defs: WidgetDef[] = [
     keywords: ["launcher", "apps", "shortcuts", "favorites"],
     defaultSize: { w: 4, h: 9 },
     minSize: { w: 2, h: 4 },
+    settings: QUICK_ACCESS_SETTINGS,
     component: lazy(() => import("./QuickAccessWidget")),
   },
   {
@@ -161,6 +195,7 @@ const defs: WidgetDef[] = [
     keywords: ["processes", "task manager", "running"],
     defaultSize: { w: 5, h: 9 },
     minSize: { w: 3, h: 5 },
+    settings: TASKS_SETTINGS,
     component: lazy(() => import("./TasksWidget")),
   },
   {
@@ -178,13 +213,16 @@ const defs: WidgetDef[] = [
   {
     type: "music",
     title: "Music Player",
-    description: "Now playing and media controls.",
+    description: "Now playing and controls. NETRUNNER tabs and music sites first; stays on its track when paused.",
     icon: Music,
-    status: "planned",
-    dataSource: "Planned via Windows media session controls (Phase 2+).",
-    keywords: ["media", "audio", "spotify", "soundcloud"],
+    status: "live",
+    dataSource:
+      "NETRUNNER browser tabs and web overlays (read from the page's own player), then other apps through Windows media sessions (Spotify, Chrome…). Apps that publish no media session cannot be shown.",
+    keywords: ["media", "audio", "spotify", "soundcloud", "now playing", "player"],
     defaultSize: { w: 4, h: 5 },
-    minSize: { w: 3, h: 4 },
+    minSize: { w: 3, h: 3 },
+    settings: MUSIC_SETTINGS,
+    component: lazy(() => import("./MusicWidget")),
   },
   {
     type: "activity",
@@ -196,6 +234,7 @@ const defs: WidgetDef[] = [
     keywords: ["log", "history", "events", "audit"],
     defaultSize: { w: 3, h: 10 },
     minSize: { w: 2, h: 4 },
+    settings: ACTIVITY_SETTINGS,
     component: lazy(() => import("./ActivityWidget")),
   },
   {
@@ -208,6 +247,7 @@ const defs: WidgetDef[] = [
     keywords: ["time", "date", "calendar"],
     defaultSize: { w: 3, h: 5 },
     minSize: { w: 2, h: 3 },
+    settings: CLOCK_SETTINGS,
     component: lazy(() => import("./ClockWidget")),
   },
   {
@@ -223,7 +263,29 @@ const defs: WidgetDef[] = [
     minSize: { w: 3, h: 4 },
     component: lazy(() => import("./ThermalWidget")),
   },
+  {
+    type: "image",
+    title: "Image",
+    description: "A picture of your choice, just for looks.",
+    icon: Image,
+    status: "live",
+    dataSource: "An image you added; NETRUNNER keeps its own copy (same library as backgrounds).",
+    keywords: ["picture", "photo", "wallpaper", "art", "картинка", "decoration"],
+    defaultSize: { w: 3, h: 6 },
+    minSize: { w: 1, h: 2 },
+    settings: IMAGE_SETTINGS,
+    component: lazy(() => import("./ImageWidget")),
+  },
 ];
+
+/** Frame settings followed by the widget's own settings. */
+export function widgetSchema(def: WidgetDef | undefined): WidgetSchema {
+  return def?.settings ? [...FRAME_SETTINGS, ...def.settings] : FRAME_SETTINGS;
+}
+
+export function widgetConfig(def: WidgetDef | undefined, raw: RawConfig | undefined): RawConfig {
+  return resolveConfig(widgetSchema(def), raw);
+}
 
 export const WIDGETS: Record<string, WidgetDef> = Object.fromEntries(defs.map((d) => [d.type, d]));
 export const WIDGET_TYPES = defs.map((d) => d.type);

@@ -2,6 +2,7 @@
 //! read-only OS data) and is independent of Tauri so it can be unit-tested.
 
 pub mod activity;
+pub mod appearance;
 pub mod automation;
 pub mod games;
 pub mod integrations;

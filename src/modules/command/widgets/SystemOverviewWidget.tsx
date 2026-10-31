@@ -3,8 +3,9 @@ import { Meter } from "@/components/Meter";
 import { formatBytes, formatDuration, formatPercent, formatRate } from "@/utils/format";
 import { MetricRow, Sampling } from "./common";
 import type { WidgetProps } from "./registry";
+import type { ConfigOf, SYSTEM_OVERVIEW_SETTINGS } from "./settings";
 
-export default function SystemOverviewWidget(_: WidgetProps) {
+export default function SystemOverviewWidget({ config: c }: WidgetProps<ConfigOf<typeof SYSTEM_OVERVIEW_SETTINGS>>) {
   const { snapshot } = useSystemSnapshot();
   if (!snapshot) return <Sampling />;
 
@@ -50,11 +51,13 @@ export default function SystemOverviewWidget(_: WidgetProps) {
         }
       />
       <div className="overview__grid">
-        <MetricRow
-          label="CPU temp"
-          value={cpuTemp ? `${cpuTemp.celsius.toFixed(0)} °C` : undefined}
-          unavailable={cpuTemp ? undefined : "Windows does not expose a CPU sensor to standard-user apps"}
-        />
+        {c.sensors && (
+          <MetricRow
+            label="CPU temp"
+            value={cpuTemp ? `${cpuTemp.celsius.toFixed(0)} °C` : undefined}
+            unavailable={cpuTemp ? undefined : "Windows does not expose a CPU sensor to standard-user apps"}
+          />
+        )}
         {snapshot.gpu?.usagePercent != null ? (
           <MetricRow
             label="GPU"
@@ -67,9 +70,9 @@ export default function SystemOverviewWidget(_: WidgetProps) {
             unavailable={snapshot.gpu ? undefined : "Windows GPU counters unavailable"}
           />
         )}
-        <MetricRow label="GPU temp" unavailable="Not exposed by Windows performance counters" />
-        <MetricRow label="Fans" unavailable="Windows has no standard fan interface for applications" />
-        {snapshot.diskIo ? (
+        {c.sensors && <MetricRow label="GPU temp" unavailable="Not exposed by Windows performance counters" />}
+        {c.sensors && <MetricRow label="Fans" unavailable="Windows has no standard fan interface for applications" />}
+        {!c.io ? null : snapshot.diskIo ? (
           <MetricRow
             label="Disk activity"
             value={`R ${formatRate(snapshot.diskIo.readBytesPerSec)} · W ${formatRate(snapshot.diskIo.writeBytesPerSec)}`}
