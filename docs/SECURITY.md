@@ -29,6 +29,24 @@
 
 The command policy is a safety net, not a sandbox: a confirmed command runs with your rights.
 
+## Browser
+
+| Layer | What it does |
+|---|---|
+| Isolation | Pages run in `web-*` webviews with their own WebView2 profile, separate from NETRUNNER's UI. No host objects, no web messages. Tauri's ACL refuses remote origins, and `lib.rs` rejects every command from a `web-*` webview regardless of origin |
+| Content blocking | Every request (including workers where supported) is checked by adblock-rust against the built-in list plus enabled lists (EasyList, EasyPrivacy, uBlock filters/privacy/badware, Peter Lowe, RU AdList; optional cookie banners and URLhaus malware URLs). Blocked requests get a local 403 and never leave the machine. Cosmetic rules hide leftover ad frames. Per-site off switch |
+| Tracking | WebView2 tracking prevention **Strict** by default; `Sec-GPC: 1` and `DNT: 1` on requests and `navigator.globalPrivacyControl` |
+| Transport | HTTPS-only: top-level `http://` navigations are upgraded (local network addresses exempt); the user can allow HTTP per site for the session. Invalid certificates show WebView2's interstitial |
+| Navigation | Only http(s), `about:`, `blob:`/`data:` pages. `file:` and custom schemes are refused; pages cannot launch external apps (`steam:`, `ms-settings:`…) |
+| Popups | `window.open` without a size opens a normal tab; sized popups (sign-in flows) open a hardened popup window |
+| Permissions | Camera, microphone, location, notifications, clipboard read, screen capture, MIDI, sensors, fonts, window management, multiple downloads and file-system access are denied unless the user allowed that site (stored in `browser_site_permissions`, revocable) |
+| Data entry | Password saving and form autofill are off by default |
+| Downloads | Default Downloads folder; SmartScreen reputation checks stay on (NETRUNNER's own webview disables SmartScreen, the browser profile does not) |
+| WebRTC | `--force-webrtc-ip-handling-policy=default_public_interface_only` hides local IP addresses (applies after restart) |
+| Private tabs | InPrivate WebView2 sessions; nothing is written to history |
+
+Not covered: in-page video ads served from the site's own domain (e.g. YouTube) need uBlock scriptlets, which are not bundled. Loading unpacked extensions (e.g. uBlock Origin Lite) is an opt-in setting; extensions run with the permissions they declare. Fingerprinting resistance beyond WebView2's defaults is not attempted.
+
 ## Credentials
 
 - **GitHub token:** validated against `/user`, then stored only in **Windows Credential Manager** (DPAPI) under `NETRUNNER / github-token`. It is never written to SQLite or logs and never returned to the UI. Disconnect deletes it.

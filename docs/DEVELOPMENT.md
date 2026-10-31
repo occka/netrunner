@@ -46,6 +46,7 @@ Implement a `fn x_games() -> (bool, Vec<Game>)` in `services/games.rs` (detected
 1. Create `src/modules/command/widgets/<Name>Widget.tsx` that default-exports `(props: WidgetProps) => JSX`.
 2. Add an entry to `widgets/registry.ts` with `status`, `dataSource` (an honest description of where the data comes from), `defaultSize`, `minSize` and a lazy `component`.
 3. For system metrics, use `useSystemSnapshot()` rather than a separate poller. If a value isn't available, render it as unavailable and give the reason. Never estimate it.
+4. Settings: declare a schema with `defineSettings([...])` in `widgets/settings.ts`, set it as `settings` in the registry entry, and type the component as `WidgetProps<ConfigOf<typeof MY_SETTINGS>>`. The Inspector and the OVERLAY dialog render the form; the widget only reads `config`.
 
 ## Adding a database migration
 

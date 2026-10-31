@@ -1,0 +1,267 @@
+/* ---------- Appearance: backgrounds, glass panels, effects ---------- */
+:root {
+  --panel-alpha: 1;
+  --panel-blur: 0px;
+}
+
+/* Panels and shell chrome use the surface colour at --panel-alpha so a
+   background can show through; with no background the result is unchanged. */
+.panel,
+.topbar,
+.nav,
+.statusbar,
+.inspector {
+  background: rgb(var(--c-surface-rgb) / var(--panel-alpha));
+  backdrop-filter: var(--panel-backdrop, none);
+}
+
+.backdrop {
+  overflow: hidden;
+  pointer-events: none;
+}
+.backdrop--app {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+}
+.backdrop--module {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.backdrop__image,
+.backdrop__pattern,
+.backdrop__dim {
+  position: absolute;
+  inset: 0;
+}
+.backdrop__dim {
+  background: var(--c-background);
+}
+.shell[data-backdrop="on"] {
+  background: transparent;
+}
+.shell[data-backdrop="on"] .workspace {
+  background: transparent;
+}
+
+/* The dashboard's own background sits under its header and grid. */
+.module--dashboard {
+  position: relative;
+}
+.module--dashboard > .module-head,
+.module--dashboard > .edit-banner,
+.module--dashboard > .dashboard-scroll {
+  position: relative;
+  z-index: 1;
+}
+
+/* Patterns are drawn in the theme colours. */
+.backdrop__pattern--grid {
+  background:
+    linear-gradient(rgb(var(--c-primary-rgb) / 0.14) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(90deg, rgb(var(--c-primary-rgb) / 0.14) 1px, transparent 1px) 0 0 / 32px 32px,
+    radial-gradient(ellipse at 50% 0%, rgb(var(--c-primary-rgb) / 0.18), transparent 70%),
+    var(--c-background);
+}
+.backdrop__pattern--dots {
+  background:
+    radial-gradient(rgb(var(--c-primary-rgb) / 0.35) 1px, transparent 1.6px) 0 0 / 18px 18px,
+    var(--c-background);
+}
+.backdrop__pattern--scanlines {
+  background:
+    repeating-linear-gradient(0deg, rgb(var(--c-primary-rgb) / 0.08) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, rgb(var(--c-secondary-rgb) / 0.12), transparent 60%),
+    var(--c-background);
+}
+.backdrop__pattern--circuit {
+  background:
+    linear-gradient(90deg, transparent 47px, rgb(var(--c-primary-rgb) / 0.2) 47px 49px, transparent 49px) 0 0 / 96px 96px,
+    linear-gradient(0deg, transparent 23px, rgb(var(--c-secondary-rgb) / 0.16) 23px 25px, transparent 25px) 0 0 / 96px 48px,
+    radial-gradient(circle at 48px 24px, rgb(var(--c-primary-rgb) / 0.5) 0 3px, transparent 4px) 0 0 / 96px 48px,
+    var(--c-background);
+}
+.backdrop__pattern--aurora {
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 30%, rgb(var(--c-primary-rgb) / 0.55), transparent 70%),
+    radial-gradient(ellipse 50% 60% at 80% 70%, rgb(var(--c-secondary-rgb) / 0.5), transparent 70%),
+    var(--c-background);
+  background-size: 200% 200%;
+  animation: nr-aurora 24s ease-in-out infinite alternate;
+}
+@keyframes nr-aurora {
+  from {
+    background-position: 0% 0%;
+  }
+  to {
+    background-position: 100% 100%;
+  }
+}
+:root[data-motion="reduced"] .backdrop__pattern--aurora {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .backdrop__pattern--aurora {
+    animation: none;
+  }
+}
+
+/* Effects. They draw over NETRUNNER's own UI only; browser pages are native views on top. */
+:root[data-fx-scanlines] .shell::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgb(0 0 0 / 0.16) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+:root[data-fx-vignette] .shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgb(0 0 0 / 0.55));
+}
+:root[data-fx-glow] .panel {
+  box-shadow:
+    0 0 0 1px rgb(var(--c-primary-rgb) / 0.18),
+    0 0 18px rgb(var(--c-primary-rgb) / 0.16);
+}
+:root[data-fx-glow] .panel__title,
+:root[data-fx-glow] .module-head h1,
+:root[data-fx-glow] .clock__time {
+  text-shadow: 0 0 10px rgb(var(--c-primary-rgb) / 0.55);
+}
+
+/* ---------- Appearance settings ---------- */
+.appearance-bg {
+  display: grid;
+  gap: 10px;
+}
+.wallpapers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+.wallpaper {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 1px solid var(--c-line);
+  background: var(--c-background) center / cover no-repeat;
+  cursor: pointer;
+}
+.wallpaper[aria-pressed="true"] {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 1px;
+}
+.wallpaper__del {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  opacity: 0;
+  background: rgb(0 0 0 / 0.6);
+}
+.wallpaper:hover .wallpaper__del {
+  opacity: 1;
+}
+.wallpaper--add {
+  display: grid;
+  place-items: center;
+  color: var(--c-muted);
+  border-style: dashed;
+}
+.pattern-swatch {
+  position: relative;
+  overflow: hidden;
+}
+.pattern-swatch .backdrop__pattern {
+  position: absolute;
+  inset: 0;
+}
+.pattern-swatch span {
+  position: absolute;
+  left: 6px;
+  bottom: 4px;
+  font-size: var(--fs-xs);
+  color: var(--c-text);
+  text-shadow: 0 1px 2px #000;
+}
+.appearance-sliders {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px 18px;
+}
+.appearance-sliders label {
+  display: grid;
+  gap: 4px;
+}
+.appearance-sliders input[type="range"] {
+  width: 100%;
+  accent-color: var(--c-primary);
+}
+.appearance-sliders .row {
+  display: flex;
+  justify-content: space-between;
+}
+.settings-row--stack {
+  display: grid;
+  gap: 10px;
+  /* .settings-row's space-between would shrink the grid column to its content. */
+  justify-content: stretch;
+  align-items: start;
+}
+.settings-row--stack > * {
+  width: 100%;
+  min-width: 0;
+}
+.appearance-effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.appearance-bg > .segmented {
+  justify-self: start;
+}
+/* Pages without panels keep a readable surface over a background. */
+.shell[data-backdrop="on"] .browser__start {
+  background: rgb(var(--c-background-rgb) / 0.82);
+}
+
+/* ---------- Image widget ---------- */
+.imgw {
+  position: relative;
+  display: grid;
+  height: 100%;
+  margin: 0;
+}
+.imgw img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+/* Edge to edge: fill the body, ignoring its padding. */
+.panel__body:has(> .imgw--bleed),
+.overlay__body:has(> .imgw--bleed) {
+  position: relative;
+}
+.imgw--bleed {
+  position: absolute;
+  inset: 0;
+}
+.imgw__caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 18px 10px 8px;
+  background: linear-gradient(transparent, rgb(0 0 0 / 0.7));
+  color: #fff;
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: var(--fs-sm);
+}

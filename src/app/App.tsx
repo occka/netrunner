@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertOctagon } from "lucide-react";
-import { useSettings } from "@/stores/settings";
+import { useAppearance, useSettings } from "@/stores/settings";
 import { useProfiles } from "@/stores/profiles";
 import { useQuickAccess } from "@/stores/quickAccess";
 import { refreshActivity } from "@/stores/activity";
@@ -40,6 +40,7 @@ export function App() {
   }, []);
 
   useEffect(() => applyTheme(theme), [theme]);
+  useAppearance();
 
   useEffect(() => {
     const root = document.documentElement;

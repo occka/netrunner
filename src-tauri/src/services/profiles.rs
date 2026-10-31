@@ -92,6 +92,25 @@ pub fn save_layout(conn: &Connection, id: i64, layout: &Value) -> AppResult<Prof
     get(conn, id)
 }
 
+/// Replaces one widget's settings without touching the rest of the layout, so
+/// a settings change can never overwrite an in-progress layout edit.
+pub fn set_widget_config(conn: &Connection, id: i64, widget_id: &str, config: &Value) -> AppResult<Profile> {
+    validate_config(config)?;
+    let mut layout = get(conn, id)?.layout;
+    let widget = layout
+        .get_mut("widgets")
+        .and_then(Value::as_array_mut)
+        .and_then(|list| list.iter_mut().find(|w| w.get("id").and_then(Value::as_str) == Some(widget_id)))
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| AppError::NotFound(format!("widget {widget_id} is not in this layout")))?;
+    if config.as_object().is_some_and(|o| o.is_empty()) {
+        widget.remove("config");
+    } else {
+        widget.insert("config".into(), config.clone());
+    }
+    save_layout(conn, id, &layout)
+}
+
 /// Deletes a custom profile. Built-in profiles and the active profile are kept.
 pub fn delete(conn: &Connection, id: i64) -> AppResult<()> {
     let profile = get(conn, id)?;
@@ -163,6 +182,21 @@ fn validate_layout(layout: &Value) -> AppResult<()> {
         if !ok {
             return Err(AppError::Invalid("each widget needs id, type, x, y, w and h".into()));
         }
+        if let Some(config) = widget.get("config") {
+            validate_config(config)?;
+        }
+    }
+    Ok(())
+}
+
+/// Widget settings are an opaque object owned by the frontend schema; only
+/// its shape and size are checked here.
+pub fn validate_config(config: &Value) -> AppResult<()> {
+    if !config.is_object() {
+        return Err(AppError::Invalid("widget settings must be an object".into()));
+    }
+    if serde_json::to_string(config)?.len() > 8 * 1024 {
+        return Err(AppError::Invalid("widget settings are too large".into()));
     }
     Ok(())
 }
@@ -273,5 +307,26 @@ mod tests {
         assert!(save_layout(&conn, id, &json!({"widgets": [{"id": "a"}]})).is_err());
         let ok = json!({"version": 1, "widgets": [widget("a", "clock", 0, 0, 3, 4)]});
         assert_eq!(save_layout(&conn, id, &ok).unwrap().layout, ok);
+        let bad = json!({"version": 1, "widgets": [{"id": "a", "type": "clock", "x": 0, "y": 0, "w": 3, "h": 4, "config": [1]}]});
+        assert!(save_layout(&conn, id, &bad).is_err());
+    }
+
+    #[test]
+    fn widget_config_is_set_and_cleared() {
+        let db = Database::open_in_memory().unwrap();
+        let conn = db.conn().unwrap();
+        ensure_seeded(&conn).unwrap();
+        let id = list(&conn).unwrap()[0].id;
+        let p = set_widget_config(&conn, id, "clock", &json!({"hourCycle": "h12"})).unwrap();
+        let clock = p.layout["widgets"].as_array().unwrap().iter().find(|w| w["id"] == "clock").unwrap().clone();
+        assert_eq!(clock["config"]["hourCycle"], "h12");
+        assert_eq!(clock["x"], 9, "position is untouched");
+        let p = set_widget_config(&conn, id, "clock", &json!({})).unwrap();
+        let clock = p.layout["widgets"].as_array().unwrap().iter().find(|w| w["id"] == "clock").unwrap().clone();
+        assert!(clock.get("config").is_none());
+        assert!(set_widget_config(&conn, id, "missing", &json!({})).is_err());
+        assert!(set_widget_config(&conn, id, "clock", &json!("x")).is_err());
+        let huge = json!({ "frame.title": "x".repeat(9000) });
+        assert!(set_widget_config(&conn, id, "clock", &huge).is_err());
     }
 }

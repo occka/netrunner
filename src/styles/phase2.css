@@ -359,3 +359,7 @@
     grid-template-columns: 1fr;
   }
 }
+.opacity > .mono {
+  min-width: 5ch;
+  text-align: right;
+}

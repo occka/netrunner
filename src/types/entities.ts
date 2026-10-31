@@ -49,6 +49,8 @@ export interface WidgetInstance {
   y: number;
   w: number;
   h: number;
+  /** Widget settings that differ from the defaults (see widgets/settings.ts). */
+  config?: Record<string, unknown>;
 }
 
 export interface DashboardLayout {

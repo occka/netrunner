@@ -21,7 +21,7 @@ import { useProfiles, PROFILE_KIND_LABEL } from "@/stores/profiles";
 import { useShell } from "@/stores/shell";
 import { useDashboard } from "@/stores/dashboard";
 import { reportError } from "@/stores/notifications";
-import { WIDGETS, WIDGET_STATUS_LABEL } from "@/modules/command/widgets/registry";
+import { WIDGETS, WIDGET_STATUS_LABEL, widgetSchema } from "@/modules/command/widgets/registry";
 import { ENTRY_KIND_META, entryActionLabel, entryHasLocation, entryIcon } from "@/modules/quick-access/entryMeta";
 import { formatRelative, parseDbTime } from "@/utils/format";
 import type { NrObject, ObjectRef } from "@/objects/types";
@@ -110,7 +110,19 @@ function widgetObject(id: string): NrObject | null {
       { label: "Instance", value: instance.id, mono: true },
       { label: "Position", value: `col ${instance.x + 1}, row ${instance.y + 1}`, mono: true },
       { label: "Size", value: `${instance.w} × ${instance.h}`, mono: true },
+      { label: "Custom settings", value: String(Object.keys(instance.config ?? {}).length), mono: true },
     ],
+    settings: def
+      ? {
+          schema: widgetSchema(def),
+          config: instance.config,
+          onChange: (config) => {
+            // During EDIT LAYOUT settings go into the draft and are saved with it.
+            if (dash.editing && dash.draft) dash.setConfig(id, config);
+            else if (profiles.activeId != null) profiles.setWidgetConfig(profiles.activeId, id, config);
+          },
+        }
+      : undefined,
     actions: [
       {
         id: "edit-layout",

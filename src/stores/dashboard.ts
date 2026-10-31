@@ -15,6 +15,7 @@ interface DashboardStore {
   setPositions: (positions: Pick<WidgetInstance, "id" | "x" | "y" | "w" | "h">[]) => void;
   addWidget: (widget: WidgetInstance) => void;
   removeWidget: (id: string) => void;
+  setConfig: (id: string, config: Record<string, unknown>) => void;
   end: () => void;
 }
 
@@ -42,6 +43,12 @@ export const useDashboard = create<DashboardStore>((set) => ({
   removeWidget: (id) =>
     set((s) =>
       s.draft ? { draft: { ...s.draft, widgets: s.draft.widgets.filter((w) => w.id !== id) }, dirty: true } : s,
+    ),
+  setConfig: (id, config) =>
+    set((s) =>
+      s.draft
+        ? { draft: { ...s.draft, widgets: s.draft.widgets.map((w) => (w.id === id ? { ...w, config } : w)) }, dirty: true }
+        : s,
     ),
   end: () => set({ editing: false, draft: null, dirty: false, profileId: null }),
 }));

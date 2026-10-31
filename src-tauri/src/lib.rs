@@ -6,6 +6,7 @@
 //! Tauri runtime (tray, windows, background events). See docs/ARCHITECTURE.md.
 
 mod automation;
+mod browser;
 mod commands;
 mod dev;
 mod desktop;
@@ -25,6 +26,21 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 use services::activity::{self, Level};
 use state::AppState;
 use storage::Database;
+
+/// Defence in depth on top of Tauri's ACL (which already refuses remote
+/// origins): nothing running in a browser tab or web overlay (`web-*`
+/// webviews) may call a NETRUNNER command, whatever page it shows.
+fn guarded<R: tauri::Runtime>(
+    handler: impl Fn(tauri::ipc::Invoke<R>) -> bool + Send + Sync + 'static,
+) -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Send + Sync + 'static {
+    move |invoke| {
+        if invoke.message.webview_ref().label().starts_with(browser::LABEL_PREFIX) {
+            invoke.resolver.reject("NETRUNNER commands are not available to web pages");
+            return true;
+        }
+        handler(invoke)
+    }
+}
 
 pub fn run() {
     let overlay_hotkey = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyO);
@@ -65,6 +81,9 @@ pub fn run() {
                 services::profiles::ensure_seeded(&conn)?;
                 activity::record(&conn, Level::Info, "core", &format!("NETRUNNER {} started", app.package_info().version));
             }
+            let prefs = browser::Prefs::load(&*db.conn()?);
+            let local_dir = app.path().app_local_data_dir()?;
+            app.manage(browser::Browser::new(&data_dir, &local_dir, prefs));
             app.manage(AppState::new(db, data_dir));
             app.manage(dev::terminal::Terminals::default());
 
@@ -76,12 +95,13 @@ pub fn run() {
                 log::warn!("overlay hotkey Ctrl+Alt+O unavailable: {err}");
             }
             overlay::restore_on_startup(&handle);
+            browser::start_blocker(handle.clone(), false);
             automation::start_process_watcher(handle.clone());
             std::thread::spawn(move || automation::fire(&handle, "netrunner_start", ""));
             Ok(())
         })
         .on_window_event(desktop::handle_window_event)
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(guarded(tauri::generate_handler![
             commands::app::app_info,
             commands::app::app_autostart_get,
             commands::app::app_autostart_set,
@@ -91,11 +111,16 @@ pub fn run() {
             commands::app::app_install_update,
             commands::settings::settings_get_all,
             commands::settings::settings_set,
+            commands::settings::appearance_wallpapers,
+            commands::settings::appearance_import_wallpaper,
+            commands::settings::appearance_delete_wallpaper,
+            commands::settings::appearance_wallpaper_data,
             commands::profiles::profiles_state,
             commands::profiles::profile_create,
             commands::profiles::profile_rename,
             commands::profiles::profile_delete,
             commands::profiles::profile_save_layout,
+            commands::profiles::profile_set_widget_config,
             commands::profiles::profile_activate,
             commands::quick_access::qa_list,
             commands::quick_access::qa_create,
@@ -193,7 +218,36 @@ pub fn run() {
             commands::files::files_open,
             commands::files::files_reveal,
             commands::files::files_search,
-        ])
+            commands::overlay::overlay_create_web,
+            commands::browser::browser_status,
+            commands::browser::browser_prefs_changed,
+            commands::browser::browser_update_lists,
+            commands::browser::browser_tabs,
+            commands::browser::browser_open,
+            commands::browser::browser_navigate,
+            commands::browser::browser_action,
+            commands::browser::browser_close,
+            commands::browser::browser_set_bounds,
+            commands::browser::browser_set_zoom,
+            commands::browser::browser_allow_http,
+            commands::browser::browser_clear_data,
+            commands::browser::browser_downloads,
+            commands::browser::browser_bookmarks,
+            commands::browser::browser_bookmark_add,
+            commands::browser::browser_bookmark_rename,
+            commands::browser::browser_bookmark_remove,
+            commands::browser::browser_history,
+            commands::browser::browser_history_clear,
+            commands::browser::browser_permissions,
+            commands::browser::browser_permission_set,
+            commands::browser::browser_pop_out,
+            commands::browser::browser_overlay_tab,
+            commands::browser::browser_media,
+            commands::browser::browser_media_control,
+            commands::browser::browser_media_artwork,
+            commands::system::media_status,
+            commands::system::media_control,
+        ]))
         .run(tauri::generate_context!())
         .expect("error while running NETRUNNER");
 }

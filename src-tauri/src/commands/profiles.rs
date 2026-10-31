@@ -49,6 +49,12 @@ pub async fn profile_save_layout(state: State<'_, AppState>, id: i64, layout: Va
     Ok(profile)
 }
 
+/// Widget settings change often (sliders), so this is not written to the activity log.
+#[tauri::command]
+pub async fn profile_set_widget_config(state: State<'_, AppState>, id: i64, widget_id: String, config: Value) -> AppResult<Profile> {
+    profiles::set_widget_config(&*state.db.conn()?, id, &widget_id, &config)
+}
+
 #[tauri::command]
 pub async fn profile_activate(app: tauri::AppHandle, state: State<'_, AppState>, id: i64) -> AppResult<Profile> {
     let profile = {

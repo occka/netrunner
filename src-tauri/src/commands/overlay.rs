@@ -25,6 +25,14 @@ pub async fn overlay_create(app: AppHandle, state: State<'_, AppState>, widget_t
 }
 
 #[tauri::command]
+pub async fn overlay_create_web(app: AppHandle, state: State<'_, AppState>, url: String, title: String) -> AppResult<Overlay> {
+    let o = overlays::create_web(&*state.db.conn()?, &url, &title)?;
+    overlay::open(&app, &o)?;
+    activity::record(&*state.db.conn()?, Level::Info, "overlay", &format!("Created web overlay for {}", o.url));
+    Ok(o)
+}
+
+#[tauri::command]
 pub async fn overlay_patch(app: AppHandle, state: State<'_, AppState>, id: i64, patch: OverlayPatch) -> AppResult<Overlay> {
     let o = overlays::patch(&*state.db.conn()?, id, &patch)?;
     overlay::apply(&app, &o);

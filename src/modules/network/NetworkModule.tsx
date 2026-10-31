@@ -4,7 +4,7 @@ import { ModuleHeader } from "@/components/ModuleHeader";
 import { api } from "@/services/api";
 import { usePolled } from "@/hooks/usePolled";
 import { useSystemSnapshot } from "@/hooks/useSystemSnapshot";
-import { WIDGETS } from "@/modules/command/widgets/registry";
+import { WIDGETS, widgetConfig } from "@/modules/command/widgets/registry";
 import { CONNECTIVITY_LABEL } from "@/modules/command/widgets/NetworkWidget";
 import { Sampling } from "@/modules/command/widgets/common";
 import { formatRate } from "@/utils/format";
@@ -75,7 +75,7 @@ export default function NetworkModule() {
             </header>
             <div className="panel__body">
               <Suspense fallback={<Sampling />}>
-                <Throughput instanceId="network-module" editing={false} />
+                <Throughput instanceId="network-module" editing={false} config={widgetConfig(WIDGETS.network, undefined)} host="dashboard" />
               </Suspense>
             </div>
           </section>

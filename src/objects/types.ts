@@ -3,6 +3,7 @@
  * Inspector, command palette and (later) AI context share one representation.
  */
 import type { LucideIcon } from "lucide-react";
+import type { WidgetSchema } from "@/modules/command/widgets/settings";
 
 export type ObjectType = "qa-entry" | "widget" | "module" | "profile";
 
@@ -41,6 +42,12 @@ export interface NrObject {
   summary?: string;
   details: ObjectDetail[];
   actions: ObjectAction[];
+  /** Editable settings, shown as the Inspector's SETTINGS tab. */
+  settings?: {
+    schema: WidgetSchema;
+    config: Record<string, unknown> | undefined;
+    onChange: (config: Record<string, unknown>) => void;
+  };
 }
 
 export function refKey(ref: ObjectRef): string {

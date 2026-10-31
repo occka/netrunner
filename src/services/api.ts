@@ -16,6 +16,16 @@ import type {
   TermEvent,
   Toolchain,
 } from "@/types/dev";
+import type {
+  Bookmark,
+  BrowserDownload,
+  BrowserStatus,
+  BrowserTab,
+  HistoryEntry,
+  MediaStatus,
+  SitePermission,
+  TabMedia,
+} from "@/types/browser";
 import type { Attachment, ChatState, ContextItem, FileEntry, FilePreview, ModelInfo, NeuralStatus, Places, StreamEvent } from "@/types/neural";
 import type {
   ActivityEntry,
@@ -88,6 +98,8 @@ export const api = {
     rename: (id: number, name: string) => call<Profile>("profile_rename", { id, name }),
     remove: (id: number) => call<void>("profile_delete", { id }),
     saveLayout: (id: number, layout: DashboardLayout) => call<Profile>("profile_save_layout", { id, layout }),
+    setWidgetConfig: (id: number, widgetId: string, config: Record<string, unknown>) =>
+      call<Profile>("profile_set_widget_config", { id, widgetId, config }),
     activate: (id: number) => call<Profile>("profile_activate", { id }),
   },
 
@@ -237,12 +249,56 @@ export const api = {
     list: () => call<Overlay[]>("overlay_list"),
     get: (id: number) => call<Overlay>("overlay_get", { id }),
     create: (widgetType: string) => call<Overlay>("overlay_create", { widgetType }),
-    patch: (id: number, patch: Partial<Pick<Overlay, "opacity" | "locked" | "showOnStartup">>) =>
+    createWeb: (url: string, title: string) => call<Overlay>("overlay_create_web", { url, title }),
+    patch: (id: number, patch: Partial<Pick<Overlay, "opacity" | "locked" | "showOnStartup" | "config" | "title">>) =>
       call<Overlay>("overlay_patch", { id, patch }),
     setGeometry: (id: number, x: number, y: number, width: number, height: number) =>
       call<void>("overlay_set_geometry", { id, x, y, width, height }),
     setVisible: (id: number, visible: boolean) => call<void>("overlay_set_visible", { id, visible }),
     remove: (id: number) => call<void>("overlay_delete", { id }),
     toggleAll: () => call<void>("overlay_toggle_all"),
+  },
+
+  browser: {
+    status: () => call<BrowserStatus>("browser_status"),
+    updateLists: () => call<[string, string][]>("browser_update_lists"),
+    tabs: () => call<BrowserTab[]>("browser_tabs"),
+    open: (input: string, isPrivate = false) => call<BrowserTab>("browser_open", { input, private: isPrivate }),
+    navigate: (id: string, input: string) => call<void>("browser_navigate", { id, input }),
+    action: (id: string, action: "back" | "forward" | "reload" | "stop" | "mute" | "unmute") =>
+      call<void>("browser_action", { id, action }),
+    close: (id: string) => call<void>("browser_close", { id }),
+    setBounds: (id: string, x: number, y: number, width: number, height: number, visible: boolean) =>
+      call<void>("browser_set_bounds", { id, x, y, width, height, visible }),
+    setZoom: (id: string, factor: number) => call<void>("browser_set_zoom", { id, factor }),
+    allowHttp: (id: string, url: string) => call<void>("browser_allow_http", { id, url }),
+    clearData: () => call<void>("browser_clear_data"),
+    downloads: () => call<BrowserDownload[]>("browser_downloads"),
+    bookmarks: () => call<Bookmark[]>("browser_bookmarks"),
+    addBookmark: (url: string, title: string) => call<Bookmark>("browser_bookmark_add", { url, title }),
+    renameBookmark: (id: number, title: string) => call<void>("browser_bookmark_rename", { id, title }),
+    removeBookmark: (id: number) => call<void>("browser_bookmark_remove", { id }),
+    history: (query: string, limit = 200) => call<HistoryEntry[]>("browser_history", { query, limit }),
+    clearHistory: () => call<void>("browser_history_clear"),
+    permissions: () => call<SitePermission[]>("browser_permissions"),
+    setPermission: (host: string, kind: string, granted: boolean) => call<void>("browser_permission_set", { host, kind, granted }),
+    popOut: (id: string) => call<Overlay>("browser_pop_out", { id }),
+    overlayTab: (overlayId: number) => call<BrowserTab>("browser_overlay_tab", { overlayId }),
+    media: () => call<TabMedia[]>("browser_media"),
+    mediaControl: (id: string, action: "toggle" | "play" | "pause" | "nexttrack" | "previoustrack" | "stop") =>
+      call<void>("browser_media_control", { id, action }),
+    mediaArtwork: (url: string) => call<string | null>("browser_media_artwork", { url }),
+  },
+
+  appearance: {
+    wallpapers: () => call<{ name: string; sizeBytes: number }[]>("appearance_wallpapers"),
+    importWallpaper: (path: string) => call<{ name: string; sizeBytes: number }>("appearance_import_wallpaper", { path }),
+    deleteWallpaper: (name: string) => call<void>("appearance_delete_wallpaper", { name }),
+    wallpaperData: (name: string) => call<string>("appearance_wallpaper_data", { name }),
+  },
+
+  media: {
+    status: () => call<MediaStatus>("media_status"),
+    control: (appId: string, action: "toggle" | "next" | "previous" | "stop") => call<void>("media_control", { appId, action }),
   },
 };

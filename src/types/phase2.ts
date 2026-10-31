@@ -126,4 +126,9 @@ export interface Overlay {
   locked: boolean;
   visible: boolean;
   showOnStartup: boolean;
+  /** Widget settings (frame + content), see widgets/settings.ts. */
+  config: Record<string, unknown>;
+  /** Web overlays (widgetType "web"): the page shown. */
+  url: string;
+  title: string;
 }

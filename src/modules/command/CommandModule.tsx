@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { LayoutGrid, Plus, Save, Undo2, X } from "lucide-react";
+import { LayoutGrid, Palette, Plus, Save, Undo2, X } from "lucide-react";
+import { Backdrop } from "@/components/Backdrop";
+import { useSetting } from "@/stores/settings";
 import { ModuleHeader } from "@/components/ModuleHeader";
 import { useActiveProfile, useProfiles } from "@/stores/profiles";
 import { useDashboard } from "@/stores/dashboard";
@@ -14,6 +16,7 @@ export default function CommandModule() {
   const { editing, draft, dirty, profileId, begin, end } = useDashboard();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const dashBackground = useSetting("appearance.dashboard_background");
   const layout = editing && draft ? draft : profile?.layout;
 
   // A profile switch mid-edit discards the draft instead of saving it elsewhere.
@@ -65,6 +68,7 @@ export default function CommandModule() {
 
   return (
     <div className="module module--dashboard">
+      <Backdrop spec={dashBackground} className="backdrop--module" />
       <ModuleHeader
         id="command"
         subtitle={
@@ -87,9 +91,14 @@ export default function CommandModule() {
             </button>
           </>
         ) : (
-          <button className="btn" onClick={() => begin(profile.layout, profile.id)}>
-            <LayoutGrid size={14} /> Edit layout
-          </button>
+          <>
+            <button className="btn btn--ghost" title="Backgrounds, glass panels, fonts, effects" onClick={() => useShell.getState().navigate("settings", "appearance")}>
+              <Palette size={14} /> Customize
+            </button>
+            <button className="btn" onClick={() => begin(profile.layout, profile.id)}>
+              <LayoutGrid size={14} /> Edit layout
+            </button>
+          </>
         )}
       </ModuleHeader>
 

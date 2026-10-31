@@ -5,6 +5,7 @@
 
 pub mod activity;
 pub mod app;
+pub mod browser;
 pub mod dev;
 pub mod files;
 pub mod library;

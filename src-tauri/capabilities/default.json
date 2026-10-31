@@ -14,6 +14,9 @@
     "core:window:allow-set-focus",
     "core:window:allow-start-dragging",
     "core:window:allow-start-resize-dragging",
+    "core:window:allow-set-fullscreen",
+    "core:webview:allow-set-webview-focus",
+    "core:webview:allow-set-webview-zoom",
     "dialog:allow-open",
     "log:default"
   ]
