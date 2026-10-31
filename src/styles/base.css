@@ -1,0 +1,156 @@
+/* Non-colour design tokens. Colour tokens (--c-*) are written by theme.ts. */
+:root {
+  --font-display: "Chakra Petch", "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+
+  --fs-xs: 10.5px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 20px;
+  --fs-xxl: 30px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+
+  --radius: 2px;
+  --chamfer: 8px;
+
+  --topbar-h: 44px;
+  --statusbar-h: 24px;
+  --nav-w: 52px;
+  --nav-w-open: 208px;
+
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  /* Derived colours. */
+  --c-line: rgb(var(--c-border-rgb) / 1);
+  --c-line-soft: rgb(var(--c-border-rgb) / 0.55);
+  --c-primary-soft: rgb(var(--c-primary-rgb) / 0.12);
+  --c-primary-glow: rgb(var(--c-primary-rgb) / 0.35);
+  --c-secondary-soft: rgb(var(--c-secondary-rgb) / 0.12);
+  --c-hover: rgb(var(--c-text-rgb) / 0.05);
+  --c-active: rgb(var(--c-text-rgb) / 0.09);
+
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+  }
+}
+:root[data-motion="reduced"] {
+  --dur-fast: 0ms;
+  --dur: 0ms;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--c-background);
+  color: var(--c-text);
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  line-height: 1.45;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+input,
+textarea,
+[data-selectable] {
+  user-select: text;
+}
+
+a {
+  color: var(--c-secondary);
+}
+
+:focus-visible {
+  outline: 1px solid var(--c-primary);
+  outline-offset: 1px;
+}
+
+::selection {
+  background: var(--c-primary-soft);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--c-line);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--c-muted);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Typography helpers */
+.label {
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--c-muted);
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

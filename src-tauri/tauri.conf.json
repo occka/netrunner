@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "NETRUNNER",
+  "version": "0.4.0",
+  "identifier": "com.netrunner.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "NETRUNNER",
+        "width": 1480,
+        "height": 920,
+        "minWidth": 1100,
+        "minHeight": 680,
+        "decorations": false,
+        "center": true,
+        "backgroundColor": "#0b0d10"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src ipc: http://ipc.localhost; worker-src 'self' blob:"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcwMjczRjc1RTMwMkI2Q0MKUldUTXRnTGpkVDhuY0tlU3p6Y2ppbEQ4a0RFTDVWakNrUXBwMmxRYXNheDF3dFVLNkk4RThHU08K",
+      "endpoints": ["https://github.com/occka/netrunner/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": true,
+    "targets": ["nsis", "msi"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
