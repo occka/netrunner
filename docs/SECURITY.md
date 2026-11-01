@@ -19,7 +19,7 @@
 | Game URIs | Protocol allowlist (steam, epic, gog, uplay/ubisoft, origin, battlenet, xbox) |
 | Games from the library | Resolved by library id from launcher data; Prism instance ids are quoted |
 | Shell command entries | `command_policy` flags destructive patterns. Flagged or marked commands return `confirmation_required` until confirmed |
-| Automation | Never runs a command that needs confirmation; asks the UI instead. Rate-limited and depth-limited |
+| Automation | Never runs a command that needs confirmation; asks the UI instead. Rate-limited and depth-limited. URLs open only as http(s) BROWSER tabs; folder triggers only list file names; the dry run never runs anything |
 | Process termination | UI confirmation plus backend `confirmed` flag; protected system processes and NETRUNNER itself are refused |
 | Startup entries | Only per-user entries can be toggled (Explorer's reversible StartupApproved flag; nothing is deleted) |
 | Project files | Canonicalised paths must stay inside opened project roots; `..` rejected; `.git` read-only; deletes go to the Recycle Bin |

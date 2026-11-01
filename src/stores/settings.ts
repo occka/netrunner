@@ -35,6 +35,11 @@ export interface SettingsSchema {
   "app.start_minimized": boolean;
   /** Check GitHub releases for an update at startup. */
   "app.update_check": boolean;
+  "games.view": "list" | "banners";
+  "games.sort": "name" | "playtime" | "recent" | "launcher";
+  "games.period": "today" | "week" | "month" | "all";
+  /** Read by the backend playtime tracker: library ids whose time is not counted (tools such as Wallpaper Engine). */
+  "games.untracked": string[];
   /** Read by the backend (overlay_snap.rs): overlays stick to screen edges and to each other. */
   "overlay.snap": boolean;
   // BROWSER: read by the backend (browser/mod.rs `Prefs`). Changing one reloads them.
@@ -84,6 +89,10 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "app.start_minimized": true,
   "app.update_check": true,
   "overlay.snap": true,
+  "games.view": "list",
+  "games.sort": "name",
+  "games.period": "week",
+  "games.untracked": [],
   "browser.adblock": true,
   "browser.cosmetic": true,
   "browser.https_only": true,

@@ -4,12 +4,14 @@
 pub mod activity;
 pub mod alarms;
 pub mod appearance;
+pub mod artwork;
 pub mod automation;
 pub mod games;
 pub mod integrations;
 pub mod launcher;
 pub mod notes;
 pub mod overlays;
+pub mod playtime;
 pub mod profiles;
 pub mod quick_access;
 pub mod settings;

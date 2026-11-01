@@ -414,6 +414,7 @@ fn on_download(app: &AppHandle, label: &str, event: DownloadEvent<'_>) -> bool {
             notice(app, label, "download", url.host_str().unwrap_or(""), url.as_str());
         }
         DownloadEvent::Finished { url, path, success } => {
+            let file = path.as_ref().map(|p| p.display().to_string());
             if let Ok(mut d) = browser.downloads.lock() {
                 if let Some(entry) = d.iter_mut().rev().find(|x| x.url == url.as_str() && x.state == "running") {
                     entry.state = if success { "done" } else { "failed" }.into();
@@ -421,6 +422,9 @@ fn on_download(app: &AppHandle, label: &str, event: DownloadEvent<'_>) -> bool {
                 }
             }
             let _ = app.emit("browser://downloads", ());
+            if let (true, Some(file)) = (success, file) {
+                crate::automation::fire(app, "download_finished", &file);
+            }
         }
         _ => {}
     }

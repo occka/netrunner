@@ -1,6 +1,5 @@
-import { useState } from "react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { FolderSearch, Pencil, Play, Plus, Trash2, Workflow } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, CheckCircle2, CircleSlash, FlaskConical, Pencil, Play, Plus, Trash2, Workflow, X } from "lucide-react";
 import { ModuleHeader } from "@/components/ModuleHeader";
 import { Dialog } from "@/components/Dialog";
 import { api } from "@/services/api";
@@ -10,56 +9,168 @@ import { useProfiles } from "@/stores/profiles";
 import { confirmAction } from "@/stores/confirm";
 import { notify, reportError } from "@/stores/notifications";
 import { refreshActivity } from "@/stores/activity";
-import { WIDGETS } from "@/modules/command/widgets/registry";
 import { formatRelative, parseDbTime } from "@/utils/format";
-import type { ActionKind, AutomationInput, AutomationRule, Overlay, TriggerKind } from "@/types/phase2";
+import { ValueInput, type Choices } from "./ValueInput";
+import type { ActionKind, AutomationInput, AutomationRule, ConditionKind, DryRun, RuleAction, RuleCondition, TriggerKind } from "@/types/phase2";
 
-const TRIGGERS: Record<TriggerKind, string> = {
+export const TRIGGERS: Record<TriggerKind, string> = {
   netrunner_start: "NETRUNNER starts",
+  manual: "Manual (Run button only)",
   app_started: "Application starts",
   app_stopped: "Application closes",
   profile_changed: "Profile changes",
-  manual: "Manual (Run button only)",
+  time: "At a time of day",
+  interval: "Every N minutes",
+  file_created: "New file in a folder",
+  download_finished: "BROWSER download finished",
+  network_up: "Network adapter connects",
+  network_down: "Network adapter disconnects",
+  game_started: "Game starts",
+  game_stopped: "Game closes",
+  power_source: "Power source changes",
+  power_plan: "Power plan changes",
 };
-const ACTIONS: Record<ActionKind, string> = {
+export const CONDITIONS: Record<ConditionKind, string> = {
+  profile: "Profile is active",
+  time_between: "Time is between",
+  weekday: "Day of the week is",
+  process_running: "Application is running",
+  process_not_running: "Application is not running",
+  power_source: "Running on",
+  vpn: "VPN-type adapter is",
+};
+export const ACTIONS: Record<ActionKind, string> = {
   launch_program: "Launch program",
   launch_entry: "Launch Quick Access entry",
   switch_profile: "Switch profile",
   notify: "Show notification",
   show_overlay: "Show overlay",
   hide_overlay: "Hide overlay",
+  show_overlay_set: "Show overlay set",
+  hide_overlay_set: "Hide overlay set",
+  set_volume: "Set volume",
+  power_plan: "Switch power plan",
+  open_url: "Open page in BROWSER",
+  wait: "Wait",
 };
+
+/** Lists the editors choose from, loaded once for the module. */
+function useChoices(): Choices {
+  const entries = useQuickAccess((s) => s.entries);
+  const profiles = useProfiles((s) => s.profiles);
+  const overlays = usePolled(() => api.overlays.list());
+  const games = usePolled(() => api.games.scan());
+  const power = usePolled(() => api.system.power());
+  const network = usePolled(() => api.network.status());
+  return useMemo(
+    () => ({
+      entries: entries.map((e) => ({ id: String(e.id), label: `${e.name} (${e.kind})` })),
+      profiles: profiles.map((p) => ({ id: String(p.id), label: p.name })),
+      overlays: (overlays.data ?? []).map((o) => ({
+        id: String(o.id),
+        label: `#${o.id} ${(o.config["frame.title"] as string) || o.title || o.widgetType}`,
+      })),
+      games: [
+        ...entries.filter((e) => e.kind === "game").map((e) => ({ id: `qa:${e.id}`, label: `${e.name} (your game)` })),
+        ...(games.data?.games ?? []).map((g) => ({ id: g.id, label: g.name })),
+      ],
+      plans: (power.data?.plans ?? []).map((p) => ({ id: p.guid, label: p.name })),
+      adapters: (network.data?.adapters ?? []).map((a) => ({ id: a.name, label: `${a.name}${a.vpnLike ? " (VPN-type)" : ""}` })),
+    }),
+    [entries, profiles, overlays.data, games.data, power.data, network.data],
+  );
+}
+
+const label = (list: { id: string; label: string }[], id: string, missing = "?") => list.find((x) => x.id === id)?.label ?? missing;
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const daysText = (mask: string) => {
+  const m = Number(mask);
+  if (m === 127) return "every day";
+  if (m === 31) return "weekdays";
+  if (m === 96) return "weekends";
+  return DAYS.filter((_, i) => m & (1 << i)).join(", ");
+};
+
+export function describeTrigger(kind: TriggerKind, value: string, c: Choices): string {
+  switch (kind) {
+    case "app_started":
+    case "app_stopped":
+      return `${TRIGGERS[kind]}: ${value}`;
+    case "profile_changed":
+      return value ? `Profile → ${label(c.profiles, value)}` : "Any profile change";
+    case "time":
+      return `Every day at ${value}`;
+    case "interval":
+      return `Every ${value} min`;
+    case "file_created":
+      return `New file in ${value}`;
+    case "download_finished":
+      return value ? `Download finished: ${value.split(",").map((e) => `.${e}`).join(", ")}` : "Any download finished";
+    case "network_up":
+    case "network_down":
+      return `${value === "vpn" ? "VPN-type adapter" : value || "Any adapter"} ${kind === "network_up" ? "connects" : "disconnects"}`;
+    case "game_started":
+    case "game_stopped":
+      return `${value ? label(c.games, value) : "Any game"} ${kind === "game_started" ? "starts" : "closes"}`;
+    case "power_source":
+      return value === "ac" ? "Plugged in" : "On battery";
+    case "power_plan":
+      return value ? `Power plan → ${label(c.plans, value)}` : "Power plan changes";
+    default:
+      return TRIGGERS[kind];
+  }
+}
+
+export function describeCondition(x: RuleCondition, c: Choices): string {
+  switch (x.kind) {
+    case "profile":
+      return `profile is ${label(c.profiles, x.value)}`;
+    case "time_between":
+      return `time ${x.value.replace("-", "–")}`;
+    case "weekday":
+      return daysText(x.value);
+    case "process_running":
+      return `${x.value} is running`;
+    case "process_not_running":
+      return `${x.value} is not running`;
+    case "power_source":
+      return x.value === "ac" ? "plugged in" : "on battery";
+    case "vpn":
+      return `VPN-type adapter ${x.value}`;
+  }
+}
+
+export function describeAction(a: RuleAction, c: Choices): string {
+  switch (a.kind) {
+    case "launch_program":
+      return `Launch ${a.value.split(/[\\/]/).pop()}${a.args ? ` ${a.args}` : ""}`;
+    case "launch_entry":
+      return `Launch "${label(c.entries, a.value, "missing entry")}"`;
+    case "switch_profile":
+      return `Switch to "${label(c.profiles, a.value, "missing profile")}"`;
+    case "notify":
+      return `Notify: ${a.value}`;
+    case "show_overlay":
+    case "hide_overlay":
+      return `${a.kind === "show_overlay" ? "Show" : "Hide"} overlay ${label(c.overlays, a.value)}`;
+    case "show_overlay_set":
+    case "hide_overlay_set":
+      return `${a.kind === "show_overlay_set" ? "Show" : "Hide"} overlays of ${a.value === "all" ? "every profile" : label(c.profiles, a.value)}`;
+    case "set_volume":
+      return `Volume ${a.value}%`;
+    case "power_plan":
+      return `Power plan "${label(c.plans, a.value)}"`;
+    case "open_url":
+      return `Open ${a.value}`;
+    case "wait":
+      return `Wait ${a.value} s`;
+  }
+}
 
 export default function AutomationModule() {
   const rules = usePolled(() => api.automation.list(), 10000);
-  const overlays = usePolled(() => api.overlays.list());
+  const choices = useChoices();
   const [editing, setEditing] = useState<AutomationRule | "new" | null>(null);
-  const entries = useQuickAccess((s) => s.entries);
-  const profiles = useProfiles((s) => s.profiles);
-
-  const describeTrigger = (r: AutomationRule) => {
-    if (r.triggerKind === "app_started" || r.triggerKind === "app_stopped") return `${TRIGGERS[r.triggerKind]}: ${r.triggerValue}`;
-    if (r.triggerKind === "profile_changed")
-      return r.triggerValue ? `Profile → ${profiles.find((p) => String(p.id) === r.triggerValue)?.name ?? "?"}` : "Any profile change";
-    return TRIGGERS[r.triggerKind];
-  };
-  const describeAction = (r: AutomationRule) => {
-    const id = Number(r.actionValue);
-    switch (r.actionKind) {
-      case "launch_program":
-        return `Launch ${r.actionValue.split(/[\\/]/).pop()}${r.actionArgs ? ` ${r.actionArgs}` : ""}`;
-      case "launch_entry":
-        return `Launch "${entries.find((e) => e.id === id)?.name ?? "missing entry"}"`;
-      case "switch_profile":
-        return `Switch to "${profiles.find((p) => p.id === id)?.name ?? "missing profile"}"`;
-      case "notify":
-        return `Notify: ${r.actionValue}`;
-      default: {
-        const o = overlays.data?.find((x) => x.id === id);
-        return `${r.actionKind === "show_overlay" ? "Show" : "Hide"} overlay ${o ? WIDGETS[o.widgetType]?.title ?? o.widgetType : "?"}`;
-      }
-    }
-  };
 
   const toggle = async (r: AutomationRule) => {
     try {
@@ -103,27 +214,27 @@ export default function AutomationModule() {
         {import.meta.env.DEV && (
           <div className="edit-banner">
             <span className="tag tag--warn">Dev build</span>
-            Automations do not run in development builds, so rebuilding does not launch your programs.
+            Automations do not run in development builds, so rebuilding does not launch your programs. Dry runs still work.
           </div>
         )}
         <div className="howto">
           <div className="label">How rules work</div>
           <ol>
             <li>
-              <b>When</b>: the event that fires the rule, e.g. <i>NETRUNNER starts</i> or <i>Application starts: game.exe</i>.
-              <i>Manual</i> rules only run from the ▶ button.
+              <b>When</b>: one event fires the rule: NETRUNNER starts, an application or game starts, a time of day, a new file, a
+              finished download, a network adapter or the power source changing… <i>Manual</i> rules only run from ▶.
             </li>
             <li>
-              <b>Do</b>: one action, e.g. <i>Launch program</i> → <span className="mono">E:\ThrottleStop_9.7\ThrottleStop.exe</span>.
+              <b>If</b> (optional): conditions that must all hold at that moment, e.g. a profile, a time range, weekdays.
             </li>
             <li>
-              ▶ runs a rule immediately to test it; the result appears as a notification and in the activity log.
+              <b>Then</b>: actions run in order; <i>Wait</i> pauses between them. The chain stops at the first failure.
             </li>
           </ol>
           <div className="muted">
-            Programs that need administrator rights show the normal Windows UAC prompt. Commands that need confirmation are
-            never run unattended: NETRUNNER asks you first. Application start/stop is checked every 3 s, only while such a
-            rule is enabled.
+            <b>Dry run</b> in the editor checks the conditions now and shows what each action would do, without running anything. ▶
+            runs a rule for real and skips its conditions. Programs that need administrator rights show the normal UAC prompt;
+            commands that need confirmation are never run unattended.
           </div>
         </div>
         {rules.data?.length === 0 && (
@@ -141,21 +252,21 @@ export default function AutomationModule() {
               <div className="rule__main">
                 <div className="rule__name">{r.name}</div>
                 <div className="rule__flow">
-                  <span className="tag tag--info">When</span> {describeTrigger(r)}
-                  {r.conditionProfileId != null && (
+                  <span className="tag tag--info">When</span> {describeTrigger(r.triggerKind, r.triggerValue, choices)}
+                  {r.conditions.length > 0 && (
                     <>
                       {" "}
-                      <span className="tag">If profile</span> {profiles.find((p) => p.id === r.conditionProfileId)?.name ?? "?"}
+                      <span className="tag">If</span> {r.conditions.map((c) => describeCondition(c, choices)).join(" and ")}
                     </>
                   )}{" "}
-                  <span className="tag tag--accent">Do</span> {describeAction(r)}
+                  <span className="tag tag--accent">Then</span> {r.actions.map((a) => describeAction(a, choices)).join(" → ")}
                 </div>
               </div>
               <div className="rule__stats muted">
                 {r.runCount} runs · last {formatRelative(parseDbTime(r.lastRunAt))}
               </div>
               <div className="rule__actions">
-                <button className="icon-btn icon-btn--sm" title="Run now" onClick={() => void run(r)}>
+                <button className="icon-btn icon-btn--sm" title="Run now (skips conditions)" onClick={() => void run(r)}>
                   <Play size={13} />
                 </button>
                 <button className="icon-btn icon-btn--sm" title="Edit" onClick={() => setEditing(r)}>
@@ -168,12 +279,11 @@ export default function AutomationModule() {
             </div>
           ))}
         </div>
-        <p className="muted qa-hint">A visual node-based editor and more triggers (file created, download completed) are planned for Phase 5.</p>
       </div>
       {editing && (
         <RuleEditor
           rule={editing === "new" ? null : editing}
-          overlays={overlays.data ?? []}
+          choices={choices}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -185,36 +295,53 @@ export default function AutomationModule() {
   );
 }
 
-function RuleEditor({
-  rule,
-  overlays,
-  onClose,
-  onSaved,
-}: {
-  rule: AutomationRule | null;
-  overlays: Overlay[];
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const entries = useQuickAccess((s) => s.entries);
-  const profiles = useProfiles((s) => s.profiles);
+/** Starting value when a kind is picked, so the editor shows something sensible. */
+function defaultTriggerValue(kind: TriggerKind): string {
+  return kind === "time" ? "08:00" : kind === "interval" ? "60" : kind === "power_source" ? "battery" : "";
+}
+function defaultCondition(kind: ConditionKind, c: Choices): RuleCondition {
+  const value =
+    kind === "time_between"
+      ? "09:00-18:00"
+      : kind === "weekday"
+        ? "31"
+        : kind === "power_source"
+          ? "battery"
+          : kind === "vpn"
+            ? "up"
+            : kind === "profile"
+              ? (c.profiles[0]?.id ?? "")
+              : "";
+  return { kind, value };
+}
+function defaultAction(kind: ActionKind): RuleAction {
+  const value = kind === "set_volume" ? "50" : kind === "wait" ? "5" : kind === "show_overlay_set" || kind === "hide_overlay_set" ? "all" : "";
+  return { kind, value, args: "" };
+}
+
+function RuleEditor({ rule, choices, onClose, onSaved }: { rule: AutomationRule | null; choices: Choices; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState<AutomationInput>(
-    rule ?? {
-      name: "",
-      enabled: true,
-      triggerKind: "netrunner_start",
-      triggerValue: "",
-      conditionProfileId: null,
-      actionKind: "launch_program",
-      actionValue: "",
-      actionArgs: "",
-    },
+    rule ?? { name: "", enabled: true, triggerKind: "netrunner_start", triggerValue: "", conditions: [], actions: [defaultAction("launch_program")] },
   );
   const [error, setError] = useState<string | null>(null);
-  const set = <K extends keyof AutomationInput>(k: K, v: AutomationInput[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const [dry, setDry] = useState<DryRun | null>(null);
+  const [busy, setBusy] = useState(false);
+  const patch = (p: Partial<AutomationInput>) => {
+    setForm((f) => ({ ...f, ...p }));
+    setDry(null);
+  };
+  const setCondition = (i: number, c: RuleCondition | null) =>
+    patch({ conditions: c ? form.conditions.map((x, j) => (j === i ? c : x)) : form.conditions.filter((_, j) => j !== i) });
+  const setAction = (i: number, a: RuleAction | null) =>
+    patch({ actions: a ? form.actions.map((x, j) => (j === i ? a : x)) : form.actions.filter((_, j) => j !== i) });
+  const moveAction = (i: number, d: -1 | 1) => {
+    const list = [...form.actions];
+    [list[i], list[i + d]] = [list[i + d], list[i]];
+    patch({ actions: list });
+  };
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async () => {
+    setBusy(true);
     try {
       if (rule) await api.automation.update(rule.id, form);
       else await api.automation.create(form);
@@ -222,19 +349,23 @@ function RuleEditor({
       onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
     }
   };
 
-  const idSelect = (options: { id: number; label: string }[], placeholder: string) => (
-    <select className="select" value={form.actionValue} onChange={(e) => set("actionValue", e.target.value)} required>
-      <option value="">{placeholder}</option>
-      {options.map((o) => (
-        <option key={o.id} value={String(o.id)}>
-          {o.label}
-        </option>
-      ))}
-    </select>
-  );
+  const dryRun = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setDry(await api.automation.dryRun(form));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setDry(null);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Dialog
@@ -243,151 +374,142 @@ function RuleEditor({
       onClose={onClose}
       footer={
         <>
+          <label className="check flow__enabled">
+            <input type="checkbox" checked={form.enabled} onChange={(e) => patch({ enabled: e.target.checked })} />
+            Enabled
+          </label>
+          <button className="btn" onClick={() => void dryRun()} disabled={busy} title="Check conditions now and show what the actions would do">
+            <FlaskConical size={13} /> Dry run
+          </button>
           <button className="btn" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn btn--primary" type="submit" form="rule-form">
+          <button className="btn btn--primary" onClick={() => void submit()} disabled={busy || !form.name.trim()}>
             Save rule
           </button>
         </>
       }
     >
-      <form id="rule-form" className="form-grid" onSubmit={(e) => void submit(e)}>
-        <label className="field form-grid__full">
+      <div className="flow">
+        <label className="field">
           <span className="label">Name</span>
-          <input className="input" value={form.name} onChange={(e) => set("name", e.target.value)} required maxLength={80} />
+          <input className="input" value={form.name} onChange={(e) => patch({ name: e.target.value })} maxLength={80} placeholder="Gaming mode" autoFocus />
         </label>
-        <label className="field">
-          <span className="label">When</span>
-          <select
-            className="select"
-            value={form.triggerKind}
-            onChange={(e) => setForm((f) => ({ ...f, triggerKind: e.target.value as TriggerKind, triggerValue: "" }))}
-          >
-            {Object.entries(TRIGGERS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span className="label">Trigger detail</span>
-          {form.triggerKind === "app_started" || form.triggerKind === "app_stopped" ? (
-            <input
-              className="input input--mono"
-              placeholder="Cyberpunk2077.exe"
-              value={form.triggerValue}
-              onChange={(e) => set("triggerValue", e.target.value)}
-              required
-            />
-          ) : form.triggerKind === "profile_changed" ? (
-            <select className="select" value={form.triggerValue} onChange={(e) => set("triggerValue", e.target.value)}>
-              <option value="">Any profile</option>
-              {profiles.map((p) => (
-                <option key={p.id} value={String(p.id)}>
-                  {p.name}
+
+        <section className="flow__block flow__block--when">
+          <div className="flow__head">
+            <span className="tag tag--info">When</span>
+          </div>
+          <div className="flow__row">
+            <select
+              className="select"
+              value={form.triggerKind}
+              onChange={(e) => patch({ triggerKind: e.target.value as TriggerKind, triggerValue: defaultTriggerValue(e.target.value as TriggerKind) })}
+            >
+              {Object.entries(TRIGGERS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
                 </option>
               ))}
             </select>
-          ) : (
-            <input className="input" disabled value="—" />
+            <ValueInput slot="trigger" kind={form.triggerKind} value={form.triggerValue} choices={choices} onChange={(v) => patch({ triggerValue: v })} />
+          </div>
+        </section>
+
+        <div className="flow__arrow">↓</div>
+
+        <section className="flow__block">
+          <div className="flow__head">
+            <span className="tag">If</span>
+            <span className="muted">all of these hold (optional)</span>
+          </div>
+          {form.conditions.map((c, i) => (
+            <div key={i} className="flow__row" data-met={dry ? String(dry.conditions[i]?.met) : undefined}>
+              {dry && (dry.conditions[i]?.met ? <CheckCircle2 size={14} className="flow__ok" /> : <CircleSlash size={14} className="flow__no" />)}
+              <select className="select" value={c.kind} onChange={(e) => setCondition(i, defaultCondition(e.target.value as ConditionKind, choices))}>
+                {Object.entries(CONDITIONS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+              <ValueInput slot="condition" kind={c.kind} value={c.value} choices={choices} onChange={(v) => setCondition(i, { ...c, value: v })} />
+              <button className="icon-btn icon-btn--sm" title="Remove condition" onClick={() => setCondition(i, null)}>
+                <X size={13} />
+              </button>
+            </div>
+          ))}
+          {form.conditions.length < 8 && (
+            <button className="btn btn--sm btn--ghost" onClick={() => patch({ conditions: [...form.conditions, defaultCondition("profile", choices)] })}>
+              <Plus size={12} /> Condition
+            </button>
           )}
-        </label>
-        <label className="field">
-          <span className="label">Do</span>
-          <select
-            className="select"
-            value={form.actionKind}
-            onChange={(e) => setForm((f) => ({ ...f, actionKind: e.target.value as ActionKind, actionValue: "" }))}
-          >
-            {Object.entries(ACTIONS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </label>
-        {form.actionKind === "launch_program" ? (
-          <>
-            <div className="field form-grid__full">
-              <span className="label">Program</span>
-              <div className="input-row">
-                <input
-                  className="input input--mono"
-                  value={form.actionValue}
-                  onChange={(e) => set("actionValue", e.target.value)}
-                  placeholder="E:\ThrottleStop_9.7\ThrottleStop.exe"
-                  spellCheck={false}
-                  required
+        </section>
+
+        <div className="flow__arrow">↓</div>
+
+        <section className="flow__block flow__block--then">
+          <div className="flow__head">
+            <span className="tag tag--accent">Then</span>
+            <span className="muted">in this order</span>
+          </div>
+          {form.actions.map((a, i) => (
+            <div key={i} className="flow__step">
+              <span className="flow__num mono">{i + 1}</span>
+              <div className="flow__row">
+                <select className="select" value={a.kind} onChange={(e) => setAction(i, defaultAction(e.target.value as ActionKind))}>
+                  {Object.entries(ACTIONS).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+                <ValueInput
+                  slot="action"
+                  kind={a.kind}
+                  value={a.value}
+                  args={a.args}
+                  choices={choices}
+                  onChange={(v, args) => setAction(i, { ...a, value: v, args: args ?? a.args })}
+                  onName={(n) => !form.name && patch({ name: n })}
                 />
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={async () => {
-                    const file = await openDialog({
-                      multiple: false,
-                      title: "Program to launch",
-                      filters: [{ name: "Programs", extensions: ["exe", "lnk", "bat", "cmd"] }],
-                    });
-                    if (typeof file === "string") {
-                      setForm((f) => ({ ...f, actionValue: file, name: f.name || `Launch ${file.split(/[\\/]/).pop()?.replace(/\.\w+$/, "")}` }));
-                    }
-                  }}
-                >
-                  <FolderSearch size={14} /> Browse
+              </div>
+              <div className="flow__step-tools">
+                <button className="icon-btn icon-btn--sm" title="Move up" disabled={i === 0} onClick={() => moveAction(i, -1)}>
+                  <ArrowUp size={12} />
+                </button>
+                <button className="icon-btn icon-btn--sm" title="Move down" disabled={i === form.actions.length - 1} onClick={() => moveAction(i, 1)}>
+                  <ArrowDown size={12} />
+                </button>
+                <button className="icon-btn icon-btn--sm" title="Remove step" disabled={form.actions.length === 1} onClick={() => setAction(i, null)}>
+                  <X size={13} />
                 </button>
               </div>
+              {dry?.actions[i] && <div className={`flow__dry mono ${dry.actions[i].startsWith("✗") ? "flow__dry--bad" : ""}`}>{dry.actions[i]}</div>}
             </div>
-            <label className="field">
-              <span className="label">Arguments (optional)</span>
-              <input className="input input--mono" value={form.actionArgs} onChange={(e) => set("actionArgs", e.target.value)} spellCheck={false} />
-            </label>
-          </>
-        ) : (
-        <label className="field">
-          <span className="label">Action target</span>
-          {form.actionKind === "notify" ? (
-            <input className="input" value={form.actionValue} onChange={(e) => set("actionValue", e.target.value)} required />
-          ) : form.actionKind === "launch_entry" ? (
-            idSelect(entries.map((e) => ({ id: e.id, label: `${e.name} (${e.kind})` })), "Choose an entry…")
-          ) : form.actionKind === "switch_profile" ? (
-            idSelect(profiles.map((p) => ({ id: p.id, label: p.name })), "Choose a profile…")
-          ) : (
-            idSelect(overlays.map((o) => ({ id: o.id, label: `#${o.id} ${WIDGETS[o.widgetType]?.title ?? o.widgetType}` })), "Choose an overlay…")
+          ))}
+          {form.actions.length < 12 && (
+            <div className="flow__add">
+              <button className="btn btn--sm btn--ghost" onClick={() => patch({ actions: [...form.actions, defaultAction("notify")] })}>
+                <Plus size={12} /> Action
+              </button>
+              <button className="btn btn--sm btn--ghost" onClick={() => patch({ actions: [...form.actions, defaultAction("wait")] })}>
+                <Plus size={12} /> Wait
+              </button>
+            </div>
           )}
-        </label>
+        </section>
+
+        {dry && (
+          <div className={`flow__verdict ${dry.wouldRun ? "flow__verdict--ok" : ""}`}>
+            {dry.wouldRun
+              ? "If the trigger fired now, the rule would run the steps above."
+              : "If the trigger fired now, the rule would be skipped: a condition does not hold."}{" "}
+            Nothing was run.
+          </div>
         )}
-        <label className="field">
-          <span className="label">Only while profile is active</span>
-          <select
-            className="select"
-            value={form.conditionProfileId ?? ""}
-            onChange={(e) => set("conditionProfileId", e.target.value ? Number(e.target.value) : null)}
-          >
-            <option value="">Any profile</option>
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="field">
-          <span className="label">State</span>
-          <label className="check">
-            <input type="checkbox" checked={form.enabled} onChange={(e) => set("enabled", e.target.checked)} />
-            Enabled
-          </label>
-        </div>
-        {form.actionKind === "launch_entry" &&
-          entries.find((e) => String(e.id) === form.actionValue)?.kind === "command" && (
-            <div className="danger-note form-grid__full">
-              Commands that require confirmation will prompt you when the rule fires. They never run silently.
-            </div>
-          )}
-        {error && <div className="field__error form-grid__full">{error}</div>}
-      </form>
+        {error && <div className="field__error">{error}</div>}
+      </div>
     </Dialog>
   );
 }

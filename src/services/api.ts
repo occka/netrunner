@@ -48,8 +48,11 @@ import type {
 import type {
   AutomationInput,
   AutomationRule,
+  DryRun,
   Integration,
   LibraryScan,
+  PlayDay,
+  Playtime,
   NetworkStatus,
   Overlay,
   PowerInfo,
@@ -154,6 +157,13 @@ export const api = {
     scan: () => call<LibraryScan>("games_scan"),
     launch: (id: string) => call<void>("games_launch", { id }),
     reveal: (id: string) => call<void>("games_reveal", { id }),
+    /** Playtime per game since `from` (unix ms; null = all time). */
+    playtime: (from: number | null) => call<Playtime[]>("games_playtime", { from }),
+    history: (id: string, days: number) => call<PlayDay[]>("games_history", { id, days }),
+    running: () => call<string[]>("games_running"),
+    clearPlaytime: (id: string) => call<number>("games_clear_playtime", { id }),
+    /** Steam header artwork as a data URL (Steam's local cache first). */
+    banner: (id: string) => call<string>("games_banner", { id }),
   },
 
   integrations: {
@@ -167,6 +177,7 @@ export const api = {
     update: (id: number, input: AutomationInput) => call<AutomationRule>("automation_update", { id, input }),
     remove: (id: number) => call<void>("automation_delete", { id }),
     run: (id: number) => call<string>("automation_run", { id }),
+    dryRun: (input: AutomationInput) => call<DryRun>("automation_dry_run", { input }),
   },
 
   dev: {

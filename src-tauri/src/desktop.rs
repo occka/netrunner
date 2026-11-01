@@ -2,7 +2,7 @@
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 
 use crate::services::settings;
 use crate::state::AppState;
@@ -19,6 +19,14 @@ pub fn show_main(app: &AppHandle) {
         let _ = win.show();
         let _ = win.set_focus();
     }
+}
+
+/// Opens a web page as a BROWSER tab in the main window (shown if hidden).
+pub fn open_in_browser(app: &AppHandle, url: &str) -> crate::error::AppResult<()> {
+    let url = crate::security::targets::validate_web_url(url)?;
+    show_main(app);
+    let _ = app.emit_to("main", "browser://open-request", url);
+    Ok(())
 }
 
 fn bool_setting(app: &AppHandle, key: &str, default: bool) -> bool {
