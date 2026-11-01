@@ -131,6 +131,7 @@ export function PrivacyPanel({ site }: { site: string }) {
     extensions: useSetting("browser.extensions"),
     lists: useSetting("browser.adblock_lists"),
     exceptions: useSetting("browser.adblock_exceptions"),
+    restoreTabs: useSetting("browser.restore_tabs"),
   };
   const excepted = !!site && v.exceptions.includes(site);
 
@@ -222,6 +223,7 @@ export function PrivacyPanel({ site }: { site: string }) {
           <option value="basic">Basic</option>
         </select>
       </label>
+      {toggle("browser.restore_tabs", "Reopen tabs from last time", v.restoreTabs, "Private tabs are never saved; restored tabs load when you open them")}
       {toggle("browser.https_only", "HTTPS-only: upgrade unencrypted connections", v.https, "Local network addresses are exempt")}
       {toggle("browser.gpc", "Send Global Privacy Control and Do Not Track", v.gpc)}
       {toggle("browser.autofill", "Offer to save passwords and form data", v.autofill, "Off: nothing typed into sites is stored by the browser")}

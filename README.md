@@ -19,7 +19,7 @@ An industrial-cyberpunk control environment for Windows: dashboard, universal la
 | FILES | Partial | tabs, history, places/drives, sort/filter, multi-select, copy/cut/paste, rename, Recycle Bin delete, on-demand search, text/image preview, Analyze with AI |
 | GITHUB | Implemented | token in Credential Manager, repositories, PRs, issues, clone into DEVELOPER |
 | PROFILES / SETTINGS / STORAGE | Implemented / Implemented / Partial | themes; appearance: wallpaper or animated pattern for the app and the dashboard, glass panels (opacity + blur), corner radius, font, interface scale, neon glow / scanlines / vignette, per-widget accent colour; tray and autostart, data locations |
-| BROWSER | Implemented | WebView2 tabs inside NETRUNNER, private tabs, bookmarks, history, downloads; ad/tracker/malware blocking (adblock-rust with EasyList, EasyPrivacy, uBlock, RU AdList…), Strict tracking prevention, HTTPS-only, GPC, deny-by-default site permissions, no IPC for pages. See docs/SECURITY.md |
+| BROWSER | Implemented | WebView2 tabs inside NETRUNNER, tabs restored after a restart (lazily), private tabs, bookmarks, history, downloads; pop a tab out to an overlay and back; ad/tracker/malware blocking (adblock-rust with EasyList, EasyPrivacy, uBlock, RU AdList…), Strict tracking prevention, HTTPS-only, GPC, deny-by-default site permissions, no IPC for pages. See docs/SECURITY.md |
 
 Shell: system tray, close-to-tray, start with Windows (optionally minimised), single instance, Ctrl+K command palette, Ctrl+I inspector.
 

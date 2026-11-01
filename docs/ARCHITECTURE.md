@@ -73,6 +73,8 @@ Widget settings store only values that differ from the defaults (`compactConfig`
 
 `browser/mod.rs` owns tabs: each is a Tauri child webview (`unstable` feature) labelled `web-<n>` in a host window, with its own WebView2 user-data folder (`%LOCALAPPDATA%\com.netrunner.app\browser`). The React chrome is ordinary DOM; `BrowserSurface` measures an empty element every animation frame and calls `browser_set_bounds`, hiding the native view while a dialog, menu or the palette is open (HTML cannot draw over a native webview). Tabs are created on `about:blank`, hardened, then navigated, so the request filter is in place before the first request.
 
+Session restore: `modules/browser/store.ts` saves the strip (http(s) pages of non-private tabs, in order, plus the active one) to the `browser.session` setting, debounced. On the first BROWSER visit after a start, saved tabs come back as *sleeping* entries without a webview; only the active one is created at once and others wake when selected, so a restart neither loads every page nor starts several videos. A web overlay's page returns to BROWSER with `browser_return_tab` (reparent, zoom reset, overlay removed).
+
 Pitfalls found in testing:
 - A window that hosts a browser tab has several webviews, and `get_webview_window` returns `None` for it. Code that shows, hides or destroys `main` or `overlay-*` uses `get_window` / `windows()`.
 - Position and size are set with one `set_bounds` call (wry's separate setters re-read an asynchronously updated position). `BrowserSurface` re-sends its rectangle every second because a command that arrives while the native view is still being created is dropped.

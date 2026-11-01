@@ -32,7 +32,7 @@ import { useSetting, useSettings } from "@/stores/settings";
 import { notify, reportError } from "@/stores/notifications";
 import { BrowserSurface } from "./BrowserSurface";
 import { BookmarksPanel, DownloadsPanel, HistoryPanel, PrivacyPanel } from "./BrowserPanels";
-import { hostOf, mainTabs, useBrowser } from "./store";
+import { hostOf, mainTabs, stripTabs, useBrowser, type StripTab } from "./store";
 import type { BrowserNotice, BrowserTab } from "@/types/browser";
 
 type Panel = "bookmarks" | "history" | "downloads" | "privacy" | null;
@@ -54,10 +54,11 @@ const PERMISSION_LABEL: Record<string, string> = {
 };
 
 export default function BrowserModule() {
-  const { tabs, activeId, init, activate, newTab, close, nextPrivate } = useBrowser();
+  const { tabs, sleeping, order, activeId, ready, init, activate, newTab, close, nextPrivate } = useBrowser();
   const [panel, setPanel] = useState<Panel>(null);
-  const shown = mainTabs(tabs);
-  const tab = shown.find((t) => t.id === activeId) ?? null;
+  const shown = stripTabs({ tabs, sleeping, order });
+  // A sleeping tab has no webview yet: the start page shows while it wakes.
+  const tab = mainTabs(tabs).find((t) => t.id === activeId) ?? null;
   const adblock = useSetting("browser.adblock");
   const exceptions = useSetting("browser.adblock_exceptions");
 
@@ -83,8 +84,8 @@ export default function BrowserModule() {
     const un = listen<[string, string]>("browser://shortcut", (e) => {
       const [tabId, key] = e.payload;
       const s = useBrowser.getState();
-      const order = mainTabs(s.tabs);
-      const i = order.findIndex((t) => t.id === tabId);
+      const order = s.order;
+      const i = order.indexOf(tabId);
       // Keyboard focus is inside the native page; bring it back to NETRUNNER's address bar.
       const focusAddress = () =>
         void getCurrentWebview()
@@ -98,7 +99,7 @@ export default function BrowserModule() {
       else if (key === "reload") void api.browser.action(tabId, "reload").catch(() => undefined);
       else if (key === "palette") useShell.getState().openPalette();
       else if ((key === "next" || key === "prev") && order.length > 1)
-        s.activate(order[(i + (key === "next" ? 1 : -1) + order.length) % order.length].id);
+        s.activate(order[(i + (key === "next" ? 1 : -1) + order.length) % order.length]);
     });
     return () => void un.then((f) => f());
   }, []);
@@ -154,11 +155,17 @@ export default function BrowserModule() {
         </button>
       </div>
 
-      <Toolbar tab={tab} panel={panel} setPanel={setPanel} siteExcepted={siteExcepted} />
+      <Toolbar tab={tab} startPage={ready && activeId === null} panel={panel} setPanel={setPanel} siteExcepted={siteExcepted} />
       {tab && <Notices tab={tab} />}
 
       <div className="browser__main">
-        {tab ? <BrowserSurface tabId={tab.id} className="browser__view" /> : <StartPage />}
+        {tab ? (
+          <BrowserSurface tabId={tab.id} className="browser__view" />
+        ) : activeId ? (
+          <div className="browser__view browser__waking label">Restoring tab…</div>
+        ) : (
+          <StartPage />
+        )}
         {panel && (
           <aside className="browser__panel">
             <div className="browser__panel-head">
@@ -180,10 +187,10 @@ export default function BrowserModule() {
   );
 }
 
-function TabButton({ tab, active, onSelect, onClose }: { tab: BrowserTab; active: boolean; onSelect: () => void; onClose: () => void }) {
+function TabButton({ tab, active, onSelect, onClose }: { tab: StripTab; active: boolean; onSelect: () => void; onClose: () => void }) {
   return (
     <div
-      className="browser__tab"
+      className={`browser__tab${tab.sleeping ? " browser__tab--sleeping" : ""}`}
       role="tab"
       aria-selected={active}
       title={tab.url}
@@ -221,7 +228,19 @@ function TabButton({ tab, active, onSelect, onClose }: { tab: BrowserTab; active
   );
 }
 
-function Toolbar({ tab, panel, setPanel, siteExcepted }: { tab: BrowserTab | null; panel: Panel; setPanel: (p: Panel) => void; siteExcepted: boolean }) {
+function Toolbar({
+  tab,
+  startPage,
+  panel,
+  setPanel,
+  siteExcepted,
+}: {
+  tab: BrowserTab | null;
+  startPage: boolean;
+  panel: Panel;
+  setPanel: (p: Panel) => void;
+  siteExcepted: boolean;
+}) {
   const go = useBrowser((s) => s.go);
   const [text, setText] = useState("");
   const [editing, setEditing] = useState(false);
@@ -232,9 +251,10 @@ function Toolbar({ tab, panel, setPanel, siteExcepted }: { tab: BrowserTab | nul
   useEffect(() => {
     if (!editing) setText(tab?.url ?? "");
   }, [tab?.url, tab?.id, editing]);
+  // Only a new tab takes focus; a tab that is still waking up does not.
   useEffect(() => {
-    if (!tab) inputRef.current?.focus();
-  }, [tab]);
+    if (startPage) inputRef.current?.focus();
+  }, [startPage]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
