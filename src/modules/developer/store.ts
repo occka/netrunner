@@ -54,6 +54,8 @@ interface DevStore {
   setFocus: (group: 0 | 1) => void;
   /** Read-only diff of two files (Compare with…). */
   openCompare: (a: string, b: string) => Promise<void>;
+  /** Read-only diff of two texts (e.g. a file on two branches). */
+  openTextDiff: (key: string, name: string, label: string, language: string, original: string, modified: string) => void;
   setMode: (mode: IdeMode) => void;
   setSide: (side: SidePanel) => void;
   toggleTerminal: (open?: boolean) => void;
@@ -289,6 +291,11 @@ export const useDev = create<DevStore>((set, get) => ({
     }),
 
   setFocus: (focus) => set((s) => (s.focus === focus ? s : { focus })),
+
+  openTextDiff: (key, name, label, language, original, modified) => {
+    const tab: EditorTab = { key, kind: "diff", path: label, name, language, content: "", saved: "", readOnly: true, binary: false, diff: { original, modified, staged: false, label } };
+    set((s) => ({ tabs: [...s.tabs.filter((t) => t.key !== key), tab], ...placeNew(s, key) }));
+  },
 
   openCompare: async (a, b) => {
     const key = `compare:${a}|${b}`;

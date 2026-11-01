@@ -2,6 +2,7 @@
 //! detection, language servers (LSP), Git (via the git CLI) and the GitHub REST API.
 
 pub mod git;
+pub mod git_more;
 pub mod github;
 pub mod lsp;
 pub mod process;

@@ -196,3 +196,39 @@ export interface SearchResult {
   truncated: boolean;
   searched: number;
 }
+
+// ---------- Git in the editor ----------
+
+export interface GitBaseline {
+  text: string | null;
+  tracked: boolean;
+}
+
+export interface BlameLine {
+  line: number;
+  hash: string;
+  author: string;
+  time: number;
+  summary: string;
+  committed: boolean;
+}
+
+export interface GitStash {
+  index: number;
+  name: string;
+  message: string;
+}
+
+export interface GraphRow {
+  graph: string;
+  hash: string | null;
+  refs: string;
+  subject: string;
+  author: string;
+  date: string;
+}
+
+export interface ChangedFile {
+  status: string;
+  path: string;
+}

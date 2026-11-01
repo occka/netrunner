@@ -5,9 +5,9 @@ import { confirmAction } from "@/stores/confirm";
 import { promptText } from "@/stores/prompt";
 import { notify, reportError } from "@/stores/notifications";
 import { refreshActivity } from "@/stores/activity";
-import { formatRelative } from "@/utils/format";
 import { useDev } from "./store";
 import type { Commit, GitFile, RepoStatus } from "@/types/dev";
+import { GitCompare, GitHistory, GitStashes } from "./GitHistory";
 
 const LABEL: Record<string, string> = { M: "Modified", A: "Added", D: "Deleted", R: "Renamed", C: "Copied", U: "Conflict", "?": "Untracked" };
 
@@ -18,6 +18,7 @@ export function GitPanel({ root }: { root: string }) {
   const [branches, setBranches] = useState<string[]>([]);
   const [log, setLog] = useState<Commit[]>([]);
   const [message, setMessage] = useState("");
+  const [amend, setAmend] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,15 +75,32 @@ export function GitPanel({ root }: { root: string }) {
   const unstaged = status.files.filter((f) => f.worktree !== "." && f.worktree !== "?");
   const untracked = status.files.filter((f) => f.worktree === "?");
 
-  const commit = () =>
-    run(
-      "Commit",
-      async () => {
-        const hash = await api.git.commit(root, message);
+  const commit = async () => {
+    if (amend) {
+      const pushed = await api.git.headPushed(root).catch(() => false);
+      const ok = await confirmAction({
+        title: "Amend last commit",
+        message: `Replace the last commit with "${message.trim()}"${staged.length ? ` and ${staged.length} staged file(s)` : ""}?`,
+        detail: pushed
+          ? "This commit is already on the remote. After amending, the branch differs from it and pushing needs a force push, which can drop other people's work."
+          : "The last commit has not been pushed yet.",
+        confirmLabel: "Amend",
+        danger: pushed,
+      });
+      if (!ok) return;
+      return run("Amend", async () => {
+        const hash = await api.git.amend(root, message);
         setMessage("");
-        notify.success(`Committed ${hash}`);
-      },
-    );
+        setAmend(false);
+        notify.success(`Amended: ${hash}`);
+      });
+    }
+    return run("Commit", async () => {
+      const hash = await api.git.commit(root, message);
+      setMessage("");
+      notify.success(`Committed ${hash}`);
+    });
+  };
 
   const push = async () => {
     const ok = await confirmAction({
@@ -179,12 +197,26 @@ export function GitPanel({ root }: { root: string }) {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && e.ctrlKey && staged.length && message.trim()) void commit();
+            if (e.key === "Enter" && e.ctrlKey && (staged.length || amend) && message.trim()) void commit();
           }}
         />
-        <button className="btn btn--primary btn--sm" disabled={!staged.length || !message.trim() || !!busy} onClick={() => void commit()}>
-          <GitCommitHorizontal size={12} /> Commit
-        </button>
+        <div className="git__commit-actions">
+          <label className="check" title="Replace the last commit (message and staged files)">
+            <input
+              type="checkbox"
+              checked={amend}
+              disabled={!log.length}
+              onChange={(e) => {
+                setAmend(e.target.checked);
+                if (e.target.checked && !message.trim() && log[0]) setMessage(log[0].subject);
+              }}
+            />
+            Amend
+          </label>
+          <button className="btn btn--primary btn--sm" disabled={(!staged.length && !amend) || !message.trim() || !!busy} onClick={() => void commit()}>
+            <GitCommitHorizontal size={12} /> {amend ? "Amend" : "Commit"}
+          </button>
+        </div>
       </div>
 
       <div className="git__groups">
@@ -212,17 +244,9 @@ export function GitPanel({ root }: { root: string }) {
           {untracked.map((f) => fileRow(f, "untracked"))}
           {unstaged.length + untracked.length === 0 && <div className="muted git__clean">Working tree clean</div>}
         </section>
-        <section>
-          <div className="git__group-head label">History</div>
-          {log.map((c) => (
-            <div key={c.hash} className="git-commit" title={`${c.hash} · ${c.author} · ${c.date}`}>
-              <span className="mono git-commit__hash">{c.hash}</span>
-              <span className="truncate">{c.subject}</span>
-              <span className="muted git-commit__when">{formatRelative(new Date(c.date))}</span>
-            </div>
-          ))}
-          {log.length === 0 && <div className="muted git__clean">No commits yet</div>}
-        </section>
+        <GitStashes root={root} run={run} />
+        <GitCompare root={root} branches={branches} current={status.branch} />
+        <GitHistory root={root} branch={status.branch} run={run} />
       </div>
     </div>
   );

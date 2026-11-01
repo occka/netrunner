@@ -4,7 +4,12 @@
  */
 import { invoke, type Channel } from "@tauri-apps/api/core";
 import type {
+  BlameLine,
+  ChangedFile,
   Commit,
+  GitBaseline,
+  GitStash,
+  GraphRow,
   DirEntry,
   FileContent,
   GitHubEntry,
@@ -240,6 +245,19 @@ export const api = {
     push: (root: string) => call<string>("git_push", { root, confirmed: true }),
     init: (root: string) => call<void>("git_init", { root }),
     clone: (url: string, parent: string, name: string) => call<string>("git_clone", { url, parent, name }),
+    baseline: (root: string, path: string) => call<GitBaseline>("git_baseline", { root, path }),
+    stageText: (root: string, path: string, content: string) => call<void>("git_stage_text", { root, path, content }),
+    blame: (root: string, path: string, from?: number, to?: number) => call<BlameLine[]>("git_blame", { root, path, from, to }),
+    stashList: (root: string) => call<GitStash[]>("git_stash_list", { root }),
+    stashSave: (root: string, message: string, untracked: boolean) => call<void>("git_stash_save", { root, message, untracked }),
+    stashAction: (root: string, action: "apply" | "pop" | "drop", index: number) =>
+      call<string>("git_stash_action", { root, action, index, confirmed: true }),
+    amend: (root: string, message: string) => call<string>("git_amend", { root, message, confirmed: true }),
+    headPushed: (root: string) => call<boolean>("git_head_pushed", { root }),
+    graph: (root: string, limit = 200) => call<GraphRow[]>("git_graph", { root, limit }),
+    compare: (root: string, base: string, head: string) => call<ChangedFile[]>("git_compare", { root, base, head }),
+    fileAt: (root: string, revision: string, path: string) => call<string>("git_file_at", { root, revision, path }),
+    cherryPick: (root: string, hash: string) => call<string>("git_cherry_pick", { root, hash, confirmed: true }),
   },
 
   github: {

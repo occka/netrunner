@@ -9,6 +9,7 @@ import { applyMarkers, fileModelUri, previewModels, takeReveal, useLsp } from ".
 import { LspStatus } from "./lsp/LspStatus";
 import { applyFileConfig, cursorMemory, saveOnFocusChange, saveSessionSoon, takeRestoredCursor } from "./editorPrefs";
 import { pathKey } from "./lsp/convert";
+import { attachGit, registerConflictLenses } from "./gitEditor";
 
 /** File tabs use real file URIs so language servers and Go to Definition can address them. */
 const modelUri = (tab: EditorTab) => (tab.kind === "file" ? fileModelUri(tab.path).toString() : `inmemory://nr/${encodeURIComponent(tab.key)}`);
@@ -34,6 +35,7 @@ export function EditorArea({ onRun }: { onRun: (path: string) => void }) {
   const theme = useSettings((s) => s.values.theme);
 
   useEffect(() => applyMonacoTheme(theme), [theme]);
+  useEffect(registerConflictLenses, []);
 
   // Free Monaco models of closed tabs (they hold undo history and text).
   const openKeys = tabs.map((t) => t.key).join("|");
@@ -108,6 +110,8 @@ function EditorGroup({ group, onRun }: { group: 0 | 1; onRun: (path: string) => 
     });
     editor.onDidBlurEditorWidget(saveOnFocusChange);
     editor.onDidChangeModel(() => onModel(editor));
+    const git = attachGit(editor);
+    editor.onDidDispose(() => git.dispose());
     editor.onDidChangeCursorPosition((e) => {
       const model = editor.getModel();
       if (model?.uri.scheme !== "file") return;

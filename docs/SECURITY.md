@@ -25,6 +25,7 @@
 | Project files | Canonicalised paths must stay inside opened project roots; `..` rejected; `.git` read-only; deletes go to the Recycle Bin |
 | Replace in files | Confirmation listing the files; only files inside open projects; refused while an affected tab has unsaved changes |
 | Git discard / push | Confirmation required (backend enforces `confirmed`); push explains it publishes commits |
+| Git amend / cherry-pick / stash drop | Confirmation required (backend enforces `confirmed`); amend warns when the commit is already on the remote. Revisions from the UI are checked so they can never be read as git options |
 | Git clone | https URLs only; target folder must not exist |
 | Terminals | Allowlisted shells only (PowerShell, pwsh, cmd, Git Bash); cwd must be inside a project |
 | Language servers | Only executables from the registry's known names (or a path the user picked) start, in the project folder, without a window. The UI may send only allow-listed LSP methods, for files inside open projects. Server edits to files that are not open are written only after confirmation; file create/rename/delete steps are skipped. **Install** types the official command into a visible terminal after confirmation; NETRUNNER never installs a server itself |
