@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { BrainCircuit, Bug, DownloadCloud, FolderGit2, FolderOpen, GitBranch, Play, SquareTerminal, Wrench, X } from "lucide-react";
+import { BrainCircuit, Bug, CircleAlert, DownloadCloud, FolderGit2, FolderOpen, GitBranch, Play, SquareTerminal, Wrench, X } from "lucide-react";
 import { ModuleHeader } from "@/components/ModuleHeader";
 import { api } from "@/services/api";
 import { useQuickAccess } from "@/stores/quickAccess";
@@ -13,7 +13,10 @@ import { EditorArea } from "./EditorArea";
 import { TerminalPanel } from "./TerminalPanel";
 import { GitPanel } from "./GitPanel";
 import { ToolsPanel } from "./ToolsPanel";
-import { openTerminal, sendToTerminal, useTerminals } from "./terminals";
+import { LanguagesPanel } from "./lsp/LanguagesPanel";
+import { ProblemsPanel } from "./lsp/ProblemsPanel";
+import { runInTerminal } from "./terminals";
+import { startLsp } from "./lsp/client";
 import { runPlan } from "./run";
 
 const MODES: { id: IdeMode; label: string }[] = [
@@ -24,7 +27,8 @@ const MODES: { id: IdeMode; label: string }[] = [
 const SIDES: { id: SidePanel; label: string; icon: typeof FolderOpen }[] = [
   { id: "explorer", label: "Explorer", icon: FolderOpen },
   { id: "git", label: "Git", icon: GitBranch },
-  { id: "tools", label: "Toolchains", icon: Wrench },
+  { id: "problems", label: "Problems", icon: CircleAlert },
+  { id: "tools", label: "Tools", icon: Wrench },
 ];
 
 export default function DeveloperModule() {
@@ -38,6 +42,7 @@ export default function DeveloperModule() {
 
   useEffect(() => {
     loadProjects().catch((err) => reportError("Could not load projects", err));
+    startLsp();
   }, [loadProjects]);
 
   useEffect(() => {
@@ -65,14 +70,7 @@ export default function DeveloperModule() {
     });
     if (!plan) return notify.warn("No run command for this file type", "Use the terminal to run it manually.");
     toggleTerminal(true);
-    const terms = useTerminals.getState();
-    let session = terms.sessions.find((s) => s.title === "Run" && !s.exited);
-    if (!session) session = (await openTerminal("powershell", root, "Run")) ?? undefined;
-    if (session) {
-      useTerminals.getState().setActive(session.id);
-      sendToTerminal(session, plan.command);
-      notify.info(`Running with ${plan.description}`);
-    }
+    if (await runInTerminal("Run", plan.command, root)) notify.info(`Running with ${plan.description}`);
   };
 
   const showTerminal = terminalOpen || mode === "debug";
@@ -146,7 +144,13 @@ export default function DeveloperModule() {
               <div className="ide-side__body">
                 {side === "explorer" && <FileTree root={root} />}
                 {side === "git" && <GitPanel root={root} />}
-                {side === "tools" && <ToolsPanel />}
+                {side === "problems" && <ProblemsPanel root={root} />}
+                {side === "tools" && (
+                  <>
+                    <LanguagesPanel root={root} />
+                    <ToolsPanel />
+                  </>
+                )}
               </div>
             </aside>
           <div className="ide-center">

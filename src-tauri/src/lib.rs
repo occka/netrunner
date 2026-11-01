@@ -108,6 +108,7 @@ pub fn run() {
             let alarm_dir = data_dir.clone();
             app.manage(AppState::new(db, data_dir));
             app.manage(dev::terminal::Terminals::default());
+            app.manage(std::sync::Arc::new(dev::lsp::bridge::Lsp::default()));
 
             let handle = app.handle().clone();
             desktop::build_tray(&handle)?;
@@ -253,6 +254,16 @@ pub fn run() {
             commands::dev::git_push,
             commands::dev::git_init,
             commands::dev::git_clone,
+            commands::lsp::lsp_subscribe,
+            commands::lsp::lsp_servers,
+            commands::lsp::lsp_running,
+            commands::lsp::lsp_open,
+            commands::lsp::lsp_change,
+            commands::lsp::lsp_save,
+            commands::lsp::lsp_close,
+            commands::lsp::lsp_request,
+            commands::lsp::lsp_restart,
+            commands::lsp::lsp_configure,
             commands::dev::github_status,
             commands::dev::github_connect,
             commands::dev::github_disconnect,
@@ -317,6 +328,14 @@ pub fn run() {
             commands::system::media_status,
             commands::system::media_control,
         ]))
-        .run(tauri::generate_context!())
-        .expect("error while running NETRUNNER");
+        .build(tauri::generate_context!())
+        .expect("error while building NETRUNNER")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                // Language servers get a polite shutdown instead of a broken pipe.
+                if let Some(lsp) = app.try_state::<std::sync::Arc<dev::lsp::bridge::Lsp>>() {
+                    lsp.stop_all();
+                }
+            }
+        });
 }

@@ -119,6 +119,16 @@ export function sendToTerminal(session: TermSession, command: string) {
   void api.term.write(session.id, command + "\r");
 }
 
+/** Types a command into the named PowerShell terminal, opening it if needed. */
+export async function runInTerminal(title: string, command: string, cwd: string | null): Promise<TermSession | null> {
+  let session = useTerminals.getState().sessions.find((s) => s.title === title && !s.exited);
+  if (!session) session = (await openTerminal("powershell", cwd, title)) ?? undefined;
+  if (!session) return null;
+  useTerminals.getState().setActive(session.id);
+  sendToTerminal(session, command);
+  return session;
+}
+
 // Keep terminal colours in sync with the NETRUNNER theme.
 useSettings.subscribe((state, prev) => {
   if (state.values.theme === prev.values.theme) return;

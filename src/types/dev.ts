@@ -112,3 +112,61 @@ export interface GitHubIssue {
   updatedAt: string;
   draft: boolean | null;
 }
+
+// ---------- Language servers (LSP) ----------
+
+export type LspEvent =
+  | { type: "status"; server: string; spec: string; state: "starting" | "ready" | "crashed" | "stopped"; message: string | null }
+  | { type: "diagnostics"; server: string; uri: string; path: string | null; version: number | null; diagnostics: LspDiagnostic[] }
+  | { type: "log"; server: string; level: number; message: string }
+  | { type: "progress"; server: string; token: unknown; value: { kind?: string; title?: string; message?: string; percentage?: number } | null }
+  | { type: "applyEdit"; server: string; label: string | null; edit: LspWorkspaceEdit };
+
+export type LspOpened =
+  | { state: "ready"; server: string; spec: string; name: string; uri: string; languageId: string; capabilities: Record<string, unknown> }
+  | { state: "missing"; spec: string; name: string; server: string; install: string | null }
+  | { state: "disabled"; spec: string; name: string }
+  | { state: "failed"; spec: string; name: string; message: string }
+  | { state: "unsupported" };
+
+export interface LspServerStatus {
+  id: string;
+  name: string;
+  server: string;
+  extensions: string[];
+  found: boolean;
+  path: string | null;
+  version: string | null;
+  customPath: boolean;
+  disabled: boolean;
+  install: string | null;
+  docs: string;
+}
+
+export interface LspPosition {
+  line: number;
+  character: number;
+}
+export interface LspRange {
+  start: LspPosition;
+  end: LspPosition;
+}
+export interface LspDiagnostic {
+  range: LspRange;
+  severity?: number;
+  code?: string | number | { value: string | number };
+  source?: string;
+  message: string;
+  tags?: number[];
+}
+export interface LspTextEdit {
+  range: LspRange;
+  newText: string;
+}
+export interface LspWorkspaceEdit {
+  changes?: Record<string, LspTextEdit[]>;
+  documentChanges?: (
+    | { textDocument: { uri: string; version?: number | null }; edits: LspTextEdit[] }
+    | { kind: "create" | "rename" | "delete"; uri?: string; oldUri?: string; newUri?: string }
+  )[];
+}

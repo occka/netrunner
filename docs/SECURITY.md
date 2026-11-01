@@ -26,6 +26,7 @@
 | Git discard / push | Confirmation required (backend enforces `confirmed`); push explains it publishes commits |
 | Git clone | https URLs only; target folder must not exist |
 | Terminals | Allowlisted shells only (PowerShell, pwsh, cmd, Git Bash); cwd must be inside a project |
+| Language servers | Only executables from the registry's known names (or a path the user picked) start, in the project folder, without a window. The UI may send only allow-listed LSP methods, for files inside open projects. Server edits to files that are not open are written only after confirmation; file create/rename/delete steps are skipped. **Install** types the official command into a visible terminal after confirmation; NETRUNNER never installs a server itself |
 
 The command policy is a safety net, not a sandbox: a confirmed command runs with your rights.
 

@@ -74,6 +74,8 @@ export interface SettingsSchema {
   "appearance.scanlines": boolean;
   "appearance.glow": boolean;
   "appearance.vignette": boolean;
+  /** DEVELOPER: format with the language server before saving. */
+  "developer.format_on_save": boolean;
 }
 
 export const SETTINGS_DEFAULTS: SettingsSchema = {
@@ -118,6 +120,7 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "appearance.scanlines": false,
   "appearance.glow": false,
   "appearance.vignette": false,
+  "developer.format_on_save": false,
 };
 
 export type SettingKey = keyof SettingsSchema;

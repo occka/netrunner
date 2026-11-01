@@ -35,6 +35,10 @@ Development builds (`npm run app:dev`) never run automations, so rebuilding does
 2. Fire triggers with `automation::fire(app, kind, value)` from wherever the event originates (or add it to `start_event_watcher`); implement actions in `automation::execute` and describe them in `dry_run`.
 3. Add the label in `modules/automation/AutomationModule.tsx` (and `describe…`) and its value field in `ValueInput.tsx`.
 
+## Adding a language server
+
+Add a `Spec` to `SPECS` in `dev/lsp/registry.rs`: executable names, arguments, the extension → LSP language id map, the version flag (or `None` if the binary starts serving instead) and the official install command (typed into a visible terminal, never run hidden). Extensions must stay unique (a test checks). No frontend change is needed. `cargo test lsp` runs the bridge against an in-process fake server; set `NETRUNNER_LSP_SMOKE_DIR` to a folder with `npm i typescript@5 typescript-language-server` to run the real-server smoke test.
+
 ## Adding a game source
 
 Implement a `fn x_games() -> (bool, Vec<Game>)` in `services/games.rs` (detected?, games), add it to `scan()`, and, if the launcher needs parameters, extend `launch_params`. Add the label in `modules/games/GamesModule.tsx`.

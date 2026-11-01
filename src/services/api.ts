@@ -13,6 +13,9 @@ import type {
   GitHubRepo,
   GitHubStatus,
   GitHubUser,
+  LspEvent,
+  LspOpened,
+  LspServerStatus,
   RepoStatus,
   ShellOption,
   TermEvent,
@@ -192,6 +195,18 @@ export const api = {
     remove: (path: string) => call<void>("dev_delete", { path }),
     reveal: (path: string) => call<void>("dev_reveal", { path }),
     toolchains: () => call<Toolchain[]>("dev_toolchains"),
+  },
+
+  lsp: {
+    subscribe: (onEvent: Channel<LspEvent>) => call<void>("lsp_subscribe", { onEvent }),
+    servers: (project: string | null) => call<LspServerStatus[]>("lsp_servers", { project }),
+    open: (path: string, version: number, text: string) => call<LspOpened>("lsp_open", { path, version, text }),
+    change: (uri: string, version: number, text: string) => call<void>("lsp_change", { uri, version, text }),
+    save: (uri: string) => call<void>("lsp_save", { uri }),
+    close: (uri: string) => call<void>("lsp_close", { uri }),
+    request: <T = unknown>(server: string, method: string, params: unknown) => call<T>("lsp_request", { server, method, params }),
+    restart: (server: string) => call<void>("lsp_restart", { server }),
+    configure: (spec: string, path: string | null, disabled: boolean) => call<void>("lsp_configure", { spec, path, disabled }),
   },
 
   term: {

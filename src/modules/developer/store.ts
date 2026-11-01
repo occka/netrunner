@@ -5,7 +5,7 @@ import { notify, reportError } from "@/stores/notifications";
 import { languageFor } from "./languages";
 
 export type IdeMode = "code" | "debug" | "ai";
-export type SidePanel = "explorer" | "git" | "tools";
+export type SidePanel = "explorer" | "git" | "problems" | "tools";
 
 export interface EditorTab {
   key: string;
@@ -48,6 +48,9 @@ interface DevStore {
   bump: () => void;
 }
 
+/** Language-server work around saving (format on save, didSave). */
+export const saveHooks: { before?: (tab: EditorTab) => Promise<unknown>; after?: (tab: EditorTab) => Promise<unknown> } = {};
+
 const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p;
 export const isDirty = (t: EditorTab) => t.kind === "file" && t.content !== t.saved;
 
@@ -86,10 +89,13 @@ export const useDev = create<DevStore>((set, get) => ({
   },
 
   openFile: async (path) => {
-    const key = `file:${path}`;
-    if (get().tabs.some((t) => t.key === key)) return set({ active: key });
+    const same = (a: string) => a.toLowerCase() === path.toLowerCase();
+    const existing = get().tabs.find((t) => t.kind === "file" && same(t.path));
+    if (existing) return set({ active: existing.key });
     try {
       const f = await api.dev.readFile(path);
+      const key = `file:${f.path}`;
+      if (get().tabs.some((t) => t.key === key)) return set({ active: key });
       const tab: EditorTab = {
         key,
         kind: "file",
@@ -184,14 +190,18 @@ export const useDev = create<DevStore>((set, get) => ({
   setContent: (key, content) => set((s) => ({ tabs: s.tabs.map((t) => (t.key === key ? { ...t, content } : t)) })),
 
   save: async (key) => {
-    const tab = get().tabs.find((t) => t.key === key);
-    if (!tab || tab.kind !== "file" || tab.readOnly || !isDirty(tab)) return;
+    const before = get().tabs.find((t) => t.key === key);
+    if (!before || before.kind !== "file" || before.readOnly || !isDirty(before)) return;
     try {
+      await saveHooks.before?.(before);
+      // Formatting may have changed the text.
+      const tab = get().tabs.find((t) => t.key === key) ?? before;
       await api.dev.writeFile(tab.path, tab.content);
       set((s) => ({ tabs: s.tabs.map((t) => (t.key === key ? { ...t, saved: tab.content } : t)), revision: s.revision + 1 }));
+      void saveHooks.after?.(tab);
       notify.success(`Saved ${tab.name}`);
     } catch (err) {
-      reportError(`Could not save ${tab.name}`, err);
+      reportError(`Could not save ${before.name}`, err);
     }
   },
 

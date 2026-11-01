@@ -3,10 +3,13 @@ import { DiffEditor, Editor, type OnMount } from "@monaco-editor/react";
 import { Code2, Lock, Play, X } from "lucide-react";
 import { useSettings } from "@/stores/settings";
 import { applyMonacoTheme, monaco } from "./monaco";
-import { isDirty, useDev } from "./store";
+import { isDirty, useDev, type EditorTab } from "./store";
 import { fileIcon } from "./fileIcons";
+import { fileModelUri, previewModels, takeReveal, useLsp } from "./lsp/client";
+import { LspStatus } from "./lsp/LspStatus";
 
-const modelUri = (key: string) => `inmemory://nr/${encodeURIComponent(key)}`;
+/** File tabs use real file URIs so language servers and Go to Definition can address them. */
+const modelUri = (tab: EditorTab) => (tab.kind === "file" ? fileModelUri(tab.path).toString() : `inmemory://nr/${encodeURIComponent(tab.key)}`);
 
 /** The mounted code editor, so NEURAL can attach the user's current selection. */
 let currentEditor: monaco.editor.IStandaloneCodeEditor | null = null;
@@ -33,12 +36,26 @@ export function EditorArea({ onRun }: { onRun: (path: string) => void }) {
   // Free Monaco models of closed tabs (they hold undo history and text).
   const openKeys = tabs.map((t) => t.key).join("|");
   useEffect(() => {
-    const keep = new Set(tabs.map((t) => modelUri(t.key)));
+    const keep = new Set(tabs.map((t) => monaco.Uri.parse(modelUri(t)).toString()));
+    for (const uri of keep) previewModels.delete(uri);
     for (const model of monaco.editor.getModels()) {
-      const uri = model.uri.toString(true);
-      if (uri.startsWith("inmemory://nr/") && !keep.has(uri)) model.dispose();
+      const uri = model.uri.toString();
+      const ours = model.uri.scheme === "file" || uri.startsWith("inmemory://nr/");
+      if (ours && !keep.has(uri) && !previewModels.has(uri)) model.dispose();
     }
   }, [openKeys]); // keyed on the joined tab keys, not the array identity
+
+  // Go to Definition into another file: reveal the target once its tab is shown.
+  const revealTick = useLsp((s) => s.revealTick);
+  useEffect(() => {
+    const ed = currentEditor;
+    if (!ed || !tab || tab.kind !== "file") return;
+    const range = takeReveal(tab.path);
+    if (!range) return;
+    ed.setSelection(range);
+    ed.revealRangeInCenterIfOutsideViewport(range);
+    ed.focus();
+  }, [active, revealTick]); // the reveal waits for the tab switch, not for every tab change
 
   const onMount: OnMount = (editor) => {
     currentEditor = editor;
@@ -103,7 +120,7 @@ export function EditorArea({ onRun }: { onRun: (path: string) => void }) {
           />
         ) : (
           <Editor
-            path={modelUri(tab.key)}
+            path={modelUri(tab)}
             defaultValue={tab.saved}
             defaultLanguage={tab.language}
             theme="netrunner"
@@ -138,6 +155,7 @@ export function EditorArea({ onRun }: { onRun: (path: string) => void }) {
           {tab.kind === "diff" && <span className="tag tag--info">{tab.diff?.staged ? "HEAD ↔ staged" : "staged ↔ working tree"}</span>}
           {tab.kind === "proposal" && <span className="tag tag--accent">AI proposal · current ↔ proposed</span>}
           {isDirty(tab) && <span className="tag tag--warn">Unsaved</span>}
+          {tab.kind === "file" && !tab.binary && <LspStatus path={tab.path} />}
           <span className="editor-status__path mono truncate">{tab.path}</span>
           {tab.kind === "proposal" && (
             <>

@@ -602,3 +602,84 @@
   align-items: center;
   text-transform: none;
 }
+
+/* ---------- Language servers ---------- */
+.lsp-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.lsp-status__progress {
+  max-width: 220px;
+}
+.lsp-status__counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 4px;
+  border: 0;
+  background: none;
+  color: var(--c-text);
+  font: inherit;
+  cursor: pointer;
+}
+.lsp-status__counts:hover {
+  background: var(--c-elevated);
+}
+.text-crit {
+  color: var(--c-critical);
+}
+.text-warn {
+  color: var(--c-warning);
+}
+.tool__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.problems__file {
+  border-bottom: 1px solid var(--c-line-soft);
+}
+.problems__path {
+  padding: 6px 10px 2px;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+.problems__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 10px 3px 16px;
+  border: 0;
+  background: none;
+  color: var(--c-text);
+  font-size: var(--fs-xs);
+  text-align: left;
+  cursor: pointer;
+}
+.problems__item:hover {
+  background: var(--c-elevated);
+}
+.problems__item svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.problems__msg {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.problems__pos {
+  flex-shrink: 0;
+}
+.tools__option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: var(--fs-sm);
+}
