@@ -43,14 +43,14 @@ Remaining: see the release plan below.
 Each release is small enough to test by hand in one sitting and ships through auto-update. Order is by value to daily use; later items may move.
 
 ### 0.6: Widget Studio and overlays
-Done so far: Widget Studio, per-profile overlay sets, click-through and snapping, Notes / To-do, Timer / Alarm, the eight new colour presets. Left: the new background patterns, GITHUB file browsing, private source with public releases.
+Done so far: Widget Studio, per-profile overlay sets, click-through and snapping, Notes / To-do, Timer / Alarm, eight colour presets and seven background patterns. Left: GITHUB file browsing, private source with public releases.
 
 - ✅ **Widget Studio**: build a widget from HTML/CSS (sandboxed iframe, no IPC) or from a template (text, counter, link grid, RSS/JSON feed with a URL allowlist). Saved per profile, usable on the dashboard and as an overlay.
 - ✅ **Per-profile overlay sets**: switching profile shows that profile's overlays (Gaming: FPS/GPU/music; Work: clock/notes).
 - ✅ **Overlay click-through** (mouse passes through a locked overlay) and snap to screen edges.
 - ✅ **Notes / to-do widget** stored locally.
 - ✅ **Timer and alarm widget**: countdowns, stopwatch and alarms with a chosen sound (built-in sounds or your own audio file), repeat days, snooze; alarms ring even when NETRUNNER is in the tray.
-- **More theme presets and background patterns** in the cyberpunk spirit: Matrix rain, neon city, synthwave grid, glitch, hex, holo, CRT green/amber; animated ones respect the motion setting. *Colour presets done; background patterns (`styles/appearance.ts` `PATTERNS`, `appearance.css`, `components/Backdrop.tsx`) remain.*
+- ✅ **More theme presets and background patterns** in the cyberpunk spirit: Matrix rain, neon city, synthwave grid, glitch, hex, holo, CRT green/amber; animated ones respect the motion setting.
 
 - **GITHUB file browsing**: browse a repository's files and code inside NETRUNNER; open it in DEVELOPER (local clones are found automatically, or pick the folder).
 - **Private source, public releases**: the source repository becomes private; installers and auto-updates are published from a separate public releases repository.
