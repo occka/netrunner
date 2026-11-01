@@ -5,7 +5,7 @@ import { useShell } from "@/stores/shell";
 import { useSetting, useSettings } from "@/stores/settings";
 import { reportError } from "@/stores/notifications";
 
-const HOVER_DELAY_MS = 380;
+const HOVER_DELAY_MS = 200;
 
 export function NavRail() {
   const active = useShell((s) => s.module);

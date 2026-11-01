@@ -37,7 +37,45 @@ Done:
 - **Web overlays** for music and video, pop-out of a playing tab and back, **Music Player** widget (NETRUNNER tabs first, music sites first, sticky on pause; other apps through Windows media sessions).
 - **Appearance**: app and dashboard backgrounds (your images or animated patterns), glass panels, corner radius, fonts, interface scale, glow / scanlines / vignette, per-widget accent colour.
 
-Remaining: Widget Studio (custom widgets from HTML), plugin architecture, visual automation editor, more automation triggers, uBlock scriptlet resources, per-profile overlay sets.
+Remaining: see the release plan below.
+
+## Release plan
+Each release is small enough to test by hand in one sitting and ships through auto-update. Order is by value to daily use; later items may move.
+
+### 0.6: Widget Studio and overlays
+- **Widget Studio**: build a widget from HTML/CSS (sandboxed iframe, no IPC) or from a template (text, counter, link grid, RSS/JSON feed with a URL allowlist). Saved per profile, usable on the dashboard and as an overlay.
+- **Per-profile overlay sets**: switching profile shows that profile's overlays (Gaming: FPS/GPU/music; Work: clock/notes).
+- **Overlay click-through** (mouse passes through a locked overlay) and snap to screen edges.
+- **Notes / to-do widget** stored locally.
+
+### 0.7: Automation editor
+- **Visual rule editor**: trigger → conditions → several actions, with a dry-run preview.
+- **New triggers**: time of day / schedule, file created in a folder, download finished, network or VPN-type adapter up/down, game started (from the GAMES library), battery / power plan change.
+- **New actions**: set volume, switch power plan, open a URL in BROWSER, show/hide an overlay set, wait N seconds.
+
+### 0.8: System and sound
+- **Audio**: output/input device switching and per-app volume (Core Audio), as a module and a widget.
+- **Sensors**: optional HWiNFO shared-memory bridge for CPU/GPU temperatures and fan speeds (read-only, user enables it).
+- **Per-profile Quick Access sets** and hotkeys per entry; hotkey editor in Settings.
+
+### 0.9: Browser, part 2
+- **uBlock scriptlet resources** so in-video ads on sites like YouTube are blocked too.
+- Per-site JavaScript / autoplay / zoom memory, reader mode, tab groups, tab search, recently closed tabs (Ctrl+Shift+T).
+- Download manager panel with progress and "open folder"; per-site cookie viewer.
+- Password autofill through Windows Credential Manager (opt-in).
+
+### 1.0: Platform
+- **Plugin architecture**: signed plugins with a declared permission set (commands, widgets, automation triggers), loaded in an isolated webview; no access beyond what they declare.
+- **DEVELOPER**: language servers (TypeScript, Rust, Python) for completion and diagnostics; debugger (DAP) later.
+- **FILES**: zip/7z browsing, duplicate finder, opt-in search index.
+- Export / import of settings, profiles and layouts; backup schedule in STORAGE.
+
+### Engineering (alongside releases)
+- Upgrade `vitest` to 5.x (current 3.x has advisories in dev-only tooling, not shipped).
+- Run typecheck, tests and clippy on every pull request in CI, not only on release tags.
+- End-to-end smoke test of the built app (start, open each module, BROWSER tab, overlay).
+- Authenticode code-signing certificate so Windows SmartScreen trusts the installer (needs a purchased certificate).
+- Reduce the DEVELOPER chunk (Monaco) further; lazy-load language workers on demand.
 
 ## Known limitations
 - Temperatures: usually unavailable to standard-user apps; GPU temperature is not exposed by PDH.

@@ -100,6 +100,12 @@ export default function AutomationModule() {
         </button>
       </ModuleHeader>
       <div className="module__scroll">
+        {import.meta.env.DEV && (
+          <div className="edit-banner">
+            <span className="tag tag--warn">Dev build</span>
+            Automations do not run in development builds, so rebuilding does not launch your programs.
+          </div>
+        )}
         <div className="howto">
           <div className="label">How rules work</div>
           <ol>

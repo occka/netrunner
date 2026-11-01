@@ -75,7 +75,9 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "inspector.visible": true,
   "inspector.width": 300,
   "monitor.interval_ms": 1500,
-  "ui.motion": "system",
+  // Windows' "Animation effects" is often switched off for performance, not
+  // preference, so NETRUNNER animates unless asked otherwise.
+  "ui.motion": "full",
   "app.close_to_tray": true,
   "app.start_minimized": true,
   "app.update_check": true,

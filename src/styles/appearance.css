@@ -102,7 +102,7 @@
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .backdrop__pattern--aurora {
+  :root[data-motion="system"] .backdrop__pattern--aurora {
     animation: none;
   }
 }

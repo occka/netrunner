@@ -1,0 +1,186 @@
+/* ---------- Motion ----------
+   Entrance animations for surfaces that appear or swap. Durations come from
+   --dur / --dur-fast, so "Reduced" (and "Follow Windows" with animations off)
+   turns all of them off in one place. */
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-slow: 260ms;
+  --nav-dur: 220ms;
+}
+:root[data-motion="reduced"] {
+  --dur-slow: 0ms;
+  --nav-dur: 0ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-motion="system"] {
+    --dur-slow: 0ms;
+    --nav-dur: 0ms;
+  }
+}
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation-duration: 0ms !important;
+  animation-iteration-count: 1 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-motion="system"] *,
+  :root[data-motion="system"] *::before,
+  :root[data-motion="system"] *::after {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@keyframes nr-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes nr-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+}
+@keyframes nr-slide-left {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+@keyframes nr-slide-right {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+@keyframes nr-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Navigation rail: width and labels move together; labels slide in. */
+.shell__nav,
+.nav {
+  transition-duration: var(--nav-dur);
+  transition-timing-function: var(--ease-out);
+}
+.nav__label {
+  transform: translateX(-6px);
+  transition:
+    opacity var(--nav-dur) var(--ease-out),
+    transform var(--nav-dur) var(--ease-out);
+}
+.nav[data-open="true"] .nav__label {
+  transform: none;
+}
+.nav__phase {
+  transition: opacity var(--nav-dur) var(--ease-out);
+}
+.nav__item[aria-current="page"]::before {
+  animation: nr-fade var(--dur) var(--ease-out);
+}
+
+/* Module switch: the new module rises in. */
+.workspace > .module,
+.workspace > * > .module {
+  animation: nr-rise var(--dur-slow) var(--ease-out);
+}
+
+/* Inspector slides in from the right when shown; its sections cross-fade. */
+.inspector {
+  animation: nr-slide-left var(--dur-slow) var(--ease-out);
+}
+.inspector__body > * {
+  animation: nr-fade var(--dur) var(--ease-out);
+}
+.inspector__tabs button {
+  transition:
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur) var(--ease-out);
+}
+
+/* Dialogs, palette and menus pop in. */
+.dialog,
+.palette {
+  animation: nr-pop var(--dur) var(--ease-out);
+}
+.menu {
+  animation: nr-pop var(--dur-fast) var(--ease-out);
+  transform-origin: top left;
+}
+.notif-panel {
+  animation: nr-pop var(--dur) var(--ease-out);
+}
+
+/* Dashboard widgets fade up on load; hover states ease. */
+.dash .widget {
+  animation: nr-rise var(--dur-slow) var(--ease-out) both;
+}
+.panel {
+  transition:
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+.btn,
+.icon-btn,
+.tile,
+.overlay-type,
+.picker__item,
+.browser__tile,
+.wallpaper {
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease);
+}
+.btn:active:not(:disabled),
+.icon-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.tile:hover:not(:disabled),
+.browser__tile:hover {
+  transform: translateY(-1px);
+}
+
+/* BROWSER: tabs, side panel, notices. */
+.browser__tab {
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur) var(--ease-out);
+}
+.browser__tab:not(.browser__tab--sleeping) {
+  animation: nr-rise var(--dur) var(--ease-out);
+}
+.browser__panel {
+  animation: nr-slide-left var(--dur-slow) var(--ease-out);
+}
+.browser__notice {
+  animation: nr-slide-right var(--dur) var(--ease-out);
+}
+.browser__start-inner {
+  animation: nr-rise var(--dur-slow) var(--ease-out);
+}
+
+/* Settings forms. */
+.wsettings__group,
+.settings-group {
+  animation: nr-rise var(--dur-slow) var(--ease-out) both;
+}
+.segmented button {
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+/* The rail expanded on hover floats over content: keep it readable even with
+   translucent "glass" panels. */
+.shell__nav[data-pinned="false"] .nav[data-open="true"] {
+  background: rgb(var(--c-surface-rgb) / max(var(--panel-alpha), 0.95));
+}

@@ -25,6 +25,8 @@ cd src-tauri && cargo test && cargo clippy --all-targets
 
 Rust tests include `system::smoke` and `dev::smoke`, which call real Windows APIs and the git CLI on your machine. If `npm run app:dev` is running, give `cargo test` its own target dir (`$env:CARGO_TARGET_DIR="target\test"`) so it does not fight the dev build over file locks.
 
+Development builds (`npm run app:dev`) never run automations, so rebuilding does not launch your real programs. Set `NETRUNNER_DEV_AUTOMATION=1` before starting the dev build to test the engine.
+
 ## Adding an automation trigger or action
 
 1. Add the kind to the `CHECK` constraint in a new migration and to `TRIGGERS` / `ACTIONS` in `services/automation.rs`.

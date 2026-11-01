@@ -18,6 +18,7 @@ import "@/styles/developer.css";
 import "@/styles/neural.css";
 import "@/styles/browser.css";
 import "@/styles/appearance.css";
+import "@/styles/motion.css";
 import { applyTheme, DEFAULT_THEME } from "@/styles/theme";
 import { App } from "@/app/App";
 import { OverlayApp } from "@/overlay/OverlayApp";
