@@ -53,7 +53,7 @@ pub fn start(app: &AppHandle) {
             // game id → session row being extended.
             let mut sessions: HashMap<String, i64> = HashMap::new();
             loop {
-                if scanned.is_none_or(|t| t.elapsed() > RESCAN) {
+                if scanned.map_or(true, |t| t.elapsed() > RESCAN) {
                     games = watched(&app);
                     scanned = Some(Instant::now());
                 }
