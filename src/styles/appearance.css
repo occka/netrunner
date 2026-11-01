@@ -107,6 +107,224 @@
   }
 }
 
+/* ---------- Cyberpunk patterns (0.6) ----------
+   Colours come from the theme; shapes CSS cannot draw are SVG masks over a
+   theme-coloured layer. Animations stop with reduced motion (motion.css).
+   Matrix rain is a canvas (components/MatrixRain.tsx). */
+/* Static streaks for previews; the live canvas covers them. */
+.backdrop__pattern--matrix {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 14px, rgb(var(--c-primary-rgb) / 0.12) 14px 16px),
+    linear-gradient(180deg, transparent, rgb(var(--c-primary-rgb) / 0.12)),
+    var(--c-background);
+}
+.backdrop__pattern--matrix canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.backdrop__pattern--neon-city {
+  background:
+    radial-gradient(ellipse 70% 40% at 50% 100%, rgb(var(--c-primary-rgb) / 0.35), transparent 70%),
+    linear-gradient(180deg, var(--c-background) 0%, rgb(var(--c-secondary-rgb) / 0.16) 70%, rgb(var(--c-primary-rgb) / 0.25) 100%),
+    var(--c-background);
+}
+.backdrop__pattern--neon-city::before,
+.backdrop__pattern--neon-city::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 46%;
+  -webkit-mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'><path d='M0 100V10H14V67H34V64H52V12H62V65H72V55H82V67H98V10H108V33H128V33H146V68H158V52H170V63H188V18H206V33H216V47H228V66H248V57H266V43H284V33H300V51H314V26H326V34H336V14H352V52H368V63H378V22H390V44H400V100Z'/></svg>") 0 100% / 900px 100% repeat-x;
+  mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'><path d='M0 100V10H14V67H34V64H52V12H62V65H72V55H82V67H98V10H108V33H128V33H146V68H158V52H170V63H188V18H206V33H216V47H228V66H248V57H266V43H284V33H300V51H314V26H326V34H336V14H352V52H368V63H378V22H390V44H400V100Z'/></svg>") 0 100% / 900px 100% repeat-x;
+}
+/* Neon rim: the skyline in the accent colour, raised 3px so it shows above the buildings. */
+.backdrop__pattern--neon-city::before {
+  background: rgb(var(--c-primary-rgb) / 0.85);
+  -webkit-mask-position: 0 calc(100% - 3px);
+  mask-position: 0 calc(100% - 3px);
+}
+/* Buildings with scattered lit windows. */
+.backdrop__pattern--neon-city::after {
+  background:
+    radial-gradient(rgb(var(--c-secondary-rgb) / 0.8) 0 1.3px, transparent 1.8px) 5px 9px / 23px 31px,
+    radial-gradient(rgb(var(--c-primary-rgb) / 0.7) 0 1.1px, transparent 1.6px) 14px 3px / 37px 23px,
+    radial-gradient(rgb(var(--c-warning-rgb) / 0.55) 0 1px, transparent 1.5px) 2px 17px / 53px 41px,
+    rgb(var(--c-surface-rgb) / 0.97);
+  animation: nr-city-flicker 7s steps(1) infinite;
+}
+@keyframes nr-city-flicker {
+  0%, 100% { filter: brightness(1); }
+  23% { filter: brightness(0.85); }
+  24% { filter: brightness(1.05); }
+  61% { filter: brightness(0.8); }
+  62% { filter: brightness(1); }
+}
+
+.backdrop__pattern--synthwave {
+  background:
+    radial-gradient(circle at 50% 58%, rgb(var(--c-warning-rgb) / 0.9) 0 9%, rgb(var(--c-primary-rgb) / 0.85) 15%, transparent 15.2%),
+    radial-gradient(ellipse 80% 45% at 50% 58%, rgb(var(--c-primary-rgb) / 0.3), transparent 70%),
+    linear-gradient(180deg, var(--c-background) 0%, rgb(var(--c-secondary-rgb) / 0.18) 45%, rgb(var(--c-primary-rgb) / 0.22) 58%, var(--c-background) 58.2%);
+}
+/* Bands cut across the lower half of the sun. */
+.backdrop__pattern--synthwave::before {
+  content: "";
+  position: absolute;
+  inset: 44% 0 42%;
+  background: repeating-linear-gradient(180deg, transparent 0 9px, var(--c-background) 9px 13px);
+  -webkit-mask: linear-gradient(180deg, transparent 35%, #000 60%);
+  mask: linear-gradient(180deg, transparent 35%, #000 60%);
+}
+/* Perspective grid floor scrolling towards the viewer. */
+.backdrop__pattern--synthwave::after {
+  content: "";
+  position: absolute;
+  left: -50%;
+  right: -50%;
+  top: 58%;
+  height: 90%;
+  background:
+    linear-gradient(rgb(var(--c-primary-rgb) / 0.7) 2px, transparent 2px) 0 0 / 60px 60px,
+    linear-gradient(90deg, rgb(var(--c-secondary-rgb) / 0.6) 2px, transparent 2px) 0 0 / 60px 60px;
+  transform: perspective(300px) rotateX(62deg);
+  transform-origin: 50% 0;
+  -webkit-mask: linear-gradient(180deg, transparent, #000 25%);
+  mask: linear-gradient(180deg, transparent, #000 25%);
+  animation: nr-synth-grid 2.4s linear infinite;
+}
+@keyframes nr-synth-grid {
+  to { background-position: 0 60px, 0 60px; }
+}
+
+.backdrop__pattern--glitch {
+  background:
+    repeating-linear-gradient(0deg, rgb(var(--c-text-rgb) / 0.03) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at 30% 20%, rgb(var(--c-primary-rgb) / 0.16), transparent 60%),
+    var(--c-background);
+}
+.backdrop__pattern--glitch::before,
+.backdrop__pattern--glitch::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: screen;
+}
+/* Horizontal tears in the two accent colours, jumping in steps. */
+.backdrop__pattern--glitch::before {
+  background: linear-gradient(
+    transparent 12%,
+    rgb(var(--c-primary-rgb) / 0.22) 12% 13.5%,
+    transparent 13.5% 47%,
+    rgb(var(--c-primary-rgb) / 0.14) 47% 47.6%,
+    transparent 47.6% 78%,
+    rgb(var(--c-primary-rgb) / 0.2) 78% 80%,
+    transparent 80%
+  );
+  animation: nr-glitch-a 3.7s steps(1) infinite;
+}
+.backdrop__pattern--glitch::after {
+  background: linear-gradient(
+    transparent 28%,
+    rgb(var(--c-secondary-rgb) / 0.2) 28% 29%,
+    transparent 29% 63%,
+    rgb(var(--c-secondary-rgb) / 0.16) 63% 65%,
+    transparent 65%
+  );
+  animation: nr-glitch-b 2.9s steps(1) infinite;
+}
+@keyframes nr-glitch-a {
+  0%, 100% { transform: translate(0, 0); opacity: 0.9; }
+  9% { transform: translate(-14px, 4%); opacity: 1; }
+  11% { transform: translate(6px, -9%); }
+  13% { transform: translate(0, 0); opacity: 0.6; }
+  57% { transform: translate(22px, 18%); opacity: 1; }
+  59% { transform: translate(0, 0); opacity: 0.8; }
+}
+@keyframes nr-glitch-b {
+  0%, 100% { transform: translate(0, 0); }
+  31% { transform: translate(18px, -12%); }
+  33% { transform: translate(-8px, 6%); }
+  35% { transform: translate(0, 0); }
+  78% { transform: translate(-20px, 22%); }
+  80% { transform: translate(0, 0); }
+}
+
+.backdrop__pattern--hex {
+  background:
+    radial-gradient(ellipse at 50% 40%, rgb(var(--c-primary-rgb) / 0.14), transparent 70%),
+    var(--c-background);
+}
+.backdrop__pattern--hex::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgb(var(--c-primary-rgb) / 0.32);
+  -webkit-mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='56' height='100'><path d='M28 66L0 50V16L28 0l28 16v34L28 66v34M28 0v34L0 50v34l28 16 28-16V50L28 34' fill='none' stroke='black' stroke-width='1.4'/></svg>") 0 0 / 42px 75px;
+  mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='56' height='100'><path d='M28 66L0 50V16L28 0l28 16v34L28 66v34M28 0v34L0 50v34l28 16 28-16V50L28 34' fill='none' stroke='black' stroke-width='1.4'/></svg>") 0 0 / 42px 75px;
+}
+/* A slow light sweeping across the cells. */
+.backdrop__pattern--hex::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 40%, rgb(var(--c-secondary-rgb) / 0.12) 50%, transparent 60%) 0 0 / 300% 100%;
+  animation: nr-sweep 14s linear infinite;
+}
+@keyframes nr-sweep {
+  from { background-position: 100% 0; }
+  to { background-position: -50% 0; }
+}
+
+.backdrop__pattern--holo {
+  background:
+    linear-gradient(rgb(var(--c-text-rgb) / 0.04) 1px, transparent 1px) 0 0 / 100% 6px,
+    linear-gradient(120deg, rgb(var(--c-primary-rgb) / 0.3), rgb(var(--c-secondary-rgb) / 0.28), rgb(var(--c-success-rgb) / 0.2), rgb(var(--c-primary-rgb) / 0.3)) 0 0 / 300% 300%,
+    var(--c-background);
+  animation: nr-holo 18s ease-in-out infinite alternate;
+}
+@keyframes nr-holo {
+  to { background-position: 0 0, 100% 100%; }
+}
+.backdrop__pattern--holo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, transparent 40%, var(--c-background) 95%);
+}
+
+/* CRT: phosphor glow in the primary colour (pairs with the CRT Green / CRT Amber themes). */
+.backdrop__pattern--crt {
+  background:
+    repeating-linear-gradient(0deg, rgb(0 0 0 / 0.35) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse 85% 75% at 50% 50%, rgb(var(--c-primary-rgb) / 0.2), rgb(var(--c-primary-rgb) / 0.04) 65%, transparent 80%),
+    var(--c-background);
+  animation: nr-crt-flicker 0.15s steps(2) infinite;
+}
+.backdrop__pattern--crt::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 3% / 5%;
+  box-shadow: inset 0 0 120px 30px rgb(0 0 0 / 0.75);
+}
+/* A refresh band rolling slowly down the screen. */
+.backdrop__pattern--crt::before {
+  content: "";
+  position: absolute;
+  inset: -20% 0 auto;
+  height: 20%;
+  background: linear-gradient(180deg, transparent, rgb(var(--c-primary-rgb) / 0.07), transparent);
+  animation: nr-crt-roll 8s linear infinite;
+}
+@keyframes nr-crt-flicker {
+  50% { opacity: 0.97; }
+}
+@keyframes nr-crt-roll {
+  to { transform: translateY(600%); }
+}
+
 /* Effects. They draw over NETRUNNER's own UI only; browser pages are native views on top. */
 :root[data-fx-scanlines] .shell::after {
   content: "";

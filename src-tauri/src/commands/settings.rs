@@ -18,6 +18,9 @@ pub async fn settings_set(app: tauri::AppHandle, state: State<'_, AppState>, key
     if key.starts_with("browser.") {
         crate::browser::reload_prefs(&app);
     }
+    if key == crate::overlay_snap::SETTING_KEY {
+        crate::overlay_snap::set_enabled(value.as_bool().unwrap_or(true));
+    }
     Ok(())
 }
 

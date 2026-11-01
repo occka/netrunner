@@ -5,6 +5,7 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 import {
   Activity,
+  AlarmClock,
   BrainCircuit,
   CalendarClock,
   Code2,
@@ -13,16 +14,19 @@ import {
   HardDrive,
   Image,
   ListTree,
+  NotebookPen,
   MemoryStick,
   Monitor,
   Music,
   Network,
   Rocket,
   Thermometer,
+  WandSparkles,
   type LucideIcon,
 } from "lucide-react";
 import {
   ACTIVITY_SETTINGS,
+  ALARM_SETTINGS,
   CLOCK_SETTINGS,
   CPU_SETTINGS,
   FRAME_SETTINGS,
@@ -30,8 +34,10 @@ import {
   IMAGE_SETTINGS,
   MUSIC_SETTINGS,
   NETWORK_SETTINGS,
+  NOTES_SETTINGS,
   QUICK_ACCESS_SETTINGS,
   RAM_SETTINGS,
+  STUDIO_SETTINGS,
   STORAGE_SETTINGS,
   SYSTEM_OVERVIEW_SETTINGS,
   TASKS_SETTINGS,
@@ -70,6 +76,8 @@ export interface WidgetDef {
   minSize: { w: number; h: number };
   /** Content settings (frame settings are added for every widget). */
   settings?: WidgetSchema;
+  /** Instances are made from Widget Studio, not from the generic widget lists. */
+  studio?: boolean;
   // `any`: each widget narrows its own config type.
   component?: LazyExoticComponent<ComponentType<WidgetProps<any>>>;
 }
@@ -251,6 +259,47 @@ const defs: WidgetDef[] = [
     component: lazy(() => import("./ClockWidget")),
   },
   {
+    type: "custom",
+    title: "Custom widget",
+    description: "A widget you built in Widget Studio: your own HTML/CSS or a template.",
+    icon: WandSparkles,
+    status: "live",
+    dataSource: "Widget Studio (local database). HTML widgets run in a sandbox without scripts or network; feeds are fetched only from hosts you allowed.",
+    keywords: ["studio", "custom", "html", "feed", "rss"],
+    defaultSize: { w: 3, h: 6 },
+    minSize: { w: 1, h: 2 },
+    settings: STUDIO_SETTINGS,
+    studio: true,
+    component: lazy(() => import("./CustomWidget")),
+  },
+  {
+    type: "alarm",
+    title: "Timer / Alarm",
+    description: "Alarms with repeat days and snooze, countdown timers and a stopwatch.",
+    icon: AlarmClock,
+    status: "live",
+    dataSource:
+      "NETRUNNER's own scheduler (local database). Alarms and timers ring while NETRUNNER runs, also from the tray; not while it is closed.",
+    keywords: ["alarm", "timer", "countdown", "stopwatch", "будильник", "таймер", "секундомер", "clock"],
+    defaultSize: { w: 3, h: 9 },
+    minSize: { w: 2, h: 5 },
+    settings: ALARM_SETTINGS,
+    component: lazy(() => import("./AlarmWidget")),
+  },
+  {
+    type: "notes",
+    title: "Notes / To-do",
+    description: "A task list and a scratch note. Share a board between the dashboard and overlays.",
+    icon: NotebookPen,
+    status: "live",
+    dataSource: "Your notes, stored only in NETRUNNER's local database.",
+    keywords: ["todo", "to-do", "tasks", "checklist", "notes", "notepad", "заметки", "задачи"],
+    defaultSize: { w: 3, h: 9 },
+    minSize: { w: 2, h: 4 },
+    settings: NOTES_SETTINGS,
+    component: lazy(() => import("./NotesWidget")),
+  },
+  {
     type: "thermal",
     title: "Thermal Monitor",
     description: "Temperature sensors exposed by Windows.",
@@ -289,3 +338,5 @@ export function widgetConfig(def: WidgetDef | undefined, raw: RawConfig | undefi
 
 export const WIDGETS: Record<string, WidgetDef> = Object.fromEntries(defs.map((d) => [d.type, d]));
 export const WIDGET_TYPES = defs.map((d) => d.type);
+/** Types offered in "Add widget" and "New overlay" (Studio widgets are added from their own list). */
+export const PICKER_TYPES = defs.filter((d) => !d.studio).map((d) => d.type);

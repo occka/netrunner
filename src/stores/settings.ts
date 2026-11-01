@@ -35,6 +35,8 @@ export interface SettingsSchema {
   "app.start_minimized": boolean;
   /** Check GitHub releases for an update at startup. */
   "app.update_check": boolean;
+  /** Read by the backend (overlay_snap.rs): overlays stick to screen edges and to each other. */
+  "overlay.snap": boolean;
   // BROWSER: read by the backend (browser/mod.rs `Prefs`). Changing one reloads them.
   "browser.adblock": boolean;
   "browser.cosmetic": boolean;
@@ -81,6 +83,7 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "app.close_to_tray": true,
   "app.start_minimized": true,
   "app.update_check": true,
+  "overlay.snap": true,
   "browser.adblock": true,
   "browser.cosmetic": true,
   "browser.https_only": true,

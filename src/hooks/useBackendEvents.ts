@@ -28,6 +28,13 @@ export function useBackendEvents() {
       }),
       listen("profiles://changed", () => void useProfiles.getState().load()),
       listen("automation://ran", () => refreshActivity()),
+      // A link clicked in a widget (dashboard or overlay): open it as a BROWSER tab.
+      listen<string>("browser://open-request", async (e) => {
+        useShell.getState().navigate("browser");
+        const { useBrowser } = await import("@/modules/browser/store");
+        await useBrowser.getState().init();
+        await useBrowser.getState().open(e.payload);
+      }),
       // A tab came back from a web overlay: show it in BROWSER.
       listen<string>("browser://returned", async (e) => {
         useShell.getState().navigate("browser");

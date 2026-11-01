@@ -13,6 +13,11 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (3, include_str!("../../migrations/0003_automation_launch_program.sql")),
     (4, include_str!("../../migrations/0004_neural_history.sql")),
     (5, include_str!("../../migrations/0005_browser_widget_settings.sql")),
+    (6, include_str!("../../migrations/0006_overlay_profiles.sql")),
+    (7, include_str!("../../migrations/0007_overlay_click_through.sql")),
+    (8, include_str!("../../migrations/0008_notes.sql")),
+    (9, include_str!("../../migrations/0009_alarms.sql")),
+    (10, include_str!("../../migrations/0010_widget_studio.sql")),
 ];
 
 pub const LATEST_VERSION: i64 = MIGRATIONS[MIGRATIONS.len() - 1].0;

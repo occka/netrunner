@@ -313,3 +313,70 @@ pub async fn github_repos() -> AppResult<Vec<github::Repo>> {
 pub async fn github_issues(owner: String, repo: String, pulls: bool, state: Option<String>) -> AppResult<Vec<github::Issue>> {
     github::issues(&owner, &repo, pulls, state.as_deref().unwrap_or("open")).await
 }
+
+#[tauri::command]
+pub async fn github_contents(owner: String, repo: String, path: String, git_ref: Option<String>) -> AppResult<Vec<github::RepoEntry>> {
+    github::contents(&owner, &repo, &path, git_ref.as_deref()).await
+}
+
+#[tauri::command]
+pub async fn github_file(owner: String, repo: String, path: String, git_ref: Option<String>) -> AppResult<github::RepoFile> {
+    github::file(&owner, &repo, &path, git_ref.as_deref()).await
+}
+
+#[tauri::command]
+pub async fn github_branches(owner: String, repo: String) -> AppResult<Vec<String>> {
+    github::branches(&owner, &repo).await
+}
+
+const LINKS_KEY: &str = "github.links";
+
+/// Local clones: folders you linked by hand, then clones found automatically
+/// (project list, usual folders, drive roots; bounded scan). "owner/repo" (lower case) → folder.
+#[tauri::command]
+pub async fn github_local_clones(state: State<'_, AppState>) -> AppResult<std::collections::BTreeMap<String, String>> {
+    let (projects, links) = {
+        let conn = state.db.conn()?;
+        (workspace::roots(&conn)?, crate::services::settings::get(&conn, LINKS_KEY)?.unwrap_or_default())
+    };
+    let mut found = tauri::async_runtime::spawn_blocking(move || github::find_clones(&github::search_roots(&projects), 6000))
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    if let Some(map) = links.as_object() {
+        for (repo, path) in map {
+            if let Some(path) = path.as_str().filter(|p| std::path::Path::new(p).is_dir()) {
+                found.insert(repo.to_lowercase(), path.to_string());
+            }
+        }
+    }
+    Ok(found)
+}
+
+/// Links a repository to a local folder (a Git working tree), or removes the link with `path` = None.
+#[tauri::command]
+pub async fn github_link_local(state: State<'_, AppState>, full_name: String, path: Option<String>) -> AppResult<()> {
+    let key = full_name.to_lowercase();
+    if key.split('/').count() != 2 || key.len() > 201 {
+        return Err(crate::error::AppError::Invalid("invalid repository".into()));
+    }
+    let conn = state.db.conn()?;
+    let mut links = crate::services::settings::get(&conn, LINKS_KEY)?.unwrap_or_else(|| serde_json::json!({}));
+    if !links.is_object() {
+        links = serde_json::json!({});
+    }
+    match path {
+        Some(p) => {
+            let dir = std::fs::canonicalize(&p).map_err(|_| crate::error::AppError::NotFound(format!("folder not found: {p}")))?;
+            if !dir.join(".git").exists() {
+                return Err(crate::error::AppError::Invalid("this folder is not a Git repository (no .git inside)".into()));
+            }
+            links[&key] = serde_json::json!(workspace::display(&dir));
+        }
+        None => {
+            if let Some(map) = links.as_object_mut() {
+                map.remove(&key);
+            }
+        }
+    }
+    crate::services::settings::set(&conn, LINKS_KEY, &links)
+}

@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { api } from "@/services/api";
 import { backgroundActive, type BackgroundSpec } from "@/styles/appearance";
+import { MatrixRain } from "./MatrixRain";
 
 /** Wallpapers are read once per name and kept as data URLs for the session. */
 const cache = new Map<string, Promise<string | null>>();
@@ -53,7 +54,7 @@ export function Backdrop({ spec, className }: { spec: BackgroundSpec; className:
           />
         )
       ) : (
-        <div className={`backdrop__pattern backdrop__pattern--${spec.pattern}`} />
+        <div className={`backdrop__pattern backdrop__pattern--${spec.pattern}`}>{spec.pattern === "matrix" && <MatrixRain />}</div>
       )}
       <div className="backdrop__dim" style={{ opacity: spec.dim / 100 }} />
     </div>

@@ -4,11 +4,11 @@
 
 - Standard user rights. NETRUNNER never requests elevation itself. If a launched app needs admin, Windows shows its own UAC prompt. Operations that need administrator rights (machine-wide startup entries, starting/stopping services) are shown read-only.
 - No hidden execution. Shell commands, Run file and terminals always run in visible consoles. Background helpers (git, version probes) only run fixed, known tools.
-- Local data only. Nothing is uploaded. GitHub calls go only to `api.github.com` and only when you use the GITHUB module.
+- Local data only. Nothing is uploaded. GitHub calls go only to `api.github.com` and only when you use the GITHUB module. Looking for local clones reads only `.git/config` files, in a bounded scan, and stays on this computer.
 
 ## Frontend capabilities
 
-`src-tauri/capabilities/default.json` grants the main and overlay webviews `core:default`, window chrome (minimise/maximise/hide/show/close/drag), `dialog:allow-open` (native picker; returns a path, reads nothing) and `log:default`. No fs, shell or opener plugin is exposed to JavaScript. The CSP allows only local resources, IPC and local blob workers (for Monaco).
+`src-tauri/capabilities/default.json` grants the main, overlay and alarm-ringing webviews `core:default`, window chrome (minimise/maximise/hide/show/close/drag), `dialog:allow-open` (native picker; returns a path, reads nothing) and `log:default`. No fs, shell or opener plugin is exposed to JavaScript. The CSP allows only local resources, IPC and local blob workers (for Monaco).
 
 ## Execution safeguards
 
@@ -46,6 +46,14 @@ The command policy is a safety net, not a sandbox: a confirmed command runs with
 | Private tabs | InPrivate WebView2 sessions; nothing is written to history |
 
 Not covered: in-page video ads served from the site's own domain (e.g. YouTube) need uBlock scriptlets, which are not bundled. Loading unpacked extensions (e.g. uBlock Origin Lite) is an opt-in setting; extensions run with the permissions they declare. Fingerprinting resistance beyond WebView2's defaults is not attempted.
+
+## Widget Studio
+
+| Part | Safeguard |
+|---|---|
+| HTML/CSS widgets | Sandboxed frame without `allow-scripts` / `allow-same-origin`: no JavaScript, no NETRUNNER IPC, storage or cookies. Own CSP `default-src 'none'` (images and fonts only as `data:`); the app CSP blocks navigating the frame to remote pages |
+| Feed widgets | Fetched by the backend from the stored address only; host must be on the widget's allowlist, redirects too; 2 MB / 15 s limits, at most every 5 minutes. Markup is stripped; only http(s) links are passed on |
+| Links | Validated as http(s) and opened as BROWSER tabs (hardened profile), never handed to the shell |
 
 ## Credentials
 

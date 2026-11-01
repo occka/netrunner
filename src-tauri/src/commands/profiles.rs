@@ -1,5 +1,5 @@
 use serde_json::Value;
-use tauri::State;
+use tauri::{Emitter, State};
 
 use crate::error::AppResult;
 use crate::services::activity::{self, Level};
@@ -63,6 +63,8 @@ pub async fn profile_activate(app: tauri::AppHandle, state: State<'_, AppState>,
         activity::record(&conn, Level::Info, "profiles", &format!("Switched to profile '{}'", profile.name));
         profile
     };
+    crate::overlay::sync_profile(&app);
+    let _ = app.emit("overlays://changed", ());
     // Rules run on a worker thread so the UI gets its answer immediately.
     std::thread::spawn(move || crate::automation::fire(&app, "profile_changed", &id.to_string()));
     Ok(profile)

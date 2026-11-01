@@ -62,7 +62,9 @@ Add the key and its default to `SettingsSchema` / `SETTINGS_DEFAULTS` in `src/st
 
 ## Claude Code desktop sessions
 
-The Claude desktop app is an MSIX package. Processes started from its terminals inherit its container, so `%APPDATA%` and `%LOCALAPPDATA%` writes land in `AppData\Local\Packages\Claude_*\LocalCache\` instead of the real folders. A dev build started there uses a separate copy of the database and logs. Never launch or update the **installed** NETRUNNER from such a session: the updater would remove the real install and put the new version into the container copy, breaking the Start menu entry and autostart.
+The Claude desktop app is an MSIX package. Processes started from its terminals inherit its container: **new** files under `%APPDATA%` and `%LOCALAPPDATA%` land in `AppData\Local\Packages\Claude_*\LocalCache\`, but files that already exist (such as the installed app's `netrunner.db`) are changed in place. Never launch or update the **installed** NETRUNNER from such a session: the updater would remove the real install and put the new version into the container copy, breaking the Start menu entry and autostart.
+
+Development builds (`debug_assertions`) therefore never use the installed app's data folders: they keep their database, wallpapers, sounds and browser profile in a `dev` subfolder of the app data folders, or in `NETRUNNER_DATA_DIR` (`roaming` and `local` inside it) when that is set. Copy a database there to test with real data; a dev build that migrates it cannot break the installed app.
 
 ## Logs
 
@@ -70,16 +72,18 @@ The backend writes `%LOCALAPPDATA%\com.netrunner.app\logs\NETRUNNER.log`, and st
 
 ## Releases and auto-update
 
-Installed copies update from `https://github.com/occka/netrunner/releases/latest/download/latest.json`. Updates are signed: the public key is in `tauri.conf.json`, and the **private key lives only at `%USERPROFILE%\.tauri\netrunner.key`** (never commit it; back it up, because without it you cannot ship updates to existing installs).
+The source repository `occka/netrunner` can be private. Installers and updates are published to the **public** repository `occka/netrunner-releases`, which holds only a README and releases. Installed copies update from `https://github.com/occka/netrunner-releases/releases/latest/download/latest.json` (the source repository's `latest.json` is a fallback for copies from 0.5.x). Updates are signed: the public key is in `tauri.conf.json`, and the **private key lives only at `%USERPROFILE%\.tauri\netrunner.key`** (never commit it; back it up, because without it you cannot ship updates to existing installs).
 
 One-time setup:
-1. Create the public repository `occka/netrunner` and push this project.
-2. In the repo, go to Settings → Secrets and variables → Actions and add `TAURI_SIGNING_PRIVATE_KEY` with the *contents* of `netrunner.key`.
+1. In `occka/netrunner` → Settings → Secrets and variables → Actions, add `TAURI_SIGNING_PRIVATE_KEY` with the *contents* of `netrunner.key`.
+2. Create the public repository `occka/netrunner-releases` with a README (it needs one commit so releases can be tagged).
+3. Create a fine-grained personal access token limited to `occka/netrunner-releases` with **Contents: read and write**, and add it to `occka/netrunner` as the secret `RELEASES_TOKEN`.
+4. After a release that installed copies have picked up, make `occka/netrunner` private (Settings → General → Danger zone). The workflow then stops mirroring `latest.json` into it. Private repositories use GitHub Actions minutes (Windows runners count double), so one release costs roughly 30–40 of the 2000 free minutes a month.
 
 Each release:
 1. Bump `version` in `src-tauri/tauri.conf.json`, `package.json` and `src-tauri/Cargo.toml`.
 2. Commit, then `git tag v<version>` and `git push --follow-tags`.
-3. `.github/workflows/release.yml` builds, signs and publishes the release with `latest.json`. Running apps offer the update on next start (Settings → Updates).
+3. `.github/workflows/release.yml` builds, signs and publishes the release with `latest.json` to `occka/netrunner-releases` (and mirrors `latest.json` into the source repository while it is public). Running apps offer the update on next start (Settings → Updates).
 
 Local `npm run app:build` also signs updater artifacts, so set the key first:
 `$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content $env:USERPROFILE\.tauri\netrunner.key -Raw; $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""`

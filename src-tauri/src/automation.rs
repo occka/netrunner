@@ -143,6 +143,8 @@ fn execute(app: &AppHandle, rule: &Rule, depth: u8) -> Result<String, AppError> 
         "switch_profile" => {
             let profile = profiles::activate(&*state.db.conn()?, id()?)?;
             let _ = app.emit("profiles://changed", profile.id);
+            crate::overlay::sync_profile(app);
+            let _ = app.emit("overlays://changed", ());
             fire_depth(app, "profile_changed", &profile.id.to_string(), depth + 1);
             Ok(format!("switched to profile '{}'", profile.name))
         }

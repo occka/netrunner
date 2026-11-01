@@ -6,19 +6,20 @@ An industrial-cyberpunk control environment for Windows: dashboard, universal la
 
 | Module | Status | What works |
 |---|---|---|
-| COMMAND | Implemented | 12-col drag/resize dashboard, EDIT LAYOUT with save/cancel, 14 live widgets (incl. Music Player and Image), per-widget settings (gear button → Inspector SETTINGS: e.g. clock 12/24 h, size, time zone, date format) |
+| COMMAND | Implemented | 12-col drag/resize dashboard, EDIT LAYOUT with save/cancel, 16 live widgets (incl. Music Player, Image, Notes / To-do and Timer / Alarm: alarms with repeat days, snooze and your own sounds, countdowns, stopwatch; they ring from the tray too), per-widget settings (gear button → Inspector SETTINGS: e.g. clock 12/24 h, size, time zone, date format) |
 | QUICK ACCESS | Implemented | apps, games, files, folders, websites, CMD/PowerShell commands, projects |
 | SYSTEM | Implemented | hardware, processes (guarded termination), startup apps (toggle per-user entries), services (read-only), power plans |
 | NETWORK | Implemented | Windows connectivity state, adapters, throughput, VPN-type adapter detection |
 | GAMES | Implemented | Steam, Epic, GOG and Prism Launcher (Minecraft instances) detection, plus your own games |
 | AUTOMATION | Implemented | triggers: start, app start/stop, profile change, manual; actions: launch program, launch entry, switch profile, notify, show/hide overlay |
-| OVERLAY | Partial | any widget as an always-on-top window with its own settings; **web overlays** for music and video (YouTube, SoundCloud, Spotify, Yandex Music, Twitch, any URL) in the hardened browser profile; pop a playing BROWSER tab out without reloading. Widget Studio is planned |
+| OVERLAY | Implemented | any widget as an always-on-top window with its own settings; per-profile overlay sets (switching profile swaps them); click-through when locked; snapping to screen edges and to each other; **web overlays** for music and video (YouTube, SoundCloud, Spotify, Yandex Music, Twitch, any URL) in the hardened browser profile; pop a playing BROWSER tab out without reloading |
+| WIDGET STUDIO | Implemented | your own widgets per profile: HTML/CSS in a sandbox (no scripts, no network), or templates: text, counter, link grid, RSS/Atom/JSON feed fetched only from hosts you allow; on the dashboard or as overlays |
 | INTEGRATIONS | Partial | 14 known apps with separate launch / detect / status / control capabilities |
 | DEVELOPER | Partial | Monaco editor, project explorer, ConPTY terminals, Run file, Git panel, diff view, toolchain detection, NEURAL panel with reviewable AI proposals. LSP and debugger are planned |
 | NEURAL | Implemented | Gemini chat (streaming, model choice, fallback when a model is overloaded or silent), saved chats (new / switch / delete, local only), explicit attachments only, audit log; also available as a dashboard widget and floating overlay |
 | FILES | Partial | tabs, history, places/drives, sort/filter, multi-select, copy/cut/paste, rename, Recycle Bin delete, on-demand search, text/image preview, Analyze with AI |
-| GITHUB | Implemented | token in Credential Manager, repositories, PRs, issues, clone into DEVELOPER |
-| PROFILES / SETTINGS / STORAGE | Implemented / Implemented / Partial | themes; appearance: wallpaper or animated pattern for the app and the dashboard, glass panels (opacity + blur), corner radius, font, interface scale, neon glow / scanlines / vignette, per-widget accent colour; tray and autostart, data locations |
+| GITHUB | Implemented | token in Credential Manager, repositories, PRs, issues; browse code (branches, folders, read-only Monaco view); local clones found automatically or linked by hand, **Open in Developer** at the file you are viewing; clone into DEVELOPER |
+| PROFILES / SETTINGS / STORAGE | Implemented / Implemented / Partial | themes (11 presets incl. Matrix, Synthwave, CRT green/amber); appearance: wallpaper or pattern for the app and the dashboard (incl. animated Matrix rain, synthwave grid, neon city, glitch, hex, holo, CRT), glass panels (opacity + blur), corner radius, font, interface scale, neon glow / scanlines / vignette, per-widget accent colour; tray and autostart, data locations |
 | BROWSER | Implemented | WebView2 tabs inside NETRUNNER, tabs restored after a restart (lazily), private tabs, bookmarks, history, downloads; pop a tab out to an overlay and back; ad/tracker/malware blocking (adblock-rust with EasyList, EasyPrivacy, uBlock, RU AdList…), Strict tracking prevention, HTTPS-only, GPC, deny-by-default site permissions, no IPC for pages. See docs/SECURITY.md |
 
 Shell: system tray, close-to-tray, start with Windows (optionally minimised), single instance, Ctrl+K command palette, Ctrl+I inspector.

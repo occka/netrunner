@@ -1,6 +1,6 @@
 [package]
 name = "netrunner"
-version = "0.5.2"
+version = "0.6.0"
 description = "NETRUNNER — industrial control environment for Windows"
 edition = "2021"
 rust-version = "1.80"
@@ -34,6 +34,12 @@ base64 = "0.22"
 tokio = { version = "1", default-features = false, features = ["time", "macros"] }
 portable-pty = "0.9"
 trash = "5"
+# Local time for alarms (no timezone database: Windows provides the offset).
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+# Alarm sounds: WASAPI output, MP3/WAV/OGG/FLAC decoding.
+rodio = "0.20"
+# Widget Studio feed widgets: RSS, Atom and JSON Feed.
+feed-rs = "3"
 # Brave's content-blocking engine (EasyList / uBlock syntax). Without the
 # default `single-thread` feature the engine is Send + Sync.
 adblock = { version = "0.13", default-features = false, features = ["embedded-domain-resolver", "full-regex-handling"] }
@@ -73,3 +79,22 @@ codegen-units = 1
 lto = true
 opt-level = "s"
 strip = true
+
+# Audio decoding and mixing run in the sound device's callback. Unoptimized
+# (plain `cargo build`) they cannot keep up and alarms crackle in dev builds.
+[profile.dev.package.rodio]
+opt-level = 3
+[profile.dev.package.cpal]
+opt-level = 3
+[profile.dev.package.dasp_sample]
+opt-level = 3
+[profile.dev.package.symphonia-core]
+opt-level = 3
+[profile.dev.package.symphonia-bundle-mp3]
+opt-level = 3
+[profile.dev.package.claxon]
+opt-level = 3
+[profile.dev.package.lewton]
+opt-level = 3
+[profile.dev.package.hound]
+opt-level = 3

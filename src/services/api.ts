@@ -7,6 +7,8 @@ import type {
   Commit,
   DirEntry,
   FileContent,
+  GitHubEntry,
+  GitHubFile,
   GitHubIssue,
   GitHubRepo,
   GitHubStatus,
@@ -27,6 +29,9 @@ import type {
   TabMedia,
 } from "@/types/browser";
 import type { Attachment, ChatState, ContextItem, FileEntry, FilePreview, ModelInfo, NeuralStatus, Places, StreamEvent } from "@/types/neural";
+import type { NoteItem, NotesBoard } from "@/types/notes";
+import type { CustomWidget, FeedResult, StudioKind } from "@/types/studio";
+import type { Alarm, AlarmInput, AlarmsState, Sound, Timer, TimerInput } from "@/types/alarms";
 import type {
   ActivityEntry,
   AppInfo,
@@ -213,6 +218,13 @@ export const api = {
     repos: () => call<GitHubRepo[]>("github_repos"),
     issues: (owner: string, repo: string, pulls: boolean, state = "open") =>
       call<GitHubIssue[]>("github_issues", { owner, repo, pulls, state }),
+    contents: (owner: string, repo: string, path: string, gitRef?: string) =>
+      call<GitHubEntry[]>("github_contents", { owner, repo, path, gitRef }),
+    file: (owner: string, repo: string, path: string, gitRef?: string) => call<GitHubFile>("github_file", { owner, repo, path, gitRef }),
+    branches: (owner: string, repo: string) => call<string[]>("github_branches", { owner, repo }),
+    /** "owner/repo" (lower case) → local folder: linked by hand, or found automatically. */
+    localClones: () => call<Record<string, string>>("github_local_clones"),
+    linkLocal: (fullName: string, path: string | null) => call<void>("github_link_local", { fullName, path }),
   },
 
   neural: {
@@ -250,13 +262,53 @@ export const api = {
     get: (id: number) => call<Overlay>("overlay_get", { id }),
     create: (widgetType: string) => call<Overlay>("overlay_create", { widgetType }),
     createWeb: (url: string, title: string) => call<Overlay>("overlay_create_web", { url, title }),
-    patch: (id: number, patch: Partial<Pick<Overlay, "opacity" | "locked" | "showOnStartup" | "config" | "title">>) =>
+    patch: (id: number, patch: Partial<Pick<Overlay, "opacity" | "locked" | "showOnStartup" | "config" | "title" | "clickThrough">>) =>
       call<Overlay>("overlay_patch", { id, patch }),
     setGeometry: (id: number, x: number, y: number, width: number, height: number) =>
       call<void>("overlay_set_geometry", { id, x, y, width, height }),
     setVisible: (id: number, visible: boolean) => call<void>("overlay_set_visible", { id, visible }),
+    setProfile: (id: number, profileId: number | null) => call<Overlay>("overlay_set_profile", { id, profileId }),
     remove: (id: number) => call<void>("overlay_delete", { id }),
     toggleAll: () => call<void>("overlay_toggle_all"),
+  },
+
+  studio: {
+    list: () => call<CustomWidget[]>("studio_list"),
+    create: (kind: StudioKind, name: string) => call<CustomWidget>("studio_create", { kind, name }),
+    update: (id: number, name: string, config: Record<string, unknown>) => call<CustomWidget>("studio_update", { id, name, config }),
+    setProfile: (id: number, profileId: number | null) => call<CustomWidget>("studio_set_profile", { id, profileId }),
+    counter: (id: number, value: number) => call<CustomWidget>("studio_counter", { id, value }),
+    remove: (id: number) => call<void>("studio_delete", { id }),
+    feed: (id: number, force: boolean) => call<FeedResult>("studio_feed", { id, force }),
+    /** Opens a link from a widget as a BROWSER tab in the main window. */
+    openLink: (url: string) => call<void>("browser_open_request", { url }),
+  },
+
+  alarms: {
+    state: () => call<AlarmsState>("alarms_state"),
+    save: (id: number | null, input: AlarmInput) => call<Alarm>("alarm_save", { id, input }),
+    setEnabled: (id: number, enabled: boolean) => call<Alarm>("alarm_set_enabled", { id, enabled }),
+    remove: (id: number) => call<void>("alarm_delete", { id }),
+    createTimer: (input: TimerInput, start: boolean) => call<Timer>("timer_create", { input, start }),
+    timer: (id: number, action: "start" | "pause" | "reset") => call<Timer>("timer_control", { id, action }),
+    removeTimer: (id: number) => call<void>("timer_delete", { id }),
+    stop: (key: string) => call<void>("alarm_stop", { key }),
+    snooze: (key: string) => call<void>("alarm_snooze", { key }),
+    sounds: () => call<Sound[]>("sounds_list"),
+    importSound: (path: string) => call<Sound>("sound_import", { path }),
+    deleteSound: (id: string) => call<void>("sound_delete", { id }),
+    preview: (sound: string, volume: number) => call<void>("sound_preview", { sound, volume }),
+    stopPreview: () => call<void>("sound_preview_stop"),
+  },
+
+  notes: {
+    board: (board: string) => call<NotesBoard>("notes_board", { board }),
+    setText: (board: string, text: string) => call<void>("notes_set_text", { board, text }),
+    add: (board: string, text: string, first: boolean) => call<NoteItem>("notes_add", { board, text, first }),
+    update: (id: number, change: { text?: string; done?: boolean }) => call<void>("notes_update", { id, ...change }),
+    remove: (id: number) => call<void>("notes_delete", { id }),
+    reorder: (board: string, ids: number[]) => call<void>("notes_reorder", { board, ids }),
+    clearDone: (board: string) => call<number>("notes_clear_done", { board }),
   },
 
   browser: {

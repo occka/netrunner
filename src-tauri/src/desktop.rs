@@ -31,9 +31,10 @@ fn bool_setting(app: &AppHandle, key: &str, default: bool) -> bool {
 pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Open NETRUNNER", true, None::<&str>)?;
     let overlays = MenuItem::with_id(app, "overlays", "Toggle overlays   Ctrl+Alt+O", true, None::<&str>)?;
+    let unlock = MenuItem::with_id(app, "overlays-unlock", "Unlock click-through overlays", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "Quit NETRUNNER", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &overlays, &sep, &quit])?;
+    let menu = Menu::with_items(app, &[&open, &overlays, &unlock, &sep, &quit])?;
 
     let mut builder = TrayIconBuilder::with_id("main")
         .tooltip("NETRUNNER")
@@ -42,6 +43,7 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => show_main(app),
             "overlays" => crate::overlay::toggle_all(app),
+            "overlays-unlock" => crate::overlay::unlock_click_through(app),
             "quit" => app.exit(0),
             _ => {}
         })
@@ -60,6 +62,14 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 /// Closing the main window hides it to the tray when enabled (default on), so
 /// Alt+F4 and the title-bar button behave the same way.
 pub fn handle_window_event(window: &tauri::Window, event: &WindowEvent) {
+    // Closing the ringing window (Alt+F4) stops what rings, so no sound is left without a window.
+    if window.label() == crate::alarm::RING_WINDOW {
+        if let WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+            crate::alarm::stop_all(window.app_handle());
+        }
+        return;
+    }
     if window.label() != "main" {
         return;
     }

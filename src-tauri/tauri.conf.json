@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "NETRUNNER",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "identifier": "com.netrunner.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -30,7 +30,10 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcwMjczRjc1RTMwMkI2Q0MKUldUTXRnTGpkVDhuY0tlU3p6Y2ppbEQ4a0RFTDVWakNrUXBwMmxRYXNheDF3dFVLNkk4RThHU08K",
-      "endpoints": ["https://github.com/occka/netrunner/releases/latest/download/latest.json"],
+      "endpoints": [
+        "https://github.com/occka/netrunner-releases/releases/latest/download/latest.json",
+        "https://github.com/occka/netrunner/releases/latest/download/latest.json"
+      ],
       "windows": { "installMode": "passive" }
     }
   },

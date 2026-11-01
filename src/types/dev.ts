@@ -69,6 +69,24 @@ export interface GitHubStatus {
   error: string | null;
 }
 
+/** An entry of a repository folder (GitHub contents API). */
+export interface GitHubEntry {
+  name: string;
+  path: string;
+  kind: "file" | "dir" | "symlink" | "submodule";
+  size: number;
+}
+
+/** A repository file for viewing; text only (binary or very large files have no content). */
+export interface GitHubFile {
+  path: string;
+  size: number;
+  content: string | null;
+  binary: boolean;
+  tooLarge: boolean;
+  htmlUrl: string | null;
+}
+
 export interface GitHubRepo {
   fullName: string;
   name: string;

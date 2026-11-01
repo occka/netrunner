@@ -13,7 +13,9 @@ mod desktop;
 mod error;
 mod files;
 mod neural;
+mod alarm;
 mod overlay;
+mod overlay_snap;
 mod security;
 mod services;
 mod state;
@@ -40,6 +42,21 @@ fn guarded<R: tauri::Runtime>(
         }
         handler(invoke)
     }
+}
+
+/// Data folders. Development builds use a `dev` subfolder (or
+/// `NETRUNNER_DATA_DIR`), so running one never migrates or changes the
+/// installed app's database, wallpapers or browser profile.
+fn data_dirs(app: &tauri::AppHandle) -> tauri::Result<(std::path::PathBuf, std::path::PathBuf)> {
+    let (data, local) = (app.path().app_data_dir()?, app.path().app_local_data_dir()?);
+    if cfg!(debug_assertions) {
+        if let Some(dir) = std::env::var_os("NETRUNNER_DATA_DIR") {
+            let dir = std::path::PathBuf::from(dir);
+            return Ok((dir.join("roaming"), dir.join("local")));
+        }
+        return Ok((data.join("dev"), local.join("dev")));
+    }
+    Ok((data, local))
 }
 
 pub fn run() {
@@ -74,7 +91,7 @@ pub fn run() {
                 .build(),
         )
         .setup(move |app| {
-            let data_dir = app.path().app_data_dir()?;
+            let (data_dir, local_dir) = data_dirs(app.handle())?;
             let db = Database::open(&data_dir.join("netrunner.db"), &data_dir.join("backups"))?;
             {
                 let conn = db.conn()?;
@@ -82,8 +99,8 @@ pub fn run() {
                 activity::record(&conn, Level::Info, "core", &format!("NETRUNNER {} started", app.package_info().version));
             }
             let prefs = browser::Prefs::load(&*db.conn()?);
-            let local_dir = app.path().app_local_data_dir()?;
             app.manage(browser::Browser::new(&data_dir, &local_dir, prefs));
+            let alarm_dir = data_dir.clone();
             app.manage(AppState::new(db, data_dir));
             app.manage(dev::terminal::Terminals::default());
 
@@ -97,6 +114,7 @@ pub fn run() {
                 log::warn!("overlay hotkey Ctrl+Alt+O unavailable: {err}");
             }
             overlay::restore_on_startup(&handle);
+            alarm::start(&handle, alarm_dir);
             browser::start_blocker(handle.clone(), false);
             automation::start_process_watcher(handle.clone());
             std::thread::spawn(move || automation::fire(&handle, "netrunner_start", ""));
@@ -163,6 +181,35 @@ pub fn run() {
             commands::overlay::overlay_set_visible,
             commands::overlay::overlay_delete,
             commands::overlay::overlay_toggle_all,
+            commands::studio::studio_list,
+            commands::studio::studio_create,
+            commands::studio::studio_update,
+            commands::studio::studio_set_profile,
+            commands::studio::studio_counter,
+            commands::studio::studio_delete,
+            commands::studio::studio_feed,
+            commands::studio::browser_open_request,
+            commands::alarms::alarms_state,
+            commands::alarms::alarm_save,
+            commands::alarms::alarm_set_enabled,
+            commands::alarms::alarm_delete,
+            commands::alarms::timer_create,
+            commands::alarms::timer_control,
+            commands::alarms::timer_delete,
+            commands::alarms::alarm_stop,
+            commands::alarms::alarm_snooze,
+            commands::alarms::sounds_list,
+            commands::alarms::sound_import,
+            commands::alarms::sound_delete,
+            commands::alarms::sound_preview,
+            commands::alarms::sound_preview_stop,
+            commands::notes::notes_board,
+            commands::notes::notes_set_text,
+            commands::notes::notes_add,
+            commands::notes::notes_update,
+            commands::notes::notes_delete,
+            commands::notes::notes_reorder,
+            commands::notes::notes_clear_done,
             commands::dev::dev_projects,
             commands::dev::dev_open_project,
             commands::dev::dev_close_project,
@@ -198,6 +245,11 @@ pub fn run() {
             commands::dev::github_disconnect,
             commands::dev::github_repos,
             commands::dev::github_issues,
+            commands::dev::github_contents,
+            commands::dev::github_file,
+            commands::dev::github_branches,
+            commands::dev::github_local_clones,
+            commands::dev::github_link_local,
             commands::neural::neural_status,
             commands::neural::neural_connect,
             commands::neural::neural_disconnect,
@@ -221,6 +273,7 @@ pub fn run() {
             commands::files::files_reveal,
             commands::files::files_search,
             commands::overlay::overlay_create_web,
+            commands::overlay::overlay_set_profile,
             commands::browser::browser_status,
             commands::browser::browser_prefs_changed,
             commands::browser::browser_update_lists,

@@ -178,7 +178,8 @@ pub async fn browser_media_artwork(url: String) -> AppResult<Option<String>> {
 #[tauri::command]
 pub async fn browser_pop_out(app: AppHandle, state: State<'_, AppState>, browser: State<'_, Browser>, id: String) -> AppResult<Overlay> {
     let tab = browser.tab(&id).ok_or_else(|| AppError::NotFound("tab is closed".into()))?;
-    let o = overlays::create_web(&*state.db.conn()?, &tab.url, &tab.title)?;
+    // A popped-out tab keeps playing across profile switches, like the BROWSER tab it came from.
+    let o = overlays::create_web(&*state.db.conn()?, &tab.url, &tab.title, None)?;
     overlay::open(&app, &o)?;
     browser::move_tab(&app, &id, &overlay::label(o.id))?;
     activity::record(&*state.db.conn()?, Level::Info, "browser", &format!("Moved {} to an overlay", tab.url));

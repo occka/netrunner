@@ -1,6 +1,10 @@
-# Builds signed Windows installers and publishes a GitHub release with
-# latest.json, which NETRUNNER's updater reads. Triggered by pushing a tag
-# like v0.4.1 (the tag must match "version" in tauri.conf.json).
+# Builds signed Windows installers and publishes them, with latest.json for
+# NETRUNNER's updater, to the PUBLIC releases repository (occka/netrunner-releases).
+# The source repository can stay private. Triggered by pushing a tag like
+# v0.6.0 (the tag must match "version" in tauri.conf.json).
+#
+# Needs the secrets TAURI_SIGNING_PRIVATE_KEY and RELEASES_TOKEN (a
+# fine-grained token with Contents: read and write on occka/netrunner-releases).
 name: Release
 
 on:
@@ -10,6 +14,9 @@ on:
 
 permissions:
   contents: write
+
+env:
+  RELEASES_REPO: occka/netrunner-releases
 
 jobs:
   release:
@@ -32,12 +39,30 @@ jobs:
 
       - uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         with:
+          owner: occka
+          repo: netrunner-releases
           tagName: v__VERSION__
           releaseName: NETRUNNER v__VERSION__
-          releaseBody: Signed Windows build. Installed copies update themselves (Settings → Updates).
+          releaseBody: Signed Windows build. Download the setup .exe to install; installed copies update themselves (Settings → Updates).
           releaseDraft: false
           prerelease: false
+
+      # Copies from 0.5.x read latest.json from this (source) repository. While it
+      # is still public, publish latest.json here too; its download links point
+      # at the public releases repository. Skipped once the repository is private.
+      - name: Mirror latest.json for older installs
+        if: ${{ !github.event.repository.private }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          SOURCE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $tag = "v$version"
+          gh release download $tag -R $env:RELEASES_REPO -p latest.json -D mirror
+          $env:GH_TOKEN = $env:SOURCE_TOKEN
+          gh release create $tag mirror/latest.json -R $env:GITHUB_REPOSITORY --title "NETRUNNER $tag" --notes "Installers: https://github.com/$env:RELEASES_REPO/releases/tag/$tag"

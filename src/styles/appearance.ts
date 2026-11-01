@@ -7,7 +7,19 @@
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 
 export type BackgroundKind = "none" | "image" | "pattern";
-export type BackgroundPattern = "grid" | "dots" | "scanlines" | "aurora" | "circuit";
+export type BackgroundPattern =
+  | "grid"
+  | "dots"
+  | "scanlines"
+  | "aurora"
+  | "circuit"
+  | "matrix"
+  | "neon-city"
+  | "synthwave"
+  | "glitch"
+  | "hex"
+  | "holo"
+  | "crt";
 export type BackgroundFit = "cover" | "contain" | "tile" | "center";
 
 export interface BackgroundSpec {
@@ -30,6 +42,13 @@ export const PATTERNS: { id: BackgroundPattern; label: string }[] = [
   { id: "scanlines", label: "Scanlines" },
   { id: "circuit", label: "Circuit" },
   { id: "aurora", label: "Aurora (animated)" },
+  { id: "matrix", label: "Matrix rain (animated)" },
+  { id: "neon-city", label: "Neon city" },
+  { id: "synthwave", label: "Synthwave grid (animated)" },
+  { id: "glitch", label: "Glitch (animated)" },
+  { id: "hex", label: "Hex cells" },
+  { id: "holo", label: "Holo (animated)" },
+  { id: "crt", label: "CRT screen (animated)" },
 ];
 
 export type UiFont = "plex" | "chakra" | "mono" | "system";

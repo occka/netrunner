@@ -113,8 +113,9 @@ export default function ProfilesModule() {
           })}
         </div>
         <p className="muted profiles-note">
-          A profile currently defines the COMMAND dashboard layout. Per-profile Quick Access sets, overlays, hotkeys and
-          automation are planned. Switching profiles never closes applications.
+          A profile defines the COMMAND dashboard layout and its own overlay set (see OVERLAY): switching closes the previous
+          profile's overlays and opens this one's. Per-profile Quick Access sets, hotkeys and automation are planned. Switching
+          profiles never closes applications.
         </p>
       </div>
       {dialog && <NameDialogView dialog={dialog} onClose={() => setDialog(null)} />}

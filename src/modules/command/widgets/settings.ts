@@ -17,6 +17,8 @@ interface Base<K extends string> {
   group?: string;
   /** Shown only when another setting has the given value. */
   when?: { key: string; equals: string | number | boolean };
+  /** Stored and resolved like any setting, but never shown in the form. */
+  hidden?: boolean;
 }
 
 export interface ToggleSetting<K extends string = string> extends Base<K> {
@@ -125,7 +127,7 @@ export function compactConfig(schema: WidgetSchema, values: RawConfig): RawConfi
 }
 
 export function isVisible(field: WidgetSetting, values: RawConfig): boolean {
-  return !field.when || values[field.when.key] === field.when.equals;
+  return !field.hidden && (!field.when || values[field.when.key] === field.when.equals);
 }
 
 // ---------- Per-widget schemas ----------
@@ -254,6 +256,32 @@ export const ACTIVITY_SETTINGS = defineSettings([
     ], default: "all" },
   { key: "limit", kind: "range", label: "Entries", min: 5, max: 200, step: 5, default: 60 },
   { key: "source", kind: "toggle", label: "Source column", default: true },
+]);
+
+/** A Widget Studio widget on the dashboard or as an overlay: which custom widget it shows. */
+export const STUDIO_SETTINGS = defineSettings([
+  { key: "studio.id", kind: "range", label: "Custom widget", min: 0, max: 1_000_000_000, step: 1, default: 0, hidden: true },
+]);
+
+export const ALARM_SETTINGS = defineSettings([
+  { key: "view", kind: "select", label: "Show", options: [
+      { value: "tabs", label: "Alarms, timers and stopwatch (tabs)" },
+      { value: "alarms", label: "Alarms only" },
+      { value: "timers", label: "Timers only" },
+      { value: "stopwatch", label: "Stopwatch only" },
+    ], default: "tabs" },
+]);
+
+export const NOTES_SETTINGS = defineSettings([
+  { key: "board", kind: "text", label: "Board", default: "Main", placeholder: "Main", maxLength: 40,
+    hint: "Widgets and overlays with the same board name show the same notes." },
+  { key: "view", kind: "select", label: "Show", options: [
+      { value: "tabs", label: "Tasks and note (tabs)" },
+      { value: "tasks", label: "Tasks only" },
+      { value: "note", label: "Note only" },
+    ], default: "tabs" },
+  { key: "hideDone", kind: "toggle", label: "Hide completed tasks", default: false },
+  { key: "addTop", kind: "toggle", label: "Add new tasks at the top", default: false },
 ]);
 
 export const QUICK_ACCESS_SETTINGS = defineSettings([
