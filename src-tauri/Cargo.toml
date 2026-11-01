@@ -55,6 +55,9 @@ keyring = { version = "3", features = ["windows-native"] }
 webview2-com = "0.39"
 windows = { version = "0.62", features = [
   "Foundation",
+  "Win32_Devices_FunctionDiscovery",
+  "Win32_Foundation",
+  "Win32_UI_Shell_PropertiesSystem",
   "Media_Control",
   "Storage_Streams",
   "Win32_Media_Audio",
@@ -65,6 +68,8 @@ windows = { version = "0.62", features = [
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
 ] }
+# The `#[interface]` macro (IPolicyConfig) expands to `windows_core` paths.
+windows-core = "0.62"
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
