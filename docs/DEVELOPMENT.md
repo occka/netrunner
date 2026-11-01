@@ -29,9 +29,9 @@ Development builds (`npm run app:dev`) never run automations, so rebuilding does
 
 ## Adding an automation trigger or action
 
-1. Add the kind to the `CHECK` constraint in a new migration and to `TRIGGERS` / `ACTIONS` in `services/automation.rs`.
-2. Fire triggers with `automation::fire(app, kind, value)` from wherever the event originates; implement actions in `automation::execute`.
-3. Add labels and an editor field in `modules/automation/AutomationModule.tsx`.
+1. Add the kind to `TRIGGERS` / `CONDITIONS` / `ACTIONS` in `services/automation.rs` and its value check to `trigger_value` / `condition` / `action` there (no migration needed). Matching (`trigger_matches`) and conditions (`condition_met`) are pure: add a test.
+2. Fire triggers with `automation::fire(app, kind, value)` from wherever the event originates (or add it to `start_event_watcher`); implement actions in `automation::execute` and describe them in `dry_run`.
+3. Add the label in `modules/automation/AutomationModule.tsx` (and `describe…`) and its value field in `ValueInput.tsx`.
 
 ## Adding a game source
 

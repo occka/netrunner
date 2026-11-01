@@ -1,6 +1,7 @@
 //! Hardware and OS monitoring. Only reports values the OS actually provides;
 //! anything unavailable is returned as `None` / empty, never estimated.
 
+pub mod audio;
 pub mod media;
 pub mod monitor;
 pub mod network;

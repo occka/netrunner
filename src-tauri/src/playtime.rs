@@ -82,6 +82,7 @@ pub fn start(app: &AppHandle) {
                     .collect();
                 let now_running = playtime::running(&games, &procs);
                 let started: Vec<String> = now_running.iter().filter(|id| !sessions.contains_key(*id)).cloned().collect();
+                let stopped: Vec<String> = sessions.keys().filter(|id| !now_running.contains(*id)).cloned().collect();
                 sessions.retain(|id, _| now_running.contains(id));
                 if let Some(state) = app.try_state::<AppState>() {
                     if let Ok(conn) = state.db.conn() {
@@ -109,6 +110,12 @@ pub fn start(app: &AppHandle) {
                 });
                 if changed.unwrap_or(false) {
                     let _ = app.emit("games://running", &ids);
+                }
+                for id in &started {
+                    crate::automation::fire(&app, "game_started", id);
+                }
+                for id in &stopped {
+                    crate::automation::fire(&app, "game_stopped", id);
                 }
                 std::thread::sleep(TICK);
             }

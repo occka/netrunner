@@ -72,8 +72,5 @@ pub async fn studio_feed(state: State<'_, AppState>, id: i64, force: bool) -> Ap
 /// Opens a link from a widget (dashboard or overlay) as a BROWSER tab in the main window.
 #[tauri::command]
 pub async fn browser_open_request(app: AppHandle, url: String) -> AppResult<()> {
-    let url = crate::security::targets::validate_web_url(&url)?;
-    crate::desktop::show_main(&app);
-    let _ = app.emit_to("main", "browser://open-request", url);
-    Ok(())
+    crate::desktop::open_in_browser(&app, &url)
 }

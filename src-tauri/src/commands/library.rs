@@ -79,6 +79,14 @@ pub async fn automation_run(app: AppHandle, state: State<'_, AppState>, id: i64)
     Ok(outcome.unwrap_or_else(|| "skipped".into()))
 }
 
+/// Checks a rule without running it: conditions now, and what each action would do.
+#[tauri::command]
+pub async fn automation_dry_run(app: AppHandle, input: RuleInput) -> AppResult<crate::automation::DryRun> {
+    tauri::async_runtime::spawn_blocking(move || crate::automation::dry_run(&app, input))
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+}
+
 /// Playtime per game since `from` (unix ms; None = all time).
 #[tauri::command]
 pub async fn games_playtime(state: State<'_, AppState>, from: Option<i64>) -> AppResult<Vec<crate::services::playtime::Playtime>> {

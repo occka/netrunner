@@ -602,3 +602,136 @@
   align-items: center;
   justify-content: space-between;
 }
+
+/* ---------- AUTOMATION: visual rule editor ---------- */
+.flow {
+  display: grid;
+  gap: 8px;
+}
+.flow__block {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius);
+  background: rgb(var(--c-surface-rgb) / 0.6);
+}
+.flow__block--when {
+  border-color: rgb(var(--c-secondary-rgb) / 0.6);
+}
+.flow__block--then {
+  border-color: rgb(var(--c-primary-rgb) / 0.6);
+}
+.flow__head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: var(--fs-xs);
+}
+.flow__arrow {
+  justify-self: center;
+  color: var(--c-muted);
+  line-height: 1;
+}
+.flow__row {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.flow__row > .select {
+  width: 230px;
+  flex: none;
+}
+.flow__row > .input,
+.flow__row > .flow__path,
+.flow__row > .flow__program {
+  flex: 1;
+  min-width: 180px;
+}
+.flow__row[data-met="false"] > .select {
+  border-color: var(--c-critical);
+}
+.flow__ok {
+  color: var(--c-success);
+}
+.flow__no {
+  color: var(--c-critical);
+}
+.flow__none {
+  font-size: var(--fs-sm);
+}
+.flow__unit,
+.flow__path,
+.flow__days {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.flow__unit .input[type="number"] {
+  width: 90px;
+}
+.flow__path .input {
+  flex: 1;
+}
+.flow__program {
+  display: grid;
+  gap: 6px;
+}
+.flow__time {
+  width: 110px;
+}
+.flow__days .alarmw__day {
+  width: 34px;
+}
+.flow__volume input[type="range"] {
+  width: 180px;
+  accent-color: var(--c-primary);
+}
+.flow__step {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed rgb(var(--c-border-rgb) / 0.6);
+}
+.flow__num {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--c-primary);
+  border-radius: 50%;
+  color: var(--c-primary);
+  font-size: var(--fs-xs);
+}
+.flow__step-tools {
+  display: flex;
+}
+.flow__dry {
+  grid-column: 2 / -1;
+  font-size: var(--fs-xs);
+  color: var(--c-success);
+}
+.flow__dry--bad {
+  color: var(--c-critical);
+}
+.flow__add {
+  display: flex;
+  gap: 6px;
+}
+.flow__verdict {
+  padding: 8px 10px;
+  border: 1px solid var(--c-warning);
+  border-radius: var(--radius);
+  font-size: var(--fs-sm);
+}
+.flow__verdict--ok {
+  border-color: var(--c-success);
+}
+.flow__enabled {
+  margin-right: auto;
+}

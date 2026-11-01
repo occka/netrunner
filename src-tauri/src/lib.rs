@@ -119,6 +119,7 @@ pub fn run() {
             playtime::start(&handle);
             browser::start_blocker(handle.clone(), false);
             automation::start_process_watcher(handle.clone());
+            automation::start_event_watcher(handle.clone());
             std::thread::spawn(move || automation::fire(&handle, "netrunner_start", ""));
             Ok(())
         })
@@ -180,6 +181,7 @@ pub fn run() {
             commands::library::automation_update,
             commands::library::automation_delete,
             commands::library::automation_run,
+            commands::library::automation_dry_run,
             commands::overlay::overlay_list,
             commands::overlay::overlay_get,
             commands::overlay::overlay_create,

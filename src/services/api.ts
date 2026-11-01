@@ -48,6 +48,7 @@ import type {
 import type {
   AutomationInput,
   AutomationRule,
+  DryRun,
   Integration,
   LibraryScan,
   PlayDay,
@@ -176,6 +177,7 @@ export const api = {
     update: (id: number, input: AutomationInput) => call<AutomationRule>("automation_update", { id, input }),
     remove: (id: number) => call<void>("automation_delete", { id }),
     run: (id: number) => call<string>("automation_run", { id }),
+    dryRun: (input: AutomationInput) => call<DryRun>("automation_dry_run", { input }),
   },
 
   dev: {
