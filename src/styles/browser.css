@@ -400,3 +400,11 @@ label.check.browser__opt {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+.browser__tab--sleeping {
+  font-style: italic;
+  opacity: 0.7;
+}
+.browser__waking {
+  display: grid;
+  place-items: center;
+}

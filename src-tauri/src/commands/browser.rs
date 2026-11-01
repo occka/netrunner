@@ -186,6 +186,27 @@ pub async fn browser_pop_out(app: AppHandle, state: State<'_, AppState>, browser
     Ok(o)
 }
 
+/// Moves the page shown in a web overlay back into BROWSER (still playing,
+/// no reload) and removes the overlay.
+#[tauri::command]
+pub async fn browser_return_tab(app: AppHandle, state: State<'_, AppState>, overlay_id: i64) -> AppResult<Tab> {
+    let host = overlay::label(overlay_id);
+    let tab = browser::tab_for_host(&app, &host).ok_or_else(|| AppError::NotFound("this overlay has no page".into()))?;
+    browser::move_tab(&app, &tab.id, "main")?;
+    // The overlay may have zoomed the page out to fit a small window.
+    if let Ok(view) = browser::webview(&app, &tab.id) {
+        let _ = view.set_zoom(1.0);
+    }
+    // The tab already left the overlay window, so closing it keeps the page.
+    overlay::close(&app, overlay_id);
+    overlays::delete(&*state.db.conn()?, overlay_id)?;
+    activity::record(&*state.db.conn()?, Level::Info, "browser", &format!("Moved {} back from an overlay", tab.url));
+    crate::desktop::show_main(&app);
+    let _ = app.emit("overlays://changed", ());
+    let _ = app.emit("browser://returned", &tab.id);
+    Ok(Tab { host: "main".into(), ..tab })
+}
+
 /// Web overlay page: returns the tab shown in this overlay, creating it on
 /// first use (or reusing a tab that was popped out of BROWSER).
 #[tauri::command]

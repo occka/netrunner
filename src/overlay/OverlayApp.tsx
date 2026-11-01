@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { emit, listen } from "@tauri-apps/api/event";
-import { Lock, Minus, Plus, VolumeX, Volume2, X } from "lucide-react";
+import { Lock, Minus, PanelTopOpen, Plus, VolumeX, Volume2, X } from "lucide-react";
 import { api } from "@/services/api";
 import { useAppearance, useSettings } from "@/stores/settings";
 import { useQuickAccess } from "@/stores/quickAccess";
@@ -174,6 +174,13 @@ function WebTabControls({ overlay }: { overlay: Overlay }) {
       </span>
       <button className="icon-btn icon-btn--sm" title="Zoom in" onClick={() => step(1)}>
         <Plus size={11} />
+      </button>
+      <button
+        className="icon-btn icon-btn--sm"
+        title="Back to a BROWSER tab (keeps playing) and remove this overlay"
+        onClick={() => void api.browser.returnTab(overlay.id).catch(() => undefined)}
+      >
+        <PanelTopOpen size={12} />
       </button>
       <button
       className="icon-btn icon-btn--sm"

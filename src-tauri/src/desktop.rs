@@ -76,9 +76,41 @@ pub fn handle_window_event(window: &tauri::Window, event: &WindowEvent) {
 /// When Windows starts NETRUNNER at sign-in, stay in the tray if configured.
 pub fn apply_launch_mode(app: &AppHandle) {
     let autostarted = std::env::args().any(|a| a == AUTOSTART_ARG);
-    if autostarted && bool_setting(app, START_MINIMIZED_KEY, true) {
+    let minimized = autostarted && bool_setting(app, START_MINIMIZED_KEY, true);
+    log::info!("launch: {}", if autostarted { "started by Windows sign-in" } else { "started by the user" });
+    if minimized {
+        log::info!("launch: staying in the tray (Start minimised to tray is on)");
         if let Some(win) = app.get_window("main") {
             let _ = win.hide();
+        }
+    }
+}
+
+/// The Windows startup entry stores an absolute path. After a reinstall to
+/// another folder it points at a missing file and sign-in silently starts
+/// nothing, so an enabled entry is rewritten for the running executable.
+/// Debug builds never touch it (it would point autostart at `target\debug`).
+#[cfg(windows)]
+pub fn repair_autostart(app: &AppHandle) {
+    use tauri_plugin_autostart::ManagerExt;
+    if cfg!(debug_assertions) {
+        return;
+    }
+    let manager = app.autolaunch();
+    // Disabled entries (by the user or in Task Manager) are left alone.
+    if !manager.is_enabled().unwrap_or(false) {
+        return;
+    }
+    let Ok(exe) = std::env::current_exe() else { return };
+    let current = winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER)
+        .open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Run")
+        .and_then(|k| k.get_value::<String, _>(app.package_info().name.as_str()))
+        .unwrap_or_default();
+    let expected = exe.display().to_string();
+    if !current.to_lowercase().contains(&expected.to_lowercase()) {
+        match manager.enable() {
+            Ok(()) => log::warn!("autostart entry pointed at '{current}'; rewritten for '{expected}'"),
+            Err(err) => log::error!("cannot repair the autostart entry: {err}"),
         }
     }
 }

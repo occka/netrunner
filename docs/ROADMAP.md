@@ -33,8 +33,8 @@ Not done in Phase 4:
 ## Phase 5: Overlay, Browser, Extensions (in progress)
 Done:
 - **Widget settings**: typed per-widget schema, frame settings for every widget (title, header, content size, transparency), Inspector SETTINGS tab with live preview, settings for overlays. Clock: 12/24 h, seconds style, size or fit-to-width, time zone, date format, week start, ISO week numbers.
-- **BROWSER**: tabs, private tabs, bookmarks, history, downloads, ad/tracker/malware blocking, Strict tracking prevention, HTTPS-only, GPC, permission prompts, page fullscreen.
-- **Web overlays** for music and video, pop-out of a playing tab, **Music Player** widget (NETRUNNER tabs first, music sites first, sticky on pause; other apps through Windows media sessions).
+- **BROWSER**: tabs (restored after restart, lazily), private tabs, bookmarks, history, downloads, ad/tracker/malware blocking, Strict tracking prevention, HTTPS-only, GPC, permission prompts, page fullscreen.
+- **Web overlays** for music and video, pop-out of a playing tab and back, **Music Player** widget (NETRUNNER tabs first, music sites first, sticky on pause; other apps through Windows media sessions).
 - **Appearance**: app and dashboard backgrounds (your images or animated patterns), glass panels, corner radius, fonts, interface scale, glow / scanlines / vignette, per-widget accent colour.
 
 Remaining: Widget Studio (custom widgets from HTML), plugin architecture, visual automation editor, more automation triggers, uBlock scriptlet resources, per-profile overlay sets.

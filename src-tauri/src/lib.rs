@@ -90,6 +90,8 @@ pub fn run() {
             let handle = app.handle().clone();
             desktop::build_tray(&handle)?;
             desktop::apply_launch_mode(&handle);
+            #[cfg(windows)]
+            desktop::repair_autostart(&handle);
             if let Err(err) = app.global_shortcut().register(overlay_hotkey) {
                 // Another app may own the combination; everything else still works.
                 log::warn!("overlay hotkey Ctrl+Alt+O unavailable: {err}");
@@ -242,6 +244,7 @@ pub fn run() {
             commands::browser::browser_permission_set,
             commands::browser::browser_pop_out,
             commands::browser::browser_overlay_tab,
+            commands::browser::browser_return_tab,
             commands::browser::browser_media,
             commands::browser::browser_media_control,
             commands::browser::browser_media_artwork,

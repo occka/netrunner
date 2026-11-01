@@ -284,6 +284,7 @@ export const api = {
     setPermission: (host: string, kind: string, granted: boolean) => call<void>("browser_permission_set", { host, kind, granted }),
     popOut: (id: string) => call<Overlay>("browser_pop_out", { id }),
     overlayTab: (overlayId: number) => call<BrowserTab>("browser_overlay_tab", { overlayId }),
+    returnTab: (overlayId: number) => call<BrowserTab>("browser_return_tab", { overlayId }),
     media: () => call<TabMedia[]>("browser_media"),
     mediaControl: (id: string, action: "toggle" | "play" | "pause" | "nexttrack" | "previoustrack" | "stop") =>
       call<void>("browser_media_control", { id, action }),

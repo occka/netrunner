@@ -58,6 +58,10 @@ Implement a `fn x_games() -> (bool, Vec<Game>)` in `services/games.rs` (detected
 
 Add the key and its default to `SettingsSchema` / `SETTINGS_DEFAULTS` in `src/stores/settings.ts`. Keys must be lowercase `area.name`. If it should be searchable, add a section to `modules/settings/settingsIndex.ts`.
 
+## Claude Code desktop sessions
+
+The Claude desktop app is an MSIX package. Processes started from its terminals inherit its container, so `%APPDATA%` and `%LOCALAPPDATA%` writes land in `AppData\Local\Packages\Claude_*\LocalCache\` instead of the real folders. A dev build started there uses a separate copy of the database and logs. Never launch or update the **installed** NETRUNNER from such a session: the updater would remove the real install and put the new version into the container copy, breaking the Start menu entry and autostart.
+
 ## Logs
 
 The backend writes `%LOCALAPPDATA%\com.netrunner.app\logs\NETRUNNER.log`, and stdout in dev. User-visible events go to the `activity_log` table.

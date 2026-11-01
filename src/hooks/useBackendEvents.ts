@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "@/services/api";
 import { useProfiles } from "@/stores/profiles";
+import { useShell } from "@/stores/shell";
 import { useQuickAccess } from "@/stores/quickAccess";
 import { refreshActivity } from "@/stores/activity";
 import { confirmAction } from "@/stores/confirm";
@@ -27,6 +28,14 @@ export function useBackendEvents() {
       }),
       listen("profiles://changed", () => void useProfiles.getState().load()),
       listen("automation://ran", () => refreshActivity()),
+      // A tab came back from a web overlay: show it in BROWSER.
+      listen<string>("browser://returned", async (e) => {
+        useShell.getState().navigate("browser");
+        const { useBrowser } = await import("@/modules/browser/store");
+        await useBrowser.getState().init();
+        await useBrowser.getState().refresh();
+        useBrowser.getState().activate(e.payload);
+      }),
     ];
     return () => subs.forEach((p) => void p.then((off) => off()));
   }, []);

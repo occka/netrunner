@@ -4,6 +4,23 @@ import { api } from "@/services/api";
 import { DEFAULT_THEME, sanitizeTheme, type ThemeColors } from "@/styles/theme";
 import { applyAppearance, DEFAULT_BACKGROUND, FONTS, sanitizeBackground, type BackgroundSpec, type UiFont } from "@/styles/appearance";
 
+/** Open BROWSER tabs, saved so they come back after a restart (never private tabs). */
+export interface BrowserSession {
+  tabs: { url: string; title: string }[];
+  active: number;
+}
+
+function sanitizeSession(raw: unknown): BrowserSession {
+  const r = (raw && typeof raw === "object" ? raw : {}) as { tabs?: unknown; active?: unknown };
+  const tabs = (Array.isArray(r.tabs) ? r.tabs : [])
+    .filter((t): t is { url: string; title?: unknown } => !!t && typeof (t as { url?: unknown }).url === "string")
+    .filter((t) => /^https?:\/\//.test(t.url) && t.url.length <= 4096)
+    .slice(0, 40)
+    .map((t) => ({ url: t.url, title: typeof t.title === "string" ? t.title.slice(0, 300) : "" }));
+  const active = typeof r.active === "number" && Number.isInteger(r.active) ? Math.min(Math.max(0, r.active), Math.max(0, tabs.length - 1)) : 0;
+  return { tabs, active };
+}
+
 /** Every persisted setting with its default. Keys follow `area.name`. */
 export interface SettingsSchema {
   theme: ThemeColors;
@@ -34,6 +51,9 @@ export interface SettingsSchema {
   /** Applies after restart. Loads unpacked extensions from the extensions folder. */
   "browser.extensions": boolean;
   "browser.home": string;
+  /** Reopen the tabs of the last session when BROWSER is first opened. */
+  "browser.restore_tabs": boolean;
+  "browser.session": BrowserSession;
   // Appearance (styles/appearance.ts).
   "appearance.background": BackgroundSpec;
   "appearance.dashboard_background": BackgroundSpec;
@@ -72,6 +92,8 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "browser.webrtc_protect": true,
   "browser.extensions": false,
   "browser.home": "",
+  "browser.restore_tabs": true,
+  "browser.session": { tabs: [], active: 0 },
   "appearance.background": DEFAULT_BACKGROUND,
   "appearance.dashboard_background": DEFAULT_BACKGROUND,
   "appearance.panel_opacity": 100,
@@ -109,6 +131,7 @@ function coerce(raw: Record<string, unknown>): SettingsSchema {
     }
   }
   values["monitor.interval_ms"] = Math.min(10000, Math.max(500, values["monitor.interval_ms"]));
+  values["browser.session"] = sanitizeSession(values["browser.session"]);
   values["appearance.background"] = sanitizeBackground(values["appearance.background"]);
   values["appearance.dashboard_background"] = sanitizeBackground(values["appearance.dashboard_background"]);
   values["appearance.panel_opacity"] = Math.min(100, Math.max(30, values["appearance.panel_opacity"]));
