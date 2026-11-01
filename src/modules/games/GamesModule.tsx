@@ -103,6 +103,7 @@ export default function GamesModule() {
   const view = useSetting("games.view");
   const sort = useSetting("games.sort");
   const period = useSetting("games.period");
+  const untracked = useSetting("games.untracked");
   const set = useSettings((s) => s.set);
   const [filter, setFilter] = useState<Filter>("all");
   const [text, setText] = useState("");
@@ -157,8 +158,9 @@ export default function GamesModule() {
     );
   }, [items, filter, text, sort, played, ever]);
 
-  const total = (playtime.data ?? []).reduce((s, p) => s + p.seconds, 0);
-  const top = [...(playtime.data ?? [])].sort((a, b) => b.seconds - a.seconds)[0];
+  const counted = (playtime.data ?? []).filter((p) => !untracked.includes(p.gameId));
+  const total = counted.reduce((s, p) => s + p.seconds, 0);
+  const top = [...counted].sort((a, b) => b.seconds - a.seconds)[0];
 
   const launch = async (item: LibraryItem) => {
     if (item.entry) return qa.launch(item.entry);
@@ -216,7 +218,11 @@ export default function GamesModule() {
     );
     const meta = (
       <div className="game__play muted">
-        <span className={p?.seconds ? "game__time" : undefined}>{formatPlaytime(p?.seconds ?? 0)}</span>
+        {untracked.includes(item.key) ? (
+          <span title="Playtime is not counted for this game (change it in its history)">not tracked</span>
+        ) : (
+          <span className={p?.seconds ? "game__time" : undefined}>{formatPlaytime(p?.seconds ?? 0)}</span>
+        )}
         <span>· {lastPlayedLabel(ever.get(item.key)?.lastPlayed)}</span>
       </div>
     );
@@ -307,7 +313,17 @@ export default function GamesModule() {
           15 seconds; it is stored only on this computer. NETRUNNER never modifies game files or processes.
         </p>
       </div>
-      {stats && <GameStats item={stats} total={ever.get(stats.key) as Playtime | undefined} onClose={() => setStats(null)} />}
+      {stats && (
+        <GameStats
+          item={stats}
+          total={ever.get(stats.key) as Playtime | undefined}
+          onClose={() => setStats(null)}
+          onCleared={() => {
+            void playtime.reload();
+            void allTime.reload();
+          }}
+        />
+      )}
     </div>
   );
 }

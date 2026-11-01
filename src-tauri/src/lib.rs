@@ -172,6 +172,7 @@ pub fn run() {
             commands::library::games_history,
             commands::library::games_running,
             commands::library::games_banner,
+            commands::library::games_clear_playtime,
             commands::library::integrations_list,
             commands::library::integration_launch,
             commands::library::automation_list,

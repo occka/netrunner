@@ -102,3 +102,9 @@ pub async fn games_running() -> Vec<String> {
 pub async fn games_banner(state: State<'_, AppState>, id: String) -> AppResult<String> {
     crate::services::artwork::banner(&state.data_dir, &id).await
 }
+
+/// Forgets the recorded playtime of one game.
+#[tauri::command]
+pub async fn games_clear_playtime(state: State<'_, AppState>, id: String) -> AppResult<usize> {
+    crate::services::playtime::clear(&*state.db.conn()?, &id)
+}

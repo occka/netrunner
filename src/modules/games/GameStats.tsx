@@ -1,14 +1,37 @@
 import { useEffect, useState } from "react";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Trash2 } from "lucide-react";
 import { Dialog } from "@/components/Dialog";
 import { api } from "@/services/api";
+import { useSetting, useSettings } from "@/stores/settings";
+import { confirmAction } from "@/stores/confirm";
+import { reportError } from "@/stores/notifications";
 import { formatPlaytime, type LibraryItem } from "./GamesModule";
 import type { PlayDay, Playtime } from "@/types/phase2";
 
 const RANGES = [7, 30, 90] as const;
 
 /** Playtime history of one game: totals and a bar per day. */
-export function GameStats({ item, total, onClose }: { item: LibraryItem; total?: Playtime; onClose: () => void }) {
+export function GameStats({ item, total, onClose, onCleared }: { item: LibraryItem; total?: Playtime; onClose: () => void; onCleared: () => void }) {
+  const untracked = useSetting("games.untracked");
+  const tracked = !untracked.includes(item.key);
+  const setTracked = (on: boolean) =>
+    void useSettings.getState().set("games.untracked", on ? untracked.filter((id) => id !== item.key) : [...untracked, item.key]);
+  const clear = async () => {
+    const ok = await confirmAction({
+      title: "Clear playtime",
+      message: `Delete all recorded playtime of ${item.name}?`,
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.games.clearPlaytime(item.key);
+      onCleared();
+      onClose();
+    } catch (err) {
+      reportError("Could not clear playtime", err);
+    }
+  };
   const [days, setDays] = useState<(typeof RANGES)[number]>(30);
   const [history, setHistory] = useState<PlayDay[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +91,15 @@ export function GameStats({ item, total, onClose }: { item: LibraryItem; total?:
           </div>
         )}
         {total === undefined && <p className="muted">No playtime recorded yet. NETRUNNER counts time while the game runs.</p>}
+        <div className="gstats__options">
+          <label className="check" title="Turn off for tools that run all the time (e.g. Wallpaper Engine)">
+            <input type="checkbox" checked={tracked} onChange={(e) => setTracked(e.target.checked)} />
+            Count playtime for this game
+          </label>
+          <button className="btn btn--sm btn--ghost" disabled={!total} onClick={() => void clear()}>
+            <Trash2 size={12} /> Clear recorded time
+          </button>
+        </div>
       </div>
     </Dialog>
   );

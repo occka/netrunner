@@ -23,23 +23,30 @@ pub fn running() -> Vec<String> {
     RUNNING.lock().map(|r| r.clone()).unwrap_or_default()
 }
 
-fn watched(app: &AppHandle) -> Vec<Watched> {
-    let mut list: Vec<Watched> = games::scan()
-        .games
+pub const UNTRACKED_KEY: &str = "games.untracked";
+
+/// Games whose playtime you switched off in GAMES.
+fn untracked(app: &AppHandle) -> HashSet<String> {
+    app.try_state::<AppState>()
+        .and_then(|state| state.db.conn().ok().and_then(|c| crate::services::settings::get(&c, UNTRACKED_KEY).ok().flatten()))
+        .and_then(|v| v.as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()))
+        .unwrap_or_default()
+}
+
+/// Games found by the launcher scan (slow: registry and manifests).
+fn library() -> Vec<Watched> {
+    games::scan().games.iter().filter_map(|g| playtime::watched(&g.id, &g.name, g.source, g.install_dir.as_deref())).collect()
+}
+
+/// Your own games from Quick Access (a quick database read, so new ones count at once).
+fn own_games(app: &AppHandle) -> Vec<Watched> {
+    app.try_state::<AppState>()
+        .and_then(|state| state.db.conn().and_then(|c| quick_access::list(&c)).ok())
+        .unwrap_or_default()
         .iter()
-        .filter_map(|g| playtime::watched(&g.id, &g.name, g.source, g.install_dir.as_deref()))
-        .collect();
-    if let Some(state) = app.try_state::<AppState>() {
-        if let Ok(entries) = state.db.conn().and_then(|c| quick_access::list(&c)) {
-            list.extend(
-                entries
-                    .iter()
-                    .filter(|e| e.kind == "game")
-                    .filter_map(|e| playtime::watched_exe(&format!("qa:{}", e.id), &e.name, &e.target)),
-            );
-        }
-    }
-    list
+        .filter(|e| e.kind == "game")
+        .filter_map(|e| playtime::watched_exe(&format!("qa:{}", e.id), &e.name, &e.target))
+        .collect()
 }
 
 pub fn start(app: &AppHandle) {
@@ -48,15 +55,18 @@ pub fn start(app: &AppHandle) {
         .name("nr-playtime".into())
         .spawn(move || {
             let mut sys = System::new();
-            let mut games: Vec<Watched> = Vec::new();
+            let mut library_games: Vec<Watched> = Vec::new();
             let mut scanned: Option<Instant> = None;
             // game id → session row being extended.
             let mut sessions: HashMap<String, i64> = HashMap::new();
             loop {
                 if scanned.map_or(true, |t| t.elapsed() > RESCAN) {
-                    games = watched(&app);
+                    library_games = library();
                     scanned = Some(Instant::now());
                 }
+                let skip = untracked(&app);
+                let games: Vec<Watched> =
+                    library_games.iter().cloned().chain(own_games(&app)).filter(|g| !skip.contains(&g.id)).collect();
                 sys.refresh_processes_specifics(
                     ProcessesToUpdate::All,
                     true,

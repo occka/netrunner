@@ -83,6 +83,11 @@ pub fn touch_session(conn: &Connection, id: i64, now: i64) -> AppResult<()> {
     Ok(())
 }
 
+/// Deletes the recorded sessions of one game.
+pub fn clear(conn: &Connection, game_id: &str) -> AppResult<usize> {
+    Ok(conn.execute("DELETE FROM game_sessions WHERE game_id = ?1", [game_id])?)
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Playtime {
@@ -197,6 +202,8 @@ mod tests {
         assert_eq!(half.iter().find(|p| p.game_id == "steam:1").unwrap().seconds, 1800);
         let later = totals(&conn, Some(10_000_000)).unwrap();
         assert!(later.iter().all(|p| p.seconds == 0 && p.sessions == 0));
+        assert_eq!(clear(&conn, "steam:1").unwrap(), 1);
+        assert!(totals(&conn, None).unwrap().iter().all(|p| p.game_id != "steam:1"));
     }
 
     #[test]

@@ -528,6 +528,10 @@
   letter-spacing: 0.08em;
   color: rgb(255 255 255 / 0.85);
 }
+.game-banner__src,
+.game-banner__run {
+  background: rgb(var(--c-background-rgb) / 0.8);
+}
 .game-banner__src {
   position: absolute;
   top: 8px;
@@ -590,4 +594,11 @@
   display: flex;
   justify-content: space-between;
   font-size: var(--fs-xs);
+}
+.gstats__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
 }

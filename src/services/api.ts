@@ -160,6 +160,7 @@ export const api = {
     playtime: (from: number | null) => call<Playtime[]>("games_playtime", { from }),
     history: (id: string, days: number) => call<PlayDay[]>("games_history", { id, days }),
     running: () => call<string[]>("games_running"),
+    clearPlaytime: (id: string) => call<number>("games_clear_playtime", { id }),
     /** Steam header artwork as a data URL (Steam's local cache first). */
     banner: (id: string) => call<string>("games_banner", { id }),
   },
