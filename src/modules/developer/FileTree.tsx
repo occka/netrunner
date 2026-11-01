@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Copy, FilePlus, FolderOpen, FolderPlus, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Columns2, Copy, FilePlus, FolderOpen, FolderPlus, GitCompare, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { api } from "@/services/api";
 import { useContextMenu } from "@/components/ContextMenu";
 import { confirmAction } from "@/stores/confirm";
 import { promptText } from "@/stores/prompt";
 import { notify, reportError } from "@/stores/notifications";
 import { fileIcon } from "./fileIcons";
-import { useDev } from "./store";
+import { currentKey, useDev } from "./store";
 import type { ObjectAction } from "@/objects/types";
 import type { DirEntry } from "@/types/dev";
 
@@ -92,6 +92,9 @@ async function newItem(parent: string, dir: boolean) {
   }
 }
 
+/** First file of a Compare with… pair. */
+let compareBase: string | null = null;
+
 function actionsFor(entry: DirEntry): ObjectAction[] {
   const dev = useDev.getState();
   return [
@@ -100,7 +103,31 @@ function actionsFor(entry: DirEntry): ObjectAction[] {
           { id: "new-file", label: "New file…", icon: FilePlus, run: () => newItem(entry.path, false) },
           { id: "new-folder", label: "New folder…", icon: FolderPlus, run: () => newItem(entry.path, true) },
         ]
-      : [{ id: "open", label: "Open", icon: FolderOpen, run: () => dev.openFile(entry.path) }]),
+      : [
+          { id: "open", label: "Open", icon: FolderOpen, run: () => dev.openFile(entry.path) },
+          {
+            id: "open-side",
+            label: "Open to the side",
+            icon: Columns2,
+            run: async () => {
+              if (!useDev.getState().split) useDev.getState().toggleSplit();
+              useDev.getState().setFocus(1);
+              await useDev.getState().openFile(entry.path);
+            },
+          },
+          ...(compareBase && compareBase !== entry.path
+            ? [{ id: "compare", label: `Compare with ${compareBase.split(/[\/]/).pop()}`, icon: GitCompare, run: () => dev.openCompare(compareBase!, entry.path) }]
+            : []),
+          {
+            id: "compare-select",
+            label: "Select for compare",
+            icon: GitCompare,
+            run: () => {
+              compareBase = entry.path;
+              notify.info("Selected for compare", "Right-click another file and choose Compare with…");
+            },
+          },
+        ]),
     {
       id: "rename",
       label: "Rename…",
@@ -143,7 +170,12 @@ function actionsFor(entry: DirEntry): ObjectAction[] {
         try {
           await api.dev.remove(entry.path);
           const open = dev.tabs.filter((t) => t.kind === "file" && t.path.toLowerCase().startsWith(entry.path.toLowerCase()));
-          useDev.setState((s) => ({ tabs: s.tabs.filter((t) => !open.includes(t)), active: open.some((t) => t.key === s.active) ? null : s.active }));
+          useDev.setState((s) => ({
+            tabs: s.tabs.filter((t) => !open.includes(t)),
+            right: s.right.filter((k) => !open.some((t) => t.key === k)),
+            active: open.some((t) => t.key === s.active) ? null : s.active,
+            activeRight: open.some((t) => t.key === s.activeRight) ? null : s.activeRight,
+          }));
           dev.bump();
         } catch (err) {
           reportError("Could not delete", err);
@@ -167,7 +199,7 @@ function Level({
   toggle: (dir: string) => void;
 }) {
   const openFile = useDev((s) => s.openFile);
-  const activePath = useDev((s) => s.tabs.find((t) => t.key === s.active)?.path);
+  const activePath = useDev((s) => s.tabs.find((t) => t.key === currentKey(s))?.path);
   const openMenu = useContextMenu((s) => s.open);
   const list = children[dir];
   if (!list) return depth === 0 ? <div className="tree__loading label">Loading…</div> : null;

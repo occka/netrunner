@@ -12,6 +12,11 @@ export const SETTINGS_SECTIONS = [
     keywords: ["metrics", "polling", "refresh", "cpu", "temperature", "performance"],
   },
   { id: "interface", title: "Interface & motion", keywords: ["animation", "reduced motion", "navigation", "inspector", "sidebar"] },
+  {
+    id: "editor",
+    title: "Code editor (DEVELOPER)",
+    keywords: ["font", "tab size", "indent", "word wrap", "minimap", "auto save", "format on save", "whitespace", "editor"],
+  },
   { id: "startup", title: "Startup & tray", keywords: ["autostart", "windows startup", "tray", "background"] },
 ] as const;
 

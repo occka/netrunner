@@ -14,6 +14,7 @@ import { monaco } from "../monaco";
 import { languageFor } from "../languages";
 import { reloadHooks, saveHooks, useDev, type EditorTab } from "../store";
 import { useSettings } from "@/stores/settings";
+import { applySaveFixes } from "../editorPrefs";
 import { runInTerminal } from "../terminals";
 import {
   applyTextEdits,
@@ -803,6 +804,7 @@ export function startLsp() {
   if (import.meta.env.DEV) Object.assign(window, { __nr: { monaco, useLsp, useDev } });
   saveHooks.before = async (tab) => {
     if (useSettings.getState().values["developer.format_on_save"]) await formatFile(tab.path);
+    applySaveFixes(tab);
   };
   saveHooks.after = (tab) => didSave(tab.path);
   // Replace in files rewrote an open file: update its model undoably.

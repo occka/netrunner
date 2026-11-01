@@ -21,6 +21,56 @@ function sanitizeSession(raw: unknown): BrowserSession {
   return { tabs, active };
 }
 
+/** DEVELOPER code editor preferences (an .editorconfig in the project wins per file). */
+export interface EditorPrefs {
+  fontFamily: string;
+  fontSize: number;
+  tabSize: number;
+  insertSpaces: boolean;
+  wordWrap: boolean;
+  minimap: boolean;
+  autoSave: "off" | "afterDelay" | "onFocusChange";
+  trimTrailingWhitespace: boolean;
+  insertFinalNewline: boolean;
+}
+
+export const DEFAULT_EDITOR: EditorPrefs = {
+  fontFamily: '"JetBrains Mono", Consolas, monospace',
+  fontSize: 13,
+  tabSize: 4,
+  insertSpaces: true,
+  wordWrap: false,
+  minimap: true,
+  autoSave: "off",
+  trimTrailingWhitespace: false,
+  insertFinalNewline: false,
+};
+
+/** Open DEVELOPER tabs per project, restored after a restart. */
+export interface DevSession {
+  files: { path: string; right?: boolean; line?: number; column?: number }[];
+  active?: string;
+  activeRight?: string;
+  split?: boolean;
+}
+
+function sanitizeEditor(raw: unknown): EditorPrefs {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Partial<Record<keyof EditorPrefs, unknown>>;
+  const pick = <K extends keyof EditorPrefs>(k: K, ok: (v: unknown) => boolean) => (ok(r[k]) ? (r[k] as EditorPrefs[K]) : DEFAULT_EDITOR[k]);
+  const isBool = (v: unknown) => typeof v === "boolean";
+  return {
+    fontFamily: pick("fontFamily", (v) => typeof v === "string" && v.trim().length > 0 && v.length < 200),
+    fontSize: Math.min(32, Math.max(8, pick("fontSize", (v) => typeof v === "number"))),
+    tabSize: Math.min(16, Math.max(1, pick("tabSize", (v) => typeof v === "number"))),
+    insertSpaces: pick("insertSpaces", isBool),
+    wordWrap: pick("wordWrap", isBool),
+    minimap: pick("minimap", isBool),
+    autoSave: pick("autoSave", (v) => v === "off" || v === "afterDelay" || v === "onFocusChange"),
+    trimTrailingWhitespace: pick("trimTrailingWhitespace", isBool),
+    insertFinalNewline: pick("insertFinalNewline", isBool),
+  };
+}
+
 /** Every persisted setting with its default. Keys follow `area.name`. */
 export interface SettingsSchema {
   theme: ThemeColors;
@@ -76,6 +126,9 @@ export interface SettingsSchema {
   "appearance.vignette": boolean;
   /** DEVELOPER: format with the language server before saving. */
   "developer.format_on_save": boolean;
+  "developer.editor": EditorPrefs;
+  /** Keyed by project root. */
+  "developer.session": Record<string, DevSession>;
 }
 
 export const SETTINGS_DEFAULTS: SettingsSchema = {
@@ -121,6 +174,8 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "appearance.glow": false,
   "appearance.vignette": false,
   "developer.format_on_save": false,
+  "developer.editor": DEFAULT_EDITOR,
+  "developer.session": {},
 };
 
 export type SettingKey = keyof SettingsSchema;
@@ -157,6 +212,8 @@ function coerce(raw: Record<string, unknown>): SettingsSchema {
   values["appearance.scale"] = Math.min(150, Math.max(70, values["appearance.scale"]));
   if (!FONTS.some((f) => f.id === values["appearance.font"])) values["appearance.font"] = "plex";
   values["inspector.width"] = Math.min(520, Math.max(240, values["inspector.width"]));
+  values["developer.editor"] = sanitizeEditor(values["developer.editor"]);
+  if (Array.isArray(values["developer.session"])) values["developer.session"] = {};
   return values;
 }
 

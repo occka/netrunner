@@ -6,7 +6,7 @@ import { ChatPanel } from "@/modules/neural/ChatPanel";
 import { useNeural } from "@/modules/neural/store";
 import { useNeuralSession } from "@/modules/neural/useNeuralSession";
 import { getEditorSelection } from "./EditorArea";
-import { useDev } from "./store";
+import { currentKey, useDev } from "./store";
 
 /**
  * NEURAL inside DEVELOPER. Context is attached explicitly with the buttons
@@ -18,7 +18,7 @@ export function AiPanel({ root }: { root: string }) {
   const status = useNeural((s) => s.status);
   const loadStatus = useNeural((s) => s.loadStatus);
   const attach = useNeural((s) => s.attach);
-  const activeFile = useDev((s) => s.tabs.find((t) => t.key === s.active && t.kind === "file"));
+  const activeFile = useDev((s) => s.tabs.find((t) => t.key === currentKey(s) && t.kind === "file"));
 
   useEffect(() => {
     if (!status) void loadStatus().catch(() => undefined);

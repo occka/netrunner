@@ -9,6 +9,7 @@ import { useSettings, type SettingsSchema } from "@/stores/settings";
 import { useShell } from "@/stores/shell";
 import { reportError } from "@/stores/notifications";
 import { DEFAULT_THEME, THEME_PRESETS, THEME_TOKENS, TOKEN_LABELS, type ThemeColors } from "@/styles/theme";
+import { EditorSettings } from "./EditorSettings";
 
 const INTERVALS = [500, 1000, 1500, 3000, 5000];
 
@@ -276,6 +277,8 @@ export default function SettingsModule() {
             </div>
           </div>
         </section>
+
+        <EditorSettings />
 
         <section className="panel settings-group" id="settings-startup">
           <header className="panel__header">

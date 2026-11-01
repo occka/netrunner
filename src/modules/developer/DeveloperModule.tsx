@@ -5,7 +5,7 @@ import { ModuleHeader } from "@/components/ModuleHeader";
 import { api } from "@/services/api";
 import { useQuickAccess } from "@/stores/quickAccess";
 import { notify, reportError } from "@/stores/notifications";
-import { useDev, type IdeMode, type SidePanel } from "./store";
+import { currentKey, useDev, type IdeMode, type SidePanel } from "./store";
 import { CloneDialog } from "./CloneDialog";
 import { AiPanel } from "./AiPanel";
 import { FileTree } from "./FileTree";
@@ -19,6 +19,7 @@ import { LanguagesPanel } from "./lsp/LanguagesPanel";
 import { ProblemsPanel } from "./lsp/ProblemsPanel";
 import { runInTerminal } from "./terminals";
 import { startLsp } from "./lsp/client";
+import { restoreSession, startEditorPrefs } from "./editorPrefs";
 import { runPlan } from "./run";
 
 const MODES: { id: IdeMode; label: string }[] = [
@@ -36,7 +37,7 @@ const SIDES: { id: SidePanel; label: string; icon: typeof FolderOpen }[] = [
 
 export default function DeveloperModule() {
   const { projects, root, mode, side, terminalOpen, loadProjects, openProject, closeProject, setMode, setSide, toggleTerminal } = useDev();
-  const activeTab = useDev((s) => s.tabs.find((t) => t.key === s.active));
+  const activeTab = useDev((s) => s.tabs.find((t) => t.key === currentKey(s)));
   // Select the stable array, then derive: a filtering selector would return a
   // new array each render and loop under zustand v5.
   const entries = useQuickAccess((s) => s.entries);
@@ -49,7 +50,12 @@ export default function DeveloperModule() {
   useEffect(() => {
     loadProjects().catch((err) => reportError("Could not load projects", err));
     startLsp();
+    startEditorPrefs();
   }, [loadProjects]);
+
+  useEffect(() => {
+    if (root) void restoreSession(root);
+  }, [root]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

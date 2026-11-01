@@ -18,14 +18,21 @@ export interface EditorTab {
   saved: string;
   readOnly: boolean;
   binary: boolean;
-  diff?: { original: string; modified: string; staged: boolean };
+  diff?: { original: string; modified: string; staged: boolean; label?: string };
 }
 
 interface DevStore {
   projects: string[];
   root: string | null;
   tabs: EditorTab[];
+  /** Active tab of the left (or only) editor group. */
   active: string | null;
+  /** Split editor: the right group's tab keys and its active tab. */
+  split: boolean;
+  right: string[];
+  activeRight: string | null;
+  /** The group that last had focus; new tabs open there. */
+  focus: 0 | 1;
   mode: IdeMode;
   side: SidePanel;
   terminalOpen: boolean;
@@ -42,6 +49,11 @@ interface DevStore {
   save: (key: string) => Promise<void>;
   closeTab: (key: string) => Promise<void>;
   setActive: (key: string) => void;
+  toggleSplit: () => void;
+  moveToGroup: (key: string, group: 0 | 1) => void;
+  setFocus: (group: 0 | 1) => void;
+  /** Read-only diff of two files (Compare with…). */
+  openCompare: (a: string, b: string) => Promise<void>;
   setMode: (mode: IdeMode) => void;
   setSide: (side: SidePanel) => void;
   toggleTerminal: (open?: boolean) => void;
@@ -57,6 +69,23 @@ export const saveHooks: { before?: (tab: EditorTab) => Promise<unknown>; after?:
 export const reloadHooks = new Set<(path: string, content: string) => void>();
 
 const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p;
+
+type Groups = Pick<DevStore, "split" | "right" | "active" | "activeRight" | "focus">;
+
+/** A new tab opens in the focused group. */
+function placeNew(s: Groups, key: string): Partial<Groups> {
+  const right = s.right.filter((k) => k !== key);
+  return s.split && s.focus === 1 ? { right: [...right, key], activeRight: key } : { right, active: key, focus: 0 };
+}
+
+function activate(s: Groups, key: string): Partial<Groups> {
+  return s.right.includes(key) ? { activeRight: key, focus: 1 } : { active: key, focus: 0 };
+}
+
+/** Key of the tab the user is working in (the focused group's active tab). */
+export const currentKey = (s: Groups) => (s.split && s.focus === 1 ? s.activeRight : s.active);
+
+const NO_TABS = { tabs: [], active: null, right: [], activeRight: null, focus: 0 as const };
 export const isDirty = (t: EditorTab) => t.kind === "file" && t.content !== t.saved;
 
 export const useDev = create<DevStore>((set, get) => ({
@@ -64,6 +93,10 @@ export const useDev = create<DevStore>((set, get) => ({
   root: null,
   tabs: [],
   active: null,
+  split: false,
+  right: [],
+  activeRight: null,
+  focus: 0,
   mode: "code",
   side: "explorer",
   terminalOpen: false,
@@ -81,7 +114,7 @@ export const useDev = create<DevStore>((set, get) => ({
     try {
       const root = await api.dev.openProject(path);
       const projects = await api.dev.projects();
-      set({ projects, root, tabs: [], active: null, revision: get().revision + 1 });
+      set({ projects, root, ...NO_TABS, revision: get().revision + 1 });
     } catch (err) {
       reportError("Could not open project", err);
     }
@@ -90,17 +123,17 @@ export const useDev = create<DevStore>((set, get) => ({
   closeProject: async (path) => {
     await api.dev.closeProject(path);
     const projects = await api.dev.projects();
-    set((s) => (s.root === path ? { projects, root: projects[0] ?? null, tabs: [], active: null } : { projects }));
+    set((s) => (s.root === path ? { projects, root: projects[0] ?? null, ...NO_TABS } : { projects }));
   },
 
   openFile: async (path) => {
     const same = (a: string) => a.toLowerCase() === path.toLowerCase();
     const existing = get().tabs.find((t) => t.kind === "file" && same(t.path));
-    if (existing) return set({ active: existing.key });
+    if (existing) return set((s) => activate(s, existing.key));
     try {
       const f = await api.dev.readFile(path);
       const key = `file:${f.path}`;
-      if (get().tabs.some((t) => t.key === key)) return set({ active: key });
+      if (get().tabs.some((t) => t.key === key)) return set((s) => activate(s, key));
       const tab: EditorTab = {
         key,
         kind: "file",
@@ -112,7 +145,7 @@ export const useDev = create<DevStore>((set, get) => ({
         readOnly: f.readOnly,
         binary: f.binary,
       };
-      set((s) => ({ tabs: [...s.tabs, tab], active: key }));
+      set((s) => ({ tabs: [...s.tabs, tab], ...placeNew(s, key) }));
     } catch (err) {
       reportError(`Could not open ${baseName(path)}`, err);
     }
@@ -136,7 +169,7 @@ export const useDev = create<DevStore>((set, get) => ({
         binary: false,
         diff: { ...diff, staged },
       };
-      set((s) => ({ tabs: [...s.tabs.filter((t) => t.key !== key), tab], active: key }));
+      set((s) => ({ tabs: [...s.tabs.filter((t) => t.key !== key), tab], ...placeNew(s, key) }));
     } catch (err) {
       reportError("Could not load diff", err);
     }
@@ -160,7 +193,7 @@ export const useDev = create<DevStore>((set, get) => ({
         binary: false,
         diff: { original, modified: proposed, staged: false },
       };
-      set((s) => ({ tabs: [...s.tabs.filter((t) => t.key !== key), tab], active: key }));
+      set((s) => ({ tabs: [...s.tabs.filter((t) => t.key !== key), tab], ...placeNew(s, key) }));
     } catch (err) {
       reportError("Could not open proposal", err);
     }
@@ -183,7 +216,8 @@ export const useDev = create<DevStore>((set, get) => ({
         tabs: s.tabs
           .filter((t) => t.key !== key)
           .map((t) => (t.key === `file:${tab.path}` ? { ...t, content: modified, saved: modified } : t)),
-        active: s.tabs.some((t) => t.key === `file:${tab.path}`) ? `file:${tab.path}` : null,
+        right: s.right.filter((k) => k !== key),
+        ...(s.tabs.some((t) => t.key === `file:${tab.path}`) ? activate(s, `file:${tab.path}`) : { active: s.active === key ? null : s.active }),
         revision: s.revision + 1,
       }));
       notify.success("Proposal applied", tab.path);
@@ -217,14 +251,67 @@ export const useDev = create<DevStore>((set, get) => ({
       if (!ok) return;
     }
     set((s) => {
-      const index = s.tabs.findIndex((t) => t.key === key);
       const tabs = s.tabs.filter((t) => t.key !== key);
-      const active = s.active === key ? (tabs[Math.max(0, index - 1)]?.key ?? null) : s.active;
-      return { tabs, active };
+      // The neighbour in the same group becomes active.
+      const inRight = s.right.includes(key);
+      const group = s.tabs.filter((t) => s.right.includes(t.key) === inRight).map((t) => t.key);
+      const index = group.indexOf(key);
+      const rest = group.filter((k) => k !== key);
+      const next = rest[Math.max(0, index - 1)] ?? null;
+      if (inRight) return { tabs, right: s.right.filter((k) => k !== key), activeRight: s.activeRight === key ? next : s.activeRight };
+      return { tabs, active: s.active === key ? next : s.active };
     });
   },
 
-  setActive: (active) => set({ active }),
+  setActive: (key) => set((s) => activate(s, key)),
+
+  toggleSplit: () =>
+    set((s) => {
+      if (s.split) return { split: false, right: [], activeRight: null, focus: 0, active: s.active ?? s.activeRight };
+      const left = s.tabs.filter((t) => !s.right.includes(t.key));
+      // The active tab moves to the new group when others stay behind.
+      if (s.active && left.length > 1) {
+        const rest = left.filter((t) => t.key !== s.active);
+        return { split: true, right: [s.active], activeRight: s.active, active: rest.at(-1)?.key ?? null, focus: 1 };
+      }
+      return { split: true, focus: 1 };
+    }),
+
+  moveToGroup: (key, group) =>
+    set((s) => {
+      if ((group === 1) === s.right.includes(key)) return activate(s, key);
+      if (group === 1) {
+        const left = s.tabs.filter((t) => !s.right.includes(t.key) && t.key !== key);
+        return { split: true, right: [...s.right, key], activeRight: key, focus: 1, active: s.active === key ? (left.at(-1)?.key ?? null) : s.active };
+      }
+      const right = s.right.filter((k) => k !== key);
+      return { right, active: key, focus: 0, activeRight: s.activeRight === key ? (right.at(-1) ?? null) : s.activeRight };
+    }),
+
+  setFocus: (focus) => set((s) => (s.focus === focus ? s : { focus })),
+
+  openCompare: async (a, b) => {
+    const key = `compare:${a}|${b}`;
+    try {
+      const [left, right] = await Promise.all([api.dev.readFile(a), api.dev.readFile(b)]);
+      if (left.binary || right.binary) return notify.warn("Binary files cannot be compared as text");
+      const tab: EditorTab = {
+        key,
+        kind: "diff",
+        path: b,
+        name: `${baseName(a)} ↔ ${baseName(b)}`,
+        language: languageFor(b),
+        content: "",
+        saved: "",
+        readOnly: true,
+        binary: false,
+        diff: { original: left.content, modified: right.content, staged: false, label: `${a} ↔ ${b}` },
+      };
+      set((s) => ({ tabs: [...s.tabs.filter((t) => t.key !== key), tab], ...placeNew(s, key) }));
+    } catch (err) {
+      reportError("Could not compare files", err);
+    }
+  },
   setMode: (mode) => set({ mode, terminalOpen: mode === "debug" ? true : get().terminalOpen }),
   setSide: (side) => set({ side }),
   toggleTerminal: (open) => set((s) => ({ terminalOpen: open ?? !s.terminalOpen })),
