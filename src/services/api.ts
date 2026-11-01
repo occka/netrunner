@@ -7,6 +7,8 @@ import type {
   Commit,
   DirEntry,
   FileContent,
+  GitHubEntry,
+  GitHubFile,
   GitHubIssue,
   GitHubRepo,
   GitHubStatus,
@@ -216,6 +218,13 @@ export const api = {
     repos: () => call<GitHubRepo[]>("github_repos"),
     issues: (owner: string, repo: string, pulls: boolean, state = "open") =>
       call<GitHubIssue[]>("github_issues", { owner, repo, pulls, state }),
+    contents: (owner: string, repo: string, path: string, gitRef?: string) =>
+      call<GitHubEntry[]>("github_contents", { owner, repo, path, gitRef }),
+    file: (owner: string, repo: string, path: string, gitRef?: string) => call<GitHubFile>("github_file", { owner, repo, path, gitRef }),
+    branches: (owner: string, repo: string) => call<string[]>("github_branches", { owner, repo }),
+    /** "owner/repo" (lower case) → local folder: linked by hand, or found automatically. */
+    localClones: () => call<Record<string, string>>("github_local_clones"),
+    linkLocal: (fullName: string, path: string | null) => call<void>("github_link_local", { fullName, path }),
   },
 
   neural: {

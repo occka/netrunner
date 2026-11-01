@@ -4,7 +4,7 @@
 
 - Standard user rights. NETRUNNER never requests elevation itself. If a launched app needs admin, Windows shows its own UAC prompt. Operations that need administrator rights (machine-wide startup entries, starting/stopping services) are shown read-only.
 - No hidden execution. Shell commands, Run file and terminals always run in visible consoles. Background helpers (git, version probes) only run fixed, known tools.
-- Local data only. Nothing is uploaded. GitHub calls go only to `api.github.com` and only when you use the GITHUB module.
+- Local data only. Nothing is uploaded. GitHub calls go only to `api.github.com` and only when you use the GITHUB module. Looking for local clones reads only `.git/config` files, in a bounded scan, and stays on this computer.
 
 ## Frontend capabilities
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DownloadCloud, ExternalLink, GitPullRequest, KeyRound, Lock, LogOut, RefreshCw, Star, CircleDot } from "lucide-react";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { DownloadCloud, ExternalLink, GitPullRequest, HardDrive, KeyRound, Lock, LogOut, RefreshCw, Star, CircleDot, Unlink } from "lucide-react";
 import { ModuleHeader } from "@/components/ModuleHeader";
 import { Tabs } from "@/components/Tabs";
 import { api } from "@/services/api";
@@ -7,9 +8,9 @@ import { usePolled } from "@/hooks/usePolled";
 import { confirmAction } from "@/stores/confirm";
 import { notify, reportError } from "@/stores/notifications";
 import { refreshActivity } from "@/stores/activity";
-import { useShell } from "@/stores/shell";
 import { CloneDialog } from "@/modules/developer/CloneDialog";
 import { useDev } from "@/modules/developer/store";
+import { openInDeveloper, RepoCode } from "./RepoCode";
 import { formatRelative } from "@/utils/format";
 import type { GitHubIssue, GitHubRepo } from "@/types/dev";
 
@@ -125,6 +126,8 @@ function Repos() {
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState<GitHubRepo | null>(null);
   const [cloneUrl, setCloneUrl] = useState<string | null>(null);
+  const clones = usePolled(() => api.github.localClones());
+  const projects = useDev((s) => s.projects);
 
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -152,6 +155,11 @@ function Repos() {
               <span className="truncate">{r.fullName}</span>
             </div>
             <div className="gh-repo__meta muted">
+              {localClone(r, clones.data, projects) && (
+                <span title="Cloned on this computer">
+                  <HardDrive size={10} /> local
+                </span>
+              )}
               {r.language && <span>{r.language}</span>}
               <span>
                 <Star size={10} /> {r.stargazersCount}
@@ -161,18 +169,51 @@ function Repos() {
           </button>
         ))}
       </div>
-      {selected && <RepoDetail repo={selected} onClone={() => setCloneUrl(selected.cloneUrl)} />}
-      {cloneUrl && <CloneDialog initialUrl={cloneUrl} onClose={() => setCloneUrl(null)} />}
+      {selected && (
+        <RepoDetail
+          repo={selected}
+          local={localClone(selected, clones.data, projects)}
+          scanning={clones.loading}
+          onRescan={() => void clones.reload()}
+          onClone={() => setCloneUrl(selected.cloneUrl)}
+        />
+      )}
+      {cloneUrl && (
+        <CloneDialog
+          initialUrl={cloneUrl}
+          onClose={() => {
+            setCloneUrl(null);
+            void clones.reload();
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function RepoDetail({ repo, onClone }: { repo: GitHubRepo; onClone: () => void }) {
-  const [tab, setTab] = useState<"pulls" | "issues">("pulls");
+/** The local clone of a repository: linked or found by the scan, else an open project with the same folder name. */
+function localClone(repo: GitHubRepo, clones: Record<string, string> | null, projects: string[]): string | null {
+  const found = clones?.[repo.fullName.toLowerCase()];
+  if (found) return found;
+  return projects.find((p) => p.toLowerCase().endsWith(`\\${repo.name.toLowerCase()}`)) ?? null;
+}
+
+function RepoDetail({
+  repo,
+  local,
+  scanning,
+  onRescan,
+  onClone,
+}: {
+  repo: GitHubRepo;
+  local: string | null;
+  scanning: boolean;
+  onRescan: () => void;
+  onClone: () => void;
+}) {
+  const [tab, setTab] = useState<"code" | "pulls" | "issues">("code");
   const [owner, name] = repo.fullName.split("/");
-  const items = usePolled(() => api.github.issues(owner, name, tab === "pulls"), 0);
-  const projects = useDev((s) => s.projects);
-  const local = projects.find((p) => p.toLowerCase().endsWith(`\\${name.toLowerCase()}`));
+  const items = usePolled(() => (tab === "code" ? Promise.resolve([]) : api.github.issues(owner, name, tab === "pulls")), 0);
   const { reload } = items;
 
   // usePolled loads on mount; reload when the repository or tab changes.
@@ -185,6 +226,17 @@ function RepoDetail({ repo, onClone }: { repo: GitHubRepo; onClone: () => void }
     void reload();
   }, [repo.fullName, tab, reload]);
 
+  const link = async () => {
+    const path = await openDialog({ title: `Folder with your clone of ${repo.fullName}`, directory: true, multiple: false });
+    if (typeof path !== "string") return;
+    try {
+      await api.github.linkLocal(repo.fullName, path);
+      onRescan();
+    } catch (err) {
+      reportError("Could not link the folder", err);
+    }
+  };
+
   return (
     <section className="panel gh-detail">
       <header className="panel__header">
@@ -193,14 +245,11 @@ function RepoDetail({ repo, onClone }: { repo: GitHubRepo; onClone: () => void }
           <button className="btn btn--sm btn--ghost" onClick={() => openExternal(repo.htmlUrl)}>
             <ExternalLink size={12} /> GitHub
           </button>
+          <button className="icon-btn icon-btn--sm" title="Look for local clones again" onClick={onRescan}>
+            <RefreshCw size={12} className={scanning ? "spin" : undefined} />
+          </button>
           {local ? (
-            <button
-              className="btn btn--sm btn--primary"
-              onClick={() => {
-                void useDev.getState().openProject(local);
-                useShell.getState().navigate("developer");
-              }}
-            >
+            <button className="btn btn--sm btn--primary" onClick={() => void openInDeveloper(local)}>
               Open in Developer
             </button>
           ) : (
@@ -213,22 +262,40 @@ function RepoDetail({ repo, onClone }: { repo: GitHubRepo; onClone: () => void }
       <div className="panel__body">
         {repo.description && <p className="gh-detail__desc">{repo.description}</p>}
         <div className="gh-detail__tags">
+          {local ? (
+            <span className="tag tag--info gh-local" title="Local clone">
+              <HardDrive size={10} /> {local}
+              <button
+                className="icon-btn icon-btn--sm"
+                title="Forget a folder linked by hand"
+                onClick={() => void api.github.linkLocal(repo.fullName, null).then(onRescan, (e) => reportError("Could not unlink", e))}
+              >
+                <Unlink size={10} />
+              </button>
+            </span>
+          ) : (
+            <span className="tag">{scanning ? "Looking for a local clone…" : "Not cloned on this computer"}</span>
+          )}
           {repo.private && <span className="tag">Private</span>}
           {repo.fork && <span className="tag">Fork</span>}
           {repo.defaultBranch && <span className="tag tag--info">{repo.defaultBranch}</span>}
         </div>
         <Tabs
           tabs={[
+            { id: "code", label: "Code" },
             { id: "pulls", label: "Pull requests" },
             { id: "issues", label: "Issues" },
           ]}
           value={tab}
           onChange={setTab}
         />
-        {items.error && <div className="unavailable">{items.error}</div>}
-        {items.loading && <div className="label">Loading…</div>}
-        {!items.loading && items.data?.length === 0 && <div className="empty">No open {tab === "pulls" ? "pull requests" : "issues"}.</div>}
-        <div className="gh-items">
+        {tab === "code" && <RepoCode repo={repo} local={local} onLink={() => void link()} />}
+        {tab !== "code" && items.error && <div className="unavailable">{items.error}</div>}
+        {tab !== "code" && items.loading && <div className="label">Loading…</div>}
+        {tab !== "code" && !items.loading && items.data?.length === 0 && (
+          <div className="empty">No open {tab === "pulls" ? "pull requests" : "issues"}.</div>
+        )}
+        <div className="gh-items" hidden={tab === "code"}>
           {items.data?.map((i: GitHubIssue) => (
             <button key={i.number} className="gh-item" onClick={() => openExternal(i.htmlUrl)} title="Open on GitHub">
               {tab === "pulls" ? <GitPullRequest size={13} className="gh-item__icon" /> : <CircleDot size={13} className="gh-item__icon" />}
