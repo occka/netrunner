@@ -17,6 +17,8 @@ import type {
   LspOpened,
   LspServerStatus,
   RepoStatus,
+  SearchQuery,
+  SearchResult,
   ShellOption,
   TermEvent,
   Toolchain,
@@ -195,6 +197,9 @@ export const api = {
     remove: (path: string) => call<void>("dev_delete", { path }),
     reveal: (path: string) => call<void>("dev_reveal", { path }),
     toolchains: () => call<Toolchain[]>("dev_toolchains"),
+    files: (root: string) => call<string[]>("dev_files", { root }),
+    search: (root: string, query: SearchQuery) => call<SearchResult>("dev_search", { root, query }),
+    replace: (query: SearchQuery, replacement: string, paths: string[]) => call<number>("dev_replace", { query, replacement, paths }),
   },
 
   lsp: {

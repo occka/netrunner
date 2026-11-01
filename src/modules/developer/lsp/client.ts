@@ -12,7 +12,7 @@ import { notify, reportError } from "@/stores/notifications";
 import type { LspDiagnostic, LspEvent, LspOpened, LspRange, LspTextEdit, LspWorkspaceEdit } from "@/types/dev";
 import { monaco } from "../monaco";
 import { languageFor } from "../languages";
-import { saveHooks, useDev, type EditorTab } from "../store";
+import { reloadHooks, saveHooks, useDev, type EditorTab } from "../store";
 import { useSettings } from "@/stores/settings";
 import { runInTerminal } from "../terminals";
 import {
@@ -382,7 +382,8 @@ export function takeReveal(path: string): monaco.IRange | null {
   return r;
 }
 
-async function openAt(path: string, selection: monaco.IRange | monaco.IPosition | null | undefined) {
+/** Opens a file tab and selects a range (or puts the cursor at a position). */
+export async function openAt(path: string, selection: monaco.IRange | monaco.IPosition | null | undefined) {
   const range: monaco.IRange | null = !selection
     ? null
     : "startLineNumber" in selection
@@ -804,6 +805,11 @@ export function startLsp() {
     if (useSettings.getState().values["developer.format_on_save"]) await formatFile(tab.path);
   };
   saveHooks.after = (tab) => didSave(tab.path);
+  // Replace in files rewrote an open file: update its model undoably.
+  reloadHooks.add((path, content) => {
+    const model = modelFor(path);
+    if (model && model.getValue() !== content) model.pushEditOperations([], [{ range: model.getFullModelRange(), text: content }], () => null);
+  });
   useDev.subscribe((s, prev) => {
     if (s.tabs !== prev.tabs) sync(s.tabs, prev.tabs);
   });

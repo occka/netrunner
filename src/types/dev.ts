@@ -170,3 +170,29 @@ export interface LspWorkspaceEdit {
     | { kind: "create" | "rename" | "delete"; uri?: string; oldUri?: string; newUri?: string }
   )[];
 }
+
+// ---------- Project search ----------
+
+export interface SearchQuery {
+  pattern: string;
+  regex: boolean;
+  caseSensitive: boolean;
+  wholeWord: boolean;
+  include: string;
+  exclude: string;
+}
+
+export interface SearchMatch {
+  line: number;
+  column: number;
+  length: number;
+  preview: string;
+  previewColumn: number;
+}
+
+export interface SearchResult {
+  files: { path: string; matches: SearchMatch[] }[];
+  total: number;
+  truncated: boolean;
+  searched: number;
+}

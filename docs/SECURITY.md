@@ -23,6 +23,7 @@
 | Process termination | UI confirmation plus backend `confirmed` flag; protected system processes and NETRUNNER itself are refused |
 | Startup entries | Only per-user entries can be toggled (Explorer's reversible StartupApproved flag; nothing is deleted) |
 | Project files | Canonicalised paths must stay inside opened project roots; `..` rejected; `.git` read-only; deletes go to the Recycle Bin |
+| Replace in files | Confirmation listing the files; only files inside open projects; refused while an affected tab has unsaved changes |
 | Git discard / push | Confirmation required (backend enforces `confirmed`); push explains it publishes commits |
 | Git clone | https URLs only; target folder must not exist |
 | Terminals | Allowlisted shells only (PowerShell, pwsh, cmd, Git Bash); cwd must be inside a project |

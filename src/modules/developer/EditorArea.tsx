@@ -105,7 +105,7 @@ export function EditorArea({ onRun }: { onRun: (path: string) => void }) {
           <div className="empty editor-empty">
             <Code2 size={30} strokeWidth={1} />
             <div>Open a file from the explorer, or a change from the Git panel.</div>
-            <div className="muted">Ctrl+S saves · middle-click closes a tab</div>
+            <div className="muted">Ctrl+P go to file · Ctrl+Shift+F search · Ctrl+S save · F12 definition · F2 rename · middle-click closes a tab</div>
           </div>
         ) : tab.binary ? (
           <div className="unavailable editor-binary">Binary file. It cannot be edited as text ({tab.path}).</div>

@@ -7,7 +7,7 @@ use tauri::ipc::Channel;
 use tauri::State;
 
 use crate::dev::terminal::{ShellOption, TermEvent, Terminals};
-use crate::dev::{git, github, toolchains, workspace};
+use crate::dev::{git, github, search, toolchains, workspace};
 use crate::error::{AppError, AppResult};
 use crate::services::activity::{self, Level};
 use crate::services::settings;
@@ -115,6 +115,30 @@ pub async fn dev_toolchains(state: State<'_, AppState>) -> AppResult<Vec<toolcha
         .and_then(|v| serde_json::from_value(v).ok())
         .unwrap_or_default();
     blocking(move || Ok(toolchains::detect(&overrides))).await
+}
+
+// ---------- Search ----------
+
+/// Project files for Go to file (relative paths).
+#[tauri::command]
+pub async fn dev_files(state: State<'_, AppState>, root: String) -> AppResult<Vec<String>> {
+    let root = project(&state, &root)?;
+    blocking(move || search::list_files(&root)).await
+}
+
+#[tauri::command]
+pub async fn dev_search(state: State<'_, AppState>, root: String, query: search::Query) -> AppResult<search::SearchResult> {
+    let root = project(&state, &root)?;
+    blocking(move || search::search(&root, &query)).await
+}
+
+/// Replace in files; the UI previews the matches and confirms first.
+#[tauri::command]
+pub async fn dev_replace(state: State<'_, AppState>, query: search::Query, replacement: String, paths: Vec<String>) -> AppResult<usize> {
+    let r = roots(&state)?;
+    let count = blocking(move || search::replace(&r, &query, &replacement, &paths)).await?;
+    log(&state, "developer", &format!("Replaced {count} match(es) in the project"));
+    Ok(count)
 }
 
 // ---------- Terminal ----------

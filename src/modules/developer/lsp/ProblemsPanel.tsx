@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, CircleX, Info } from "lucide-react";
-import { relativeToRoot, useDev } from "../store";
-import { fileModelUri, useLsp } from "./client";
-import { monaco } from "../monaco";
+import { relativeToRoot } from "../store";
+import { openAt, useLsp } from "./client";
 
 type Filter = "all" | "errors" | "warnings";
 
@@ -25,18 +24,7 @@ export function ProblemsPanel({ root }: { root: string }) {
   );
   const total = files.reduce((n, f) => n + f.items.length, 0);
 
-  const open = async (path: string, line: number, character: number) => {
-    await useDev.getState().openFile(path);
-    // The editor switches models after the tab activates.
-    setTimeout(() => {
-      const editor = monaco.editor.getEditors().find((e) => e.getModel()?.uri.toString() === fileModelUri(path).toString());
-      if (!editor) return;
-      const pos = { lineNumber: line + 1, column: character + 1 };
-      editor.setPosition(pos);
-      editor.revealPositionInCenter(pos);
-      editor.focus();
-    }, 60);
-  };
+  const open = (path: string, line: number, character: number) => openAt(path, { lineNumber: line + 1, column: character + 1 });
 
   return (
     <div className="problems">

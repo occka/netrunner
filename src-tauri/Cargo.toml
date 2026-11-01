@@ -43,6 +43,9 @@ feed-rs = "3"
 # Brave's content-blocking engine (EasyList / uBlock syntax). Without the
 # default `single-thread` feature the engine is Send + Sync.
 adblock = { version = "0.13", default-features = false, features = ["embedded-domain-resolver", "full-regex-handling"] }
+# DEVELOPER project search: .gitignore-aware walking and regex matching.
+ignore = "0.4"
+regex = "1"
 
 # NETRUNNER targets Windows only; these back the native integrations.
 [target.'cfg(windows)'.dependencies]

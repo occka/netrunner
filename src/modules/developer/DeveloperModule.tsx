@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { BrainCircuit, Bug, CircleAlert, DownloadCloud, FolderGit2, FolderOpen, GitBranch, Play, SquareTerminal, Wrench, X } from "lucide-react";
+import { BrainCircuit, Bug, CircleAlert, Search, DownloadCloud, FolderGit2, FolderOpen, GitBranch, Play, SquareTerminal, Wrench, X } from "lucide-react";
 import { ModuleHeader } from "@/components/ModuleHeader";
 import { api } from "@/services/api";
 import { useQuickAccess } from "@/stores/quickAccess";
@@ -13,6 +13,8 @@ import { EditorArea } from "./EditorArea";
 import { TerminalPanel } from "./TerminalPanel";
 import { GitPanel } from "./GitPanel";
 import { ToolsPanel } from "./ToolsPanel";
+import { SearchPanel } from "./SearchPanel";
+import { QuickOpen } from "./QuickOpen";
 import { LanguagesPanel } from "./lsp/LanguagesPanel";
 import { ProblemsPanel } from "./lsp/ProblemsPanel";
 import { runInTerminal } from "./terminals";
@@ -26,6 +28,7 @@ const MODES: { id: IdeMode; label: string }[] = [
 ];
 const SIDES: { id: SidePanel; label: string; icon: typeof FolderOpen }[] = [
   { id: "explorer", label: "Explorer", icon: FolderOpen },
+  { id: "search", label: "Search", icon: Search },
   { id: "git", label: "Git", icon: GitBranch },
   { id: "problems", label: "Problems", icon: CircleAlert },
   { id: "tools", label: "Tools", icon: Wrench },
@@ -39,6 +42,9 @@ export default function DeveloperModule() {
   const entries = useQuickAccess((s) => s.entries);
   const projectEntries = useMemo(() => entries.filter((e) => e.kind === "project"), [entries]);
   const [cloneOpen, setCloneOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [searchFocus, setSearchFocus] = useState(0);
+  const closeQuickOpen = useCallback(() => setQuickOpen(false), []);
 
   useEffect(() => {
     loadProjects().catch((err) => reportError("Could not load projects", err));
@@ -50,11 +56,18 @@ export default function DeveloperModule() {
       if (e.ctrlKey && e.key === "`") {
         e.preventDefault();
         toggleTerminal();
+      } else if (e.ctrlKey && !e.shiftKey && !e.altKey && e.code === "KeyP" && useDev.getState().root) {
+        e.preventDefault();
+        setQuickOpen(true);
+      } else if (e.ctrlKey && e.shiftKey && e.code === "KeyF" && useDev.getState().root) {
+        e.preventDefault();
+        setSide("search");
+        setSearchFocus((n) => n + 1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [toggleTerminal]);
+  }, [toggleTerminal, setSide]);
 
   const pickFolder = async () => {
     const dir = await openDialog({ directory: true, multiple: false, title: "Open project folder" });
@@ -143,6 +156,7 @@ export default function DeveloperModule() {
               </div>
               <div className="ide-side__body">
                 {side === "explorer" && <FileTree root={root} />}
+                {side === "search" && <SearchPanel root={root} focusTick={searchFocus} />}
                 {side === "git" && <GitPanel root={root} />}
                 {side === "problems" && <ProblemsPanel root={root} />}
                 {side === "tools" && (
@@ -192,6 +206,7 @@ export default function DeveloperModule() {
         </div>
       )}
       {cloneOpen && <CloneDialog onClose={() => setCloneOpen(false)} />}
+      {quickOpen && root && <QuickOpen root={root} onClose={closeQuickOpen} />}
     </div>
   );
 }

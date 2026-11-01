@@ -5,6 +5,7 @@ pub mod git;
 pub mod github;
 pub mod lsp;
 pub mod process;
+pub mod search;
 pub mod terminal;
 pub mod toolchains;
 pub mod workspace;

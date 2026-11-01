@@ -5,7 +5,7 @@ import { notify, reportError } from "@/stores/notifications";
 import { languageFor } from "./languages";
 
 export type IdeMode = "code" | "debug" | "ai";
-export type SidePanel = "explorer" | "git" | "problems" | "tools";
+export type SidePanel = "explorer" | "search" | "git" | "problems" | "tools";
 
 export interface EditorTab {
   key: string;
@@ -46,10 +46,15 @@ interface DevStore {
   setSide: (side: SidePanel) => void;
   toggleTerminal: (open?: boolean) => void;
   bump: () => void;
+  /** Re-reads open tabs from disk after something else wrote the files. */
+  reloadFromDisk: (paths: string[]) => Promise<void>;
 }
 
 /** Language-server work around saving (format on save, didSave). */
 export const saveHooks: { before?: (tab: EditorTab) => Promise<unknown>; after?: (tab: EditorTab) => Promise<unknown> } = {};
+
+/** Editors replace their model text when a tab is reloaded from disk. */
+export const reloadHooks = new Set<(path: string, content: string) => void>();
 
 const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p;
 export const isDirty = (t: EditorTab) => t.kind === "file" && t.content !== t.saved;
@@ -224,6 +229,16 @@ export const useDev = create<DevStore>((set, get) => ({
   setSide: (side) => set({ side }),
   toggleTerminal: (open) => set((s) => ({ terminalOpen: open ?? !s.terminalOpen })),
   bump: () => set((s) => ({ revision: s.revision + 1 })),
+
+  reloadFromDisk: async (paths) => {
+    const keys = new Set(paths.map((p) => p.toLowerCase()));
+    for (const tab of get().tabs.filter((t) => t.kind === "file" && keys.has(t.path.toLowerCase()))) {
+      const f = await api.dev.readFile(tab.path).catch(() => null);
+      if (!f) continue;
+      reloadHooks.forEach((h) => h(tab.path, f.content));
+      set((s) => ({ tabs: s.tabs.map((t) => (t.key === tab.key ? { ...t, content: f.content, saved: f.content } : t)) }));
+    }
+  },
 }));
 
 /** Path of `abs` relative to the project root, with forward slashes (git style). */
