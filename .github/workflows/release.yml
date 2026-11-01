@@ -46,6 +46,8 @@ jobs:
           owner: occka
           repo: netrunner-releases
           tagName: v__VERSION__
+          # The tag is created in the releases repository, whose history is only its README.
+          releaseCommitish: main
           releaseName: NETRUNNER v__VERSION__
           releaseBody: Signed Windows build. Download the setup .exe to install; installed copies update themselves (Settings → Updates).
           releaseDraft: false
