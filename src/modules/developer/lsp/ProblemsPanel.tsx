@@ -1,13 +1,15 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, CircleX, Info } from "lucide-react";
 import { relativeToRoot } from "../store";
-import { openAt, useLsp } from "./client";
+import { mergeDiagnostics, openAt, useLsp } from "./client";
 
 type Filter = "all" | "errors" | "warnings";
 
 /** Every diagnostic the language servers reported, grouped by file. */
 export function ProblemsPanel({ root }: { root: string }) {
-  const diagnostics = useLsp((s) => s.diagnostics);
+  const lsp = useLsp((s) => s.diagnostics);
+  const tasks = useLsp((s) => s.taskDiagnostics);
+  const diagnostics = useMemo(() => mergeDiagnostics(lsp, tasks), [lsp, tasks]);
   const [filter, setFilter] = useState<Filter>("all");
   const files = useMemo(
     () =>
@@ -40,7 +42,9 @@ export function ProblemsPanel({ root }: { root: string }) {
         </div>
       </div>
       {!files.length ? (
-        <p className="muted tools__note">No problems reported. Problems appear here for files open in the editor when a language server is installed.</p>
+        <p className="muted tools__note">
+          No problems reported. Language servers report problems for open files; Run and Test configurations add compiler errors from their output.
+        </p>
       ) : (
         files.map((f) => (
           <div key={f.path} className="problems__file">

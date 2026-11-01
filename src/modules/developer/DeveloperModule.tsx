@@ -15,6 +15,7 @@ import { GitPanel } from "./GitPanel";
 import { ToolsPanel } from "./ToolsPanel";
 import { SearchPanel } from "./SearchPanel";
 import { QuickOpen } from "./QuickOpen";
+import { RunBar } from "./RunBar";
 import { LanguagesPanel } from "./lsp/LanguagesPanel";
 import { ProblemsPanel } from "./lsp/ProblemsPanel";
 import { runInTerminal } from "./terminals";
@@ -97,6 +98,7 @@ export default function DeveloperModule() {
   return (
     <div className="module ide">
       <ModuleHeader id="developer" subtitle={root ? <span className="mono">{root}</span> : "Open a project folder to start."}>
+        {root && <RunBar root={root} />}
         <div className="segmented" role="tablist" aria-label="IDE mode">
           {MODES.map((m) => (
             <button key={m.id} aria-pressed={mode === m.id} onClick={() => setMode(m.id)}>

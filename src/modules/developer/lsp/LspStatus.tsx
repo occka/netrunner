@@ -1,13 +1,16 @@
+import { useMemo } from "react";
 import { AlertTriangle, CircleX, Download, Loader2, RotateCw } from "lucide-react";
 import { useDev } from "../store";
 import { pathKey } from "./convert";
-import { installServer, problemCounts, restartServer, retrySpec, useLsp } from "./client";
+import { installServer, mergeDiagnostics, problemCounts, restartServer, retrySpec, useLsp } from "./client";
 
 /** Language-server state of the active file, for the editor status bar. */
 export function LspStatus({ path }: { path: string }) {
   const doc = useLsp((s) => s.docs[pathKey(path)]);
   const server = useLsp((s) => (doc?.server ? s.servers[doc.server] : undefined));
-  const diagnostics = useLsp((s) => s.diagnostics);
+  const lspDiagnostics = useLsp((s) => s.diagnostics);
+  const taskDiagnostics = useLsp((s) => s.taskDiagnostics);
+  const diagnostics = useMemo(() => mergeDiagnostics(lspDiagnostics, taskDiagnostics), [lspDiagnostics, taskDiagnostics]);
   const setSide = useDev((s) => s.setSide);
   if (!doc || doc.state === "unsupported") return null;
 

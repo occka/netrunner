@@ -290,7 +290,8 @@ impl Server {
     /// Starts the executable and runs the `initialize` handshake.
     pub fn spawn(spec: &'static Spec, exe: &Path, root: &Path, key: String, sink: Sink) -> AppResult<Arc<Server>> {
         let mut cmd = crate::dev::process::command(&exe.to_string_lossy());
-        cmd.args(spec.args).current_dir(root).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+        // A plain folder path (no `\\?\` prefix), as terminals get: some tools break on it.
+        cmd.args(spec.args).current_dir(crate::dev::workspace::display(root)).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
         let mut child = cmd.spawn().map_err(|e| AppError::Launch(format!("cannot start {}: {e}", spec.server)))?;
         let stdin = child.stdin.take().expect("piped stdin");
         let stdout = child.stdout.take().expect("piped stdout");

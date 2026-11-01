@@ -15,6 +15,7 @@ import { languageFor } from "../languages";
 import { reloadHooks, saveHooks, useDev, type EditorTab } from "../store";
 import { useSettings } from "@/stores/settings";
 import { applySaveFixes } from "../editorPrefs";
+import { onTaskProblems } from "../tasks";
 import { runInTerminal } from "../terminals";
 import {
   applyTextEdits,
@@ -57,14 +58,17 @@ interface LspStore {
   docs: Record<string, DocState>;
   servers: Record<string, ServerState>;
   diagnostics: Record<string, { path: string; items: LspDiagnostic[] }>;
+  /** Problems found in task output (compiler errors from Run/Test). */
+  taskDiagnostics: Record<string, { path: string; items: LspDiagnostic[] }>;
   /** Bumped when a Go to Definition target waits to be revealed. */
   revealTick: number;
 }
 
-export const useLsp = create<LspStore>(() => ({ docs: {}, servers: {}, diagnostics: {}, revealTick: 0 }));
+export const useLsp = create<LspStore>(() => ({ docs: {}, servers: {}, diagnostics: {}, taskDiagnostics: {}, revealTick: 0 }));
 
 const capabilities = new Map<string, Caps>();
 const MARKER_OWNER = "lsp";
+const TASK_OWNER = "task";
 const CHANGE_DEBOUNCE_MS = 150;
 
 const setDoc = (path: string, patch: Partial<DocState>) =>
@@ -223,13 +227,19 @@ export async function restartServer(server: string) {
 
 // ---------- Diagnostics ----------
 
-function applyMarkers(path: string) {
+/** Language-server and task markers for a file's model (if it is open). */
+export function applyMarkers(path: string) {
   const model = modelFor(path);
   if (!model) return;
-  const items = useLsp.getState().diagnostics[pathKey(path)]?.items ?? [];
+  const s = useLsp.getState();
+  setMarkers(model, MARKER_OWNER, s.diagnostics[pathKey(path)]?.items ?? []);
+  setMarkers(model, TASK_OWNER, s.taskDiagnostics[pathKey(path)]?.items ?? []);
+}
+
+function setMarkers(model: monaco.editor.ITextModel, owner: string, items: LspDiagnostic[]) {
   monaco.editor.setModelMarkers(
     model,
-    MARKER_OWNER,
+    owner,
     items.map((d) => ({
       ...toMonacoRange(d.range),
       severity: markerSeverity(d.severity),
@@ -807,6 +817,16 @@ export function startLsp() {
     applySaveFixes(tab);
   };
   saveHooks.after = (tab) => didSave(tab.path);
+  onTaskProblems((list) => {
+    const map: LspStore["taskDiagnostics"] = {};
+    for (const { path, problem } of list ?? []) {
+      const at = { line: problem.line - 1, character: Math.max(0, problem.column - 1) };
+      (map[pathKey(path)] ??= { path, items: [] }).items.push({ range: { start: at, end: at }, severity: problem.severity, message: problem.message, source: problem.source });
+    }
+    const before = Object.values(useLsp.getState().taskDiagnostics).map((f) => f.path);
+    useLsp.setState({ taskDiagnostics: map });
+    for (const path of new Set([...before, ...Object.values(map).map((f) => f.path)])) applyMarkers(path);
+  });
   // Replace in files rewrote an open file: update its model undoably.
   reloadHooks.add((path, content) => {
     const model = modelFor(path);
@@ -816,6 +836,13 @@ export function startLsp() {
     if (s.tabs !== prev.tabs) sync(s.tabs, prev.tabs);
   });
   sync(useDev.getState().tabs, []);
+}
+
+/** Language-server and task problems together, per file. */
+export function mergeDiagnostics(a: LspStore["diagnostics"], b: LspStore["taskDiagnostics"]): LspStore["diagnostics"] {
+  const out = { ...a };
+  for (const [k, f] of Object.entries(b)) out[k] = { path: f.path, items: [...(out[k]?.items ?? []), ...f.items] };
+  return out;
 }
 
 /** Error and warning counts for one file and for the whole project. */

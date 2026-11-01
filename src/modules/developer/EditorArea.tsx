@@ -5,7 +5,7 @@ import { useSettings } from "@/stores/settings";
 import { applyMonacoTheme, monaco } from "./monaco";
 import { currentKey, isDirty, useDev, type EditorTab } from "./store";
 import { fileIcon } from "./fileIcons";
-import { fileModelUri, previewModels, takeReveal, useLsp } from "./lsp/client";
+import { applyMarkers, fileModelUri, previewModels, takeReveal, useLsp } from "./lsp/client";
 import { LspStatus } from "./lsp/LspStatus";
 import { applyFileConfig, cursorMemory, saveOnFocusChange, saveSessionSoon, takeRestoredCursor } from "./editorPrefs";
 import { pathKey } from "./lsp/convert";
@@ -87,6 +87,7 @@ function EditorGroup({ group, onRun }: { group: 0 | 1; onRun: (path: string) => 
     if (!model || model.uri.scheme !== "file") return;
     const path = model.uri.fsPath;
     void applyFileConfig(model, path);
+    applyMarkers(path);
     const restored = takeRestoredCursor(path);
     if (restored) {
       const pos = { lineNumber: restored.line, column: restored.column };

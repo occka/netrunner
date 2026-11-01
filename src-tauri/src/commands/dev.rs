@@ -159,7 +159,8 @@ pub async fn term_spawn(
     on_event: Channel<TermEvent>,
 ) -> AppResult<u32> {
     let dir = match cwd {
-        Some(c) => Some(workspace::resolve(&roots(&state)?, &c, true)?),
+        // Without the `\\?\` prefix: npm and node fail in such a working directory.
+        Some(c) => Some(PathBuf::from(workspace::display(&workspace::resolve(&roots(&state)?, &c, true)?))),
         None => None,
     };
     terminals.spawn(&shell, dir, cols, rows, on_event)
