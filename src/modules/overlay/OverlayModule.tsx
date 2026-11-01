@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { emit } from "@tauri-apps/api/event";
-import { Eye, EyeOff, Globe, Layers, Lock, MousePointerClick, MousePointerBan, Plus, Settings2, Trash2, Unlock } from "lucide-react";
+import { Eye, EyeOff, Globe, Layers, WandSparkles, Lock, MousePointerClick, MousePointerBan, Plus, Settings2, Trash2, Unlock } from "lucide-react";
 import { Dialog } from "@/components/Dialog";
 import { WidgetSettingsForm } from "@/modules/command/WidgetSettingsForm";
 import { ModuleHeader } from "@/components/ModuleHeader";
@@ -11,10 +11,11 @@ import { reportError } from "@/stores/notifications";
 import { useProfiles } from "@/stores/profiles";
 import { useSetting, useSettings } from "@/stores/settings";
 import { refreshActivity } from "@/stores/activity";
-import { WIDGETS, WIDGET_TYPES, widgetSchema } from "@/modules/command/widgets/registry";
+import { PICKER_TYPES, WIDGETS, widgetSchema } from "@/modules/command/widgets/registry";
+import { useStudioWidgets } from "@/modules/studio/studioStore";
 import type { Overlay } from "@/types/phase2";
 
-const OVERLAY_TYPES = WIDGET_TYPES.filter((t) => WIDGETS[t].component);
+const OVERLAY_TYPES = PICKER_TYPES.filter((t) => WIDGETS[t].component);
 
 /** Starting points for music and video overlays; any http(s) address works. */
 const WEB_PRESETS: { title: string; url: string; kind: "Music" | "Video" }[] = [
@@ -27,7 +28,10 @@ const WEB_PRESETS: { title: string; url: string; kind: "Music" | "Video" }[] = [
   { title: "VK Video", url: "https://vkvideo.ru/", kind: "Video" },
 ];
 
-const overlayName = (o: Overlay) => (o.widgetType === "web" ? o.title || o.url : WIDGETS[o.widgetType]?.title ?? o.widgetType);
+const overlayName = (o: Overlay) =>
+  o.widgetType === "web"
+    ? o.title || o.url
+    : (typeof o.config["frame.title"] === "string" && o.config["frame.title"]) || (WIDGETS[o.widgetType]?.title ?? o.widgetType);
 
 export default function OverlayModule() {
   const { data, reload, setData } = usePolled(() => api.overlays.list());
@@ -38,6 +42,7 @@ export default function OverlayModule() {
   const profiles = useProfiles((s) => s.profiles);
   const activeId = useProfiles((s) => s.activeId);
   const activeName = profiles.find((p) => p.id === activeId)?.name ?? "this profile";
+  const studio = useStudioWidgets()?.filter((w) => w.profileId === null || w.profileId === activeId) ?? [];
   const profileName = (id: number | null) => (id === null ? "every profile" : (profiles.find((p) => p.id === id)?.name ?? `profile #${id}`));
   const inSet = (o: Overlay) => o.profileId === null || o.profileId === activeId;
   const shown = data?.filter((o) => scope === "all" || inSet(o));
@@ -113,6 +118,29 @@ export default function OverlayModule() {
             );
           })}
         </div>
+        {studio.length > 0 && (
+          <>
+            <h2 className="label section-title">Widget Studio</h2>
+            <div className="overlay-types">
+              {studio.map((w) => (
+                <button
+                  key={w.id}
+                  className="overlay-type"
+                  onClick={() =>
+                    void act(async () => {
+                      const o = await api.overlays.create("custom");
+                      await api.overlays.patch(o.id, { config: { "studio.id": w.id, "frame.title": w.name } });
+                    }, "Could not create overlay")
+                  }
+                >
+                  <WandSparkles size={16} strokeWidth={1.5} />
+                  {w.name}
+                  <Plus size={12} className="muted" />
+                </button>
+              ))}
+            </div>
+          </>
+        )}
         <h2 className="label section-title">Music and video</h2>
         <p className="muted integrations-intro">
           A web overlay is a floating window with a page from the NETRUNNER browser: same ad blocking, tracking protection and sign-ins.
@@ -250,7 +278,6 @@ export default function OverlayModule() {
             ))}
           </tbody>
         </table>
-        <p className="muted qa-hint">Widget Studio (custom widgets built from HTML) is planned.</p>
       </div>
       {configuring && (
         <Dialog title={`${overlayName(configuring)} · settings`} onClose={() => setConfiguring(null)} icon={<Settings2 size={15} />}>

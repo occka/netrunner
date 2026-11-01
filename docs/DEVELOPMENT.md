@@ -62,7 +62,9 @@ Add the key and its default to `SettingsSchema` / `SETTINGS_DEFAULTS` in `src/st
 
 ## Claude Code desktop sessions
 
-The Claude desktop app is an MSIX package. Processes started from its terminals inherit its container, so `%APPDATA%` and `%LOCALAPPDATA%` writes land in `AppData\Local\Packages\Claude_*\LocalCache\` instead of the real folders. A dev build started there uses a separate copy of the database and logs. Never launch or update the **installed** NETRUNNER from such a session: the updater would remove the real install and put the new version into the container copy, breaking the Start menu entry and autostart.
+The Claude desktop app is an MSIX package. Processes started from its terminals inherit its container: **new** files under `%APPDATA%` and `%LOCALAPPDATA%` land in `AppData\Local\Packages\Claude_*\LocalCache\`, but files that already exist (such as the installed app's `netrunner.db`) are changed in place. Never launch or update the **installed** NETRUNNER from such a session: the updater would remove the real install and put the new version into the container copy, breaking the Start menu entry and autostart.
+
+Development builds (`debug_assertions`) therefore never use the installed app's data folders: they keep their database, wallpapers, sounds and browser profile in a `dev` subfolder of the app data folders, or in `NETRUNNER_DATA_DIR` (`roaming` and `local` inside it) when that is set. Copy a database there to test with real data; a dev build that migrates it cannot break the installed app.
 
 ## Logs
 

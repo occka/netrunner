@@ -14,3 +14,4 @@ pub mod profiles;
 pub mod quick_access;
 pub mod settings;
 pub mod sounds;
+pub mod studio;

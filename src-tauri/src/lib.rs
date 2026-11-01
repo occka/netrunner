@@ -44,6 +44,21 @@ fn guarded<R: tauri::Runtime>(
     }
 }
 
+/// Data folders. Development builds use a `dev` subfolder (or
+/// `NETRUNNER_DATA_DIR`), so running one never migrates or changes the
+/// installed app's database, wallpapers or browser profile.
+fn data_dirs(app: &tauri::AppHandle) -> tauri::Result<(std::path::PathBuf, std::path::PathBuf)> {
+    let (data, local) = (app.path().app_data_dir()?, app.path().app_local_data_dir()?);
+    if cfg!(debug_assertions) {
+        if let Some(dir) = std::env::var_os("NETRUNNER_DATA_DIR") {
+            let dir = std::path::PathBuf::from(dir);
+            return Ok((dir.join("roaming"), dir.join("local")));
+        }
+        return Ok((data.join("dev"), local.join("dev")));
+    }
+    Ok((data, local))
+}
+
 pub fn run() {
     let overlay_hotkey = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyO);
 
@@ -76,7 +91,7 @@ pub fn run() {
                 .build(),
         )
         .setup(move |app| {
-            let data_dir = app.path().app_data_dir()?;
+            let (data_dir, local_dir) = data_dirs(app.handle())?;
             let db = Database::open(&data_dir.join("netrunner.db"), &data_dir.join("backups"))?;
             {
                 let conn = db.conn()?;
@@ -84,7 +99,6 @@ pub fn run() {
                 activity::record(&conn, Level::Info, "core", &format!("NETRUNNER {} started", app.package_info().version));
             }
             let prefs = browser::Prefs::load(&*db.conn()?);
-            let local_dir = app.path().app_local_data_dir()?;
             app.manage(browser::Browser::new(&data_dir, &local_dir, prefs));
             let alarm_dir = data_dir.clone();
             app.manage(AppState::new(db, data_dir));
@@ -167,6 +181,14 @@ pub fn run() {
             commands::overlay::overlay_set_visible,
             commands::overlay::overlay_delete,
             commands::overlay::overlay_toggle_all,
+            commands::studio::studio_list,
+            commands::studio::studio_create,
+            commands::studio::studio_update,
+            commands::studio::studio_set_profile,
+            commands::studio::studio_counter,
+            commands::studio::studio_delete,
+            commands::studio::studio_feed,
+            commands::studio::browser_open_request,
             commands::alarms::alarms_state,
             commands::alarms::alarm_save,
             commands::alarms::alarm_set_enabled,

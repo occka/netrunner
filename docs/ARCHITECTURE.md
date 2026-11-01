@@ -89,6 +89,14 @@ The Music Player widget combines two sources. NETRUNNER's own tabs and web overl
 
 The Notes / To-do widget stores boards in SQLite (`note_boards` for the free-text note, `note_items` for tasks; `services/notes.rs`). A widget shows the board named in its settings, so the dashboard and overlays can share one. `widgets/notesStore.ts` keeps loaded boards per window and applies changes optimistically; every write emits `notes://changed` with the board and the source webview, and other windows reload that board (the source skips it, so typing is never overwritten by its own echo). Tasks are reordered with pointer events, because the window's file-drop handler takes HTML drag-and-drop.
 
+## Widget Studio
+
+Custom widgets live in `custom_widgets` (`services/studio.rs`): a profile (or every profile), a kind and a JSON config validated per kind. Dashboard and overlay instances are the widget type `custom` with a hidden `studio.id` setting; `modules/studio/studioStore.ts` loads the list once per window and reloads on `studio://changed`.
+
+- **HTML/CSS** is rendered by the UI in `<iframe sandbox="" srcdoc>`: no scripts, an opaque origin (no IPC, storage or cookies), no forms or popups. The document carries its own CSP (`default-src 'none'`, images and fonts only as `data:`), and the app CSP (`default-src 'self'`) stops the frame from navigating anywhere. Theme colours and fonts are passed in as the app's CSS variables, with the app's `color-scheme` so the frame stays transparent.
+- **Feed** widgets are fetched in Rust by widget id, so the UI never supplies an address: the stored URL's host must be on the widget's allowlist (subdomains included), redirects must stay on it, responses are capped at 2 MB / 15 s and cached for the refresh interval (5 min minimum, 1 min for a manual refresh). `feed-rs` parses RSS/Atom/JSON Feed; JSON APIs use a dot path and field names. Only plain text, http(s) links and dates are returned.
+- **Links** from widgets (feed items, link grid) go through `browser_open_request`, which validates the URL, shows the main window and opens a BROWSER tab there (`browser://open-request`).
+
 ## Alarms and timers
 
 `services/alarms.rs` stores alarms (local `HH:MM`, repeat-day bitmask, sound, volume, snooze) and countdown timers (`ends_at` while running, `remaining_ms` while paused) and holds the schedule rules (`due`, `next_occurrence`), which are unit-tested without a clock. `alarm.rs` runs them: a scheduler thread wakes every second and rings what fell into (last check, now]. After sleep it still rings alarms up to 10 minutes late; older ones are skipped. A ring plays the sound and opens the `alarm-ring` window (always on top, Snooze / Stop, Enter/Esc/S), so it works while the main window is hidden in the tray, but not while NETRUNNER is closed. Unanswered rings stop after 10 minutes.

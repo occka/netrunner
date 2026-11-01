@@ -47,6 +47,14 @@ The command policy is a safety net, not a sandbox: a confirmed command runs with
 
 Not covered: in-page video ads served from the site's own domain (e.g. YouTube) need uBlock scriptlets, which are not bundled. Loading unpacked extensions (e.g. uBlock Origin Lite) is an opt-in setting; extensions run with the permissions they declare. Fingerprinting resistance beyond WebView2's defaults is not attempted.
 
+## Widget Studio
+
+| Part | Safeguard |
+|---|---|
+| HTML/CSS widgets | Sandboxed frame without `allow-scripts` / `allow-same-origin`: no JavaScript, no NETRUNNER IPC, storage or cookies. Own CSP `default-src 'none'` (images and fonts only as `data:`); the app CSP blocks navigating the frame to remote pages |
+| Feed widgets | Fetched by the backend from the stored address only; host must be on the widget's allowlist, redirects too; 2 MB / 15 s limits, at most every 5 minutes. Markup is stripped; only http(s) links are passed on |
+| Links | Validated as http(s) and opened as BROWSER tabs (hardened profile), never handed to the shell |
+
 ## Credentials
 
 - **GitHub token:** validated against `/user`, then stored only in **Windows Credential Manager** (DPAPI) under `NETRUNNER / github-token`. It is never written to SQLite or logs and never returned to the UI. Disconnect deletes it.

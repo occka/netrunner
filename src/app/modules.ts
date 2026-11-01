@@ -19,6 +19,7 @@ import {
   Settings,
   SquareTerminal,
   UserCog,
+  WandSparkles,
   Workflow,
   type LucideIcon,
 } from "lucide-react";
@@ -35,6 +36,7 @@ export type ModuleId =
   | "network"
   | "quick-access"
   | "overlay"
+  | "studio"
   | "automation"
   | "integrations"
   | "storage"
@@ -175,12 +177,23 @@ export const MODULES: ModuleDef[] = [
     id: "overlay",
     label: "Overlay",
     icon: Layers,
-    status: "partial",
+    status: "implemented",
     phase: 5,
     group: "main",
     description: "Independent always-on-top floating widgets, music and video.",
-    planned: ["Widget Studio (custom widgets from HTML)", "Per-profile overlay sets", "Click-through mode"],
+    planned: [],
     component: lazy(() => import("@/modules/overlay/OverlayModule")),
+  },
+  {
+    id: "studio",
+    label: "Widget Studio",
+    icon: WandSparkles,
+    status: "implemented",
+    phase: 5,
+    group: "main",
+    description: "Your own widgets from HTML/CSS or templates, for the dashboard and overlays.",
+    planned: [],
+    component: lazy(() => import("@/modules/studio/StudioModule")),
   },
   {
     id: "automation",

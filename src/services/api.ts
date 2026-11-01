@@ -28,6 +28,7 @@ import type {
 } from "@/types/browser";
 import type { Attachment, ChatState, ContextItem, FileEntry, FilePreview, ModelInfo, NeuralStatus, Places, StreamEvent } from "@/types/neural";
 import type { NoteItem, NotesBoard } from "@/types/notes";
+import type { CustomWidget, FeedResult, StudioKind } from "@/types/studio";
 import type { Alarm, AlarmInput, AlarmsState, Sound, Timer, TimerInput } from "@/types/alarms";
 import type {
   ActivityEntry,
@@ -260,6 +261,18 @@ export const api = {
     setProfile: (id: number, profileId: number | null) => call<Overlay>("overlay_set_profile", { id, profileId }),
     remove: (id: number) => call<void>("overlay_delete", { id }),
     toggleAll: () => call<void>("overlay_toggle_all"),
+  },
+
+  studio: {
+    list: () => call<CustomWidget[]>("studio_list"),
+    create: (kind: StudioKind, name: string) => call<CustomWidget>("studio_create", { kind, name }),
+    update: (id: number, name: string, config: Record<string, unknown>) => call<CustomWidget>("studio_update", { id, name, config }),
+    setProfile: (id: number, profileId: number | null) => call<CustomWidget>("studio_set_profile", { id, profileId }),
+    counter: (id: number, value: number) => call<CustomWidget>("studio_counter", { id, value }),
+    remove: (id: number) => call<void>("studio_delete", { id }),
+    feed: (id: number, force: boolean) => call<FeedResult>("studio_feed", { id, force }),
+    /** Opens a link from a widget as a BROWSER tab in the main window. */
+    openLink: (url: string) => call<void>("browser_open_request", { url }),
   },
 
   alarms: {
