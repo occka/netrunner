@@ -9,6 +9,7 @@ pub mod app;
 pub mod browser;
 pub mod dev;
 pub mod files;
+pub mod github_link;
 pub mod library;
 pub mod lsp;
 pub mod neural;

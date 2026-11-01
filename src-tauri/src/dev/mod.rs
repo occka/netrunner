@@ -4,6 +4,7 @@
 pub mod git;
 pub mod git_more;
 pub mod github;
+pub mod github_link;
 pub mod lsp;
 pub mod process;
 pub mod search;

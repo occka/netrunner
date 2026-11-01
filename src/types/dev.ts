@@ -232,3 +232,53 @@ export interface ChangedFile {
   status: string;
   path: string;
 }
+
+// ---------- DEVELOPER ↔ GITHUB ----------
+
+export interface GhOrigin {
+  owner: string;
+  repo: string;
+  branch: string | null;
+  head: string | null;
+}
+
+export interface GhCheck {
+  name: string;
+  status: string;
+  conclusion: string | null;
+  url: string | null;
+}
+
+export interface GhChecks {
+  state: "success" | "failure" | "pending" | "none";
+  checks: GhCheck[];
+}
+
+/** Raw GitHub API objects (snake_case, as GitHub sends them). */
+export interface GhPrDetail {
+  number: number;
+  title: string;
+  body: string | null;
+  state: string;
+  draft: boolean | null;
+  html_url: string;
+  head: { ref: string; sha: string };
+  base: { ref: string; sha: string };
+  user: { login: string };
+}
+
+export interface GhPrFile {
+  filename: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  previous_filename: string | null;
+}
+
+export interface GhComment {
+  id: number;
+  body: string;
+  user: { login: string };
+  created_at: string;
+  html_url: string;
+}

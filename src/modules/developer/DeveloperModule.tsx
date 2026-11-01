@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { BrainCircuit, Bug, CircleAlert, Search, DownloadCloud, FolderGit2, FolderOpen, GitBranch, Play, SquareTerminal, Wrench, X } from "lucide-react";
+import { BrainCircuit, Bug, CircleAlert, GitPullRequest, Search, DownloadCloud, FolderGit2, FolderOpen, GitBranch, Play, SquareTerminal, Wrench, X } from "lucide-react";
 import { ModuleHeader } from "@/components/ModuleHeader";
 import { api } from "@/services/api";
 import { useQuickAccess } from "@/stores/quickAccess";
@@ -16,6 +16,7 @@ import { ToolsPanel } from "./ToolsPanel";
 import { SearchPanel } from "./SearchPanel";
 import { QuickOpen } from "./QuickOpen";
 import { RunBar } from "./RunBar";
+import { CiBadge, GitHubPanel } from "./GitHubPanel";
 import { LanguagesPanel } from "./lsp/LanguagesPanel";
 import { ProblemsPanel } from "./lsp/ProblemsPanel";
 import { runInTerminal } from "./terminals";
@@ -32,6 +33,7 @@ const SIDES: { id: SidePanel; label: string; icon: typeof FolderOpen }[] = [
   { id: "explorer", label: "Explorer", icon: FolderOpen },
   { id: "search", label: "Search", icon: Search },
   { id: "git", label: "Git", icon: GitBranch },
+  { id: "github", label: "GitHub", icon: GitPullRequest },
   { id: "problems", label: "Problems", icon: CircleAlert },
   { id: "tools", label: "Tools", icon: Wrench },
 ];
@@ -98,6 +100,7 @@ export default function DeveloperModule() {
   return (
     <div className="module ide">
       <ModuleHeader id="developer" subtitle={root ? <span className="mono">{root}</span> : "Open a project folder to start."}>
+        {root && <CiBadge root={root} />}
         {root && <RunBar root={root} />}
         <div className="segmented" role="tablist" aria-label="IDE mode">
           {MODES.map((m) => (
@@ -166,6 +169,7 @@ export default function DeveloperModule() {
                 {side === "explorer" && <FileTree root={root} />}
                 {side === "search" && <SearchPanel root={root} focusTick={searchFocus} />}
                 {side === "git" && <GitPanel root={root} />}
+                {side === "github" && <GitHubPanel root={root} />}
                 {side === "problems" && <ProblemsPanel root={root} />}
                 {side === "tools" && (
                   <>

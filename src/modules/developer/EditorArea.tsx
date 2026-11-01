@@ -3,7 +3,9 @@ import { DiffEditor, Editor, type OnMount } from "@monaco-editor/react";
 import { Code2, Columns2, Lock, Play, X } from "lucide-react";
 import { useSettings } from "@/stores/settings";
 import { applyMonacoTheme, monaco } from "./monaco";
-import { currentKey, isDirty, useDev, type EditorTab } from "./store";
+import { currentKey, isDirty, relativeToRoot, useDev, type EditorTab } from "./store";
+import { api } from "@/services/api";
+import { notify, reportError } from "@/stores/notifications";
 import { fileIcon } from "./fileIcons";
 import { applyMarkers, fileModelUri, previewModels, takeReveal, useLsp } from "./lsp/client";
 import { LspStatus } from "./lsp/LspStatus";
@@ -112,6 +114,24 @@ function EditorGroup({ group, onRun }: { group: 0 | 1; onRun: (path: string) => 
     editor.onDidChangeModel(() => onModel(editor));
     const git = attachGit(editor);
     editor.onDidDispose(() => git.dispose());
+    // Links to the file on GitHub (when the project's origin is a GitHub repository).
+    const githubLink = async (permalink: boolean, copy: boolean) => {
+      const model = editor.getModel();
+      const root = useDev.getState().root;
+      const sel = editor.getSelection();
+      if (!model || model.uri.scheme !== "file" || !root || !sel) return;
+      try {
+        const url = await api.gh.fileUrl(root, relativeToRoot(root, model.uri.fsPath), sel.startLineNumber, sel.endLineNumber, permalink);
+        if (copy) {
+          await navigator.clipboard.writeText(url);
+          notify.info("Permalink copied", url);
+        } else await api.app.openUrl(url);
+      } catch (err) {
+        reportError("No GitHub link", err);
+      }
+    };
+    editor.addAction({ id: "netrunner.github.open", label: "Open on GitHub", contextMenuGroupId: "9_git", run: () => void githubLink(false, false) });
+    editor.addAction({ id: "netrunner.github.permalink", label: "Copy GitHub Permalink", contextMenuGroupId: "9_git", run: () => void githubLink(true, true) });
     editor.onDidChangeCursorPosition((e) => {
       const model = editor.getModel();
       if (model?.uri.scheme !== "file") return;

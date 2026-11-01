@@ -5,7 +5,7 @@ import { notify, reportError } from "@/stores/notifications";
 import { languageFor } from "./languages";
 
 export type IdeMode = "code" | "debug" | "ai";
-export type SidePanel = "explorer" | "search" | "git" | "problems" | "tools";
+export type SidePanel = "explorer" | "search" | "git" | "github" | "problems" | "tools";
 
 export interface EditorTab {
   key: string;

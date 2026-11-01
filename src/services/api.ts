@@ -5,6 +5,11 @@
 import { invoke, type Channel } from "@tauri-apps/api/core";
 import type {
   BlameLine,
+  GhChecks,
+  GhComment,
+  GhOrigin,
+  GhPrDetail,
+  GhPrFile,
   ChangedFile,
   Commit,
   GitBaseline,
@@ -258,6 +263,25 @@ export const api = {
     compare: (root: string, base: string, head: string) => call<ChangedFile[]>("git_compare", { root, base, head }),
     fileAt: (root: string, revision: string, path: string) => call<string>("git_file_at", { root, revision, path }),
     cherryPick: (root: string, hash: string) => call<string>("git_cherry_pick", { root, hash, confirmed: true }),
+  },
+
+  gh: {
+    origin: (root: string) => call<GhOrigin | null>("gh_origin", { root }),
+    publish: (root: string, name: string, description: string, isPrivate: boolean) =>
+      call<{ full_name: string; clone_url: string; html_url: string }>("gh_publish", { root, name, description, private: isPrivate, confirmed: true }),
+    commitsSince: (root: string, base: string) => call<string[]>("gh_commits_since", { root, base }),
+    createPr: (root: string, title: string, body: string, base: string, draft: boolean) =>
+      call<{ number: number; html_url: string }>("gh_create_pr", { root, title, body, base, draft, confirmed: true }),
+    pr: (owner: string, repo: string, number: number) => call<GhPrDetail>("gh_pr", { owner, repo, number }),
+    prFiles: (owner: string, repo: string, number: number) => call<GhPrFile[]>("gh_pr_files", { owner, repo, number }),
+    comments: (owner: string, repo: string, number: number) => call<GhComment[]>("gh_comments", { owner, repo, number }),
+    addComment: (owner: string, repo: string, number: number, body: string) =>
+      call<GhComment>("gh_add_comment", { owner, repo, number, body, confirmed: true }),
+    checkoutPr: (root: string, number: number) => call<string>("gh_checkout_pr", { root, number }),
+    checks: (owner: string, repo: string, gitRef: string) => call<GhChecks>("gh_checks", { owner, repo, gitRef }),
+    issueBranch: (root: string, number: number, title: string) => call<string>("gh_issue_branch", { root, number, title }),
+    fileUrl: (root: string, path: string, from: number | null, to: number | null, permalink: boolean) =>
+      call<string>("gh_file_url", { root, path, from, to, permalink }),
   },
 
   github: {
