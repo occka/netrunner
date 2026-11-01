@@ -5,6 +5,7 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 import {
   Activity,
+  AlarmClock,
   BrainCircuit,
   CalendarClock,
   Code2,
@@ -13,6 +14,7 @@ import {
   HardDrive,
   Image,
   ListTree,
+  NotebookPen,
   MemoryStick,
   Monitor,
   Music,
@@ -23,6 +25,7 @@ import {
 } from "lucide-react";
 import {
   ACTIVITY_SETTINGS,
+  ALARM_SETTINGS,
   CLOCK_SETTINGS,
   CPU_SETTINGS,
   FRAME_SETTINGS,
@@ -30,6 +33,7 @@ import {
   IMAGE_SETTINGS,
   MUSIC_SETTINGS,
   NETWORK_SETTINGS,
+  NOTES_SETTINGS,
   QUICK_ACCESS_SETTINGS,
   RAM_SETTINGS,
   STORAGE_SETTINGS,
@@ -249,6 +253,33 @@ const defs: WidgetDef[] = [
     minSize: { w: 2, h: 3 },
     settings: CLOCK_SETTINGS,
     component: lazy(() => import("./ClockWidget")),
+  },
+  {
+    type: "alarm",
+    title: "Timer / Alarm",
+    description: "Alarms with repeat days and snooze, countdown timers and a stopwatch.",
+    icon: AlarmClock,
+    status: "live",
+    dataSource:
+      "NETRUNNER's own scheduler (local database). Alarms and timers ring while NETRUNNER runs, also from the tray; not while it is closed.",
+    keywords: ["alarm", "timer", "countdown", "stopwatch", "будильник", "таймер", "секундомер", "clock"],
+    defaultSize: { w: 3, h: 9 },
+    minSize: { w: 2, h: 5 },
+    settings: ALARM_SETTINGS,
+    component: lazy(() => import("./AlarmWidget")),
+  },
+  {
+    type: "notes",
+    title: "Notes / To-do",
+    description: "A task list and a scratch note. Share a board between the dashboard and overlays.",
+    icon: NotebookPen,
+    status: "live",
+    dataSource: "Your notes, stored only in NETRUNNER's local database.",
+    keywords: ["todo", "to-do", "tasks", "checklist", "notes", "notepad", "заметки", "задачи"],
+    defaultSize: { w: 3, h: 9 },
+    minSize: { w: 2, h: 4 },
+    settings: NOTES_SETTINGS,
+    component: lazy(() => import("./NotesWidget")),
   },
   {
     type: "thermal",

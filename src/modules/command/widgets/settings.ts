@@ -256,6 +256,27 @@ export const ACTIVITY_SETTINGS = defineSettings([
   { key: "source", kind: "toggle", label: "Source column", default: true },
 ]);
 
+export const ALARM_SETTINGS = defineSettings([
+  { key: "view", kind: "select", label: "Show", options: [
+      { value: "tabs", label: "Alarms, timers and stopwatch (tabs)" },
+      { value: "alarms", label: "Alarms only" },
+      { value: "timers", label: "Timers only" },
+      { value: "stopwatch", label: "Stopwatch only" },
+    ], default: "tabs" },
+]);
+
+export const NOTES_SETTINGS = defineSettings([
+  { key: "board", kind: "text", label: "Board", default: "Main", placeholder: "Main", maxLength: 40,
+    hint: "Widgets and overlays with the same board name show the same notes." },
+  { key: "view", kind: "select", label: "Show", options: [
+      { value: "tabs", label: "Tasks and note (tabs)" },
+      { value: "tasks", label: "Tasks only" },
+      { value: "note", label: "Note only" },
+    ], default: "tabs" },
+  { key: "hideDone", kind: "toggle", label: "Hide completed tasks", default: false },
+  { key: "addTop", kind: "toggle", label: "Add new tasks at the top", default: false },
+]);
+
 export const QUICK_ACCESS_SETTINGS = defineSettings([
   { key: "filter", kind: "select", label: "Entries", options: [
       { value: "all", label: "All" },

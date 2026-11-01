@@ -4,12 +4,14 @@
 //! All handlers are `async` so Tauri runs them off the main (UI) thread.
 
 pub mod activity;
+pub mod alarms;
 pub mod app;
 pub mod browser;
 pub mod dev;
 pub mod files;
 pub mod library;
 pub mod neural;
+pub mod notes;
 pub mod overlay;
 pub mod profiles;
 pub mod quick_access;

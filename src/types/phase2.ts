@@ -131,4 +131,8 @@ export interface Overlay {
   /** Web overlays (widgetType "web"): the page shown. */
   url: string;
   title: string;
+  /** Profile whose overlay set this belongs to; null = shown in every profile. */
+  profileId: number | null;
+  /** While locked, the mouse passes through the overlay to the window below. */
+  clickThrough: boolean;
 }

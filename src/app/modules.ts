@@ -223,7 +223,7 @@ export const MODULES: ModuleDef[] = [
     phase: 1,
     group: "utility",
     description: "Workspace profiles.",
-    planned: ["Per-profile Quick Access, overlays, hotkeys and automation"],
+    planned: ["Per-profile Quick Access, hotkeys and automation"],
     component: lazy(() => import("@/modules/profiles/ProfilesModule")),
   },
   {

@@ -43,15 +43,24 @@ Remaining: see the release plan below.
 Each release is small enough to test by hand in one sitting and ships through auto-update. Order is by value to daily use; later items may move.
 
 ### 0.6: Widget Studio and overlays
-- **Widget Studio**: build a widget from HTML/CSS (sandboxed iframe, no IPC) or from a template (text, counter, link grid, RSS/JSON feed with a URL allowlist). Saved per profile, usable on the dashboard and as an overlay.
-- **Per-profile overlay sets**: switching profile shows that profile's overlays (Gaming: FPS/GPU/music; Work: clock/notes).
-- **Overlay click-through** (mouse passes through a locked overlay) and snap to screen edges.
-- **Notes / to-do widget** stored locally.
+Done so far: per-profile overlay sets, click-through and snapping, Notes / To-do, Timer / Alarm, the eight new colour presets. Left: Widget Studio and the new background patterns.
 
-### 0.7: Automation editor
+- **Widget Studio**: build a widget from HTML/CSS (sandboxed iframe, no IPC) or from a template (text, counter, link grid, RSS/JSON feed with a URL allowlist). Saved per profile, usable on the dashboard and as an overlay.
+- ✅ **Per-profile overlay sets**: switching profile shows that profile's overlays (Gaming: FPS/GPU/music; Work: clock/notes).
+- ✅ **Overlay click-through** (mouse passes through a locked overlay) and snap to screen edges.
+- ✅ **Notes / to-do widget** stored locally.
+- ✅ **Timer and alarm widget**: countdowns, stopwatch and alarms with a chosen sound (built-in sounds or your own audio file), repeat days, snooze; alarms ring even when NETRUNNER is in the tray.
+- **More theme presets and background patterns** in the cyberpunk spirit: Matrix rain, neon city, synthwave grid, glitch, hex, holo, CRT green/amber; animated ones respect the motion setting. *Colour presets done; background patterns (`styles/appearance.ts` `PATTERNS`, `appearance.css`, `components/Backdrop.tsx`) remain.*
+
+### 0.7: Automation editor, SYSTEM and GAMES
 - **Visual rule editor**: trigger → conditions → several actions, with a dry-run preview.
 - **New triggers**: time of day / schedule, file created in a folder, download finished, network or VPN-type adapter up/down, game started (from the GAMES library), battery / power plan change.
 - **New actions**: set volume, switch power plan, open a URL in BROWSER, show/hide an overlay set, wait N seconds.
+- **NETWORK moves into SYSTEM** as a tab (connectivity, adapters, throughput next to hardware, processes, startup, services, power); the separate module goes away and old links open the new tab.
+- **GAMES library upgrade**:
+  - playtime per game (tracked while the game process runs) and totals for a chosen period (today, week, month, all time), with a per-game history chart;
+  - optional banner view (toggle): each game shown with its Steam artwork (header/capsule images by app id, cached locally), falling back to a generated cover for non-Steam games; the current compact list stays available;
+  - sort and filter by playtime, last played, launcher.
 
 ### 0.8: System and sound
 - **Audio**: output/input device switching and per-app volume (Core Audio), as a module and a widget.

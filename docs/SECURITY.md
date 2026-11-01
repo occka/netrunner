@@ -8,7 +8,7 @@
 
 ## Frontend capabilities
 
-`src-tauri/capabilities/default.json` grants the main and overlay webviews `core:default`, window chrome (minimise/maximise/hide/show/close/drag), `dialog:allow-open` (native picker; returns a path, reads nothing) and `log:default`. No fs, shell or opener plugin is exposed to JavaScript. The CSP allows only local resources, IPC and local blob workers (for Monaco).
+`src-tauri/capabilities/default.json` grants the main, overlay and alarm-ringing webviews `core:default`, window chrome (minimise/maximise/hide/show/close/drag), `dialog:allow-open` (native picker; returns a path, reads nothing) and `log:default`. No fs, shell or opener plugin is exposed to JavaScript. The CSP allows only local resources, IPC and local blob workers (for Monaco).
 
 ## Execution safeguards
 

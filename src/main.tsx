@@ -22,14 +22,15 @@ import "@/styles/motion.css";
 import { applyTheme, DEFAULT_THEME } from "@/styles/theme";
 import { App } from "@/app/App";
 import { OverlayApp } from "@/overlay/OverlayApp";
+import { RingApp } from "@/alarm/RingApp";
 
 // Paint the default theme before React mounts so there is no unstyled flash.
 applyTheme(DEFAULT_THEME);
 
-// The same bundle serves the main window and floating overlay windows
-// (overlay windows are opened with ?overlay=<id>).
-const overlayId = Number(new URLSearchParams(window.location.search).get("overlay"));
+// The same bundle serves the main window, floating overlay windows (opened
+// with ?overlay=<id>) and the alarm ringing window (?ring=1).
+const params = new URLSearchParams(window.location.search);
+const overlayId = Number(params.get("overlay"));
+const root = overlayId > 0 ? <OverlayApp id={overlayId} /> : params.has("ring") ? <RingApp /> : <App />;
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>{overlayId > 0 ? <OverlayApp id={overlayId} /> : <App />}</React.StrictMode>,
-);
+ReactDOM.createRoot(document.getElementById("root")!).render(<React.StrictMode>{root}</React.StrictMode>);

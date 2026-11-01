@@ -13,7 +13,9 @@ mod desktop;
 mod error;
 mod files;
 mod neural;
+mod alarm;
 mod overlay;
+mod overlay_snap;
 mod security;
 mod services;
 mod state;
@@ -84,6 +86,7 @@ pub fn run() {
             let prefs = browser::Prefs::load(&*db.conn()?);
             let local_dir = app.path().app_local_data_dir()?;
             app.manage(browser::Browser::new(&data_dir, &local_dir, prefs));
+            let alarm_dir = data_dir.clone();
             app.manage(AppState::new(db, data_dir));
             app.manage(dev::terminal::Terminals::default());
 
@@ -97,6 +100,7 @@ pub fn run() {
                 log::warn!("overlay hotkey Ctrl+Alt+O unavailable: {err}");
             }
             overlay::restore_on_startup(&handle);
+            alarm::start(&handle, alarm_dir);
             browser::start_blocker(handle.clone(), false);
             automation::start_process_watcher(handle.clone());
             std::thread::spawn(move || automation::fire(&handle, "netrunner_start", ""));
@@ -163,6 +167,27 @@ pub fn run() {
             commands::overlay::overlay_set_visible,
             commands::overlay::overlay_delete,
             commands::overlay::overlay_toggle_all,
+            commands::alarms::alarms_state,
+            commands::alarms::alarm_save,
+            commands::alarms::alarm_set_enabled,
+            commands::alarms::alarm_delete,
+            commands::alarms::timer_create,
+            commands::alarms::timer_control,
+            commands::alarms::timer_delete,
+            commands::alarms::alarm_stop,
+            commands::alarms::alarm_snooze,
+            commands::alarms::sounds_list,
+            commands::alarms::sound_import,
+            commands::alarms::sound_delete,
+            commands::alarms::sound_preview,
+            commands::alarms::sound_preview_stop,
+            commands::notes::notes_board,
+            commands::notes::notes_set_text,
+            commands::notes::notes_add,
+            commands::notes::notes_update,
+            commands::notes::notes_delete,
+            commands::notes::notes_reorder,
+            commands::notes::notes_clear_done,
             commands::dev::dev_projects,
             commands::dev::dev_open_project,
             commands::dev::dev_close_project,
@@ -221,6 +246,7 @@ pub fn run() {
             commands::files::files_reveal,
             commands::files::files_search,
             commands::overlay::overlay_create_web,
+            commands::overlay::overlay_set_profile,
             commands::browser::browser_status,
             commands::browser::browser_prefs_changed,
             commands::browser::browser_update_lists,

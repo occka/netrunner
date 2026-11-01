@@ -6,13 +6,13 @@ An industrial-cyberpunk control environment for Windows: dashboard, universal la
 
 | Module | Status | What works |
 |---|---|---|
-| COMMAND | Implemented | 12-col drag/resize dashboard, EDIT LAYOUT with save/cancel, 14 live widgets (incl. Music Player and Image), per-widget settings (gear button → Inspector SETTINGS: e.g. clock 12/24 h, size, time zone, date format) |
+| COMMAND | Implemented | 12-col drag/resize dashboard, EDIT LAYOUT with save/cancel, 16 live widgets (incl. Music Player, Image, Notes / To-do and Timer / Alarm: alarms with repeat days, snooze and your own sounds, countdowns, stopwatch; they ring from the tray too), per-widget settings (gear button → Inspector SETTINGS: e.g. clock 12/24 h, size, time zone, date format) |
 | QUICK ACCESS | Implemented | apps, games, files, folders, websites, CMD/PowerShell commands, projects |
 | SYSTEM | Implemented | hardware, processes (guarded termination), startup apps (toggle per-user entries), services (read-only), power plans |
 | NETWORK | Implemented | Windows connectivity state, adapters, throughput, VPN-type adapter detection |
 | GAMES | Implemented | Steam, Epic, GOG and Prism Launcher (Minecraft instances) detection, plus your own games |
 | AUTOMATION | Implemented | triggers: start, app start/stop, profile change, manual; actions: launch program, launch entry, switch profile, notify, show/hide overlay |
-| OVERLAY | Partial | any widget as an always-on-top window with its own settings; **web overlays** for music and video (YouTube, SoundCloud, Spotify, Yandex Music, Twitch, any URL) in the hardened browser profile; pop a playing BROWSER tab out without reloading. Widget Studio is planned |
+| OVERLAY | Partial | any widget as an always-on-top window with its own settings; per-profile overlay sets (switching profile swaps them); click-through when locked; snapping to screen edges and to each other; **web overlays** for music and video (YouTube, SoundCloud, Spotify, Yandex Music, Twitch, any URL) in the hardened browser profile; pop a playing BROWSER tab out without reloading. Widget Studio is planned |
 | INTEGRATIONS | Partial | 14 known apps with separate launch / detect / status / control capabilities |
 | DEVELOPER | Partial | Monaco editor, project explorer, ConPTY terminals, Run file, Git panel, diff view, toolchain detection, NEURAL panel with reviewable AI proposals. LSP and debugger are planned |
 | NEURAL | Implemented | Gemini chat (streaming, model choice, fallback when a model is overloaded or silent), saved chats (new / switch / delete, local only), explicit attachments only, audit log; also available as a dashboard widget and floating overlay |

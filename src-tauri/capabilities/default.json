@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window and overlay windows. The frontend gets window chrome control, events and native pickers only; all launching, file and system access goes through NETRUNNER's own Rust commands.",
-  "windows": ["main", "overlay-*"],
+  "description": "Main window, overlay windows and the alarm ringing window. The frontend gets window chrome control, events and native pickers only; all launching, file and system access goes through NETRUNNER's own Rust commands.",
+  "windows": ["main", "overlay-*", "alarm-ring"],
   "permissions": [
     "core:default",
     "core:window:allow-minimize",
