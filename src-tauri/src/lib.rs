@@ -24,7 +24,7 @@ mod storage;
 mod system;
 
 use tauri::Manager;
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut, ShortcutState};
 
 use services::activity::{self, Level};
 use state::AppState;
@@ -61,11 +61,15 @@ fn data_dirs(app: &tauri::AppHandle) -> tauri::Result<(std::path::PathBuf, std::
 }
 
 pub fn run() {
-    let overlay_hotkey = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyO);
+    let overlay_hotkey = Shortcut::new(Some(desktop::overlay_hotkey_modifiers()), Code::KeyO);
 
-    tauri::Builder::default()
-        // Must be first: a second launch focuses the running instance instead.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| desktop::show_main(app)))
+    let mut builder = tauri::Builder::default();
+    // Must be first: a second launch focuses the running instance instead.
+    // Development builds skip it, so they run beside the installed app.
+    if !cfg!(debug_assertions) {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| desktop::show_main(app)));
+    }
+    builder
         .plugin(
             tauri_plugin_log::Builder::new()
                 .clear_targets()
@@ -112,7 +116,7 @@ pub fn run() {
             desktop::repair_autostart(&handle);
             if let Err(err) = app.global_shortcut().register(overlay_hotkey) {
                 // Another app may own the combination; everything else still works.
-                log::warn!("overlay hotkey Ctrl+Alt+O unavailable: {err}");
+                log::warn!("overlay hotkey {} unavailable: {err}", desktop::OVERLAY_HOTKEY_LABEL);
             }
             overlay::restore_on_startup(&handle);
             alarm::start(&handle, alarm_dir);

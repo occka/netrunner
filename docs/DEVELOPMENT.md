@@ -25,6 +25,8 @@ cd src-tauri && cargo test && cargo clippy --all-targets
 
 Rust tests include `system::smoke` and `dev::smoke`, which call real Windows APIs and the git CLI on your machine. If `npm run app:dev` is running, give `cargo test` its own target dir (`$env:CARGO_TARGET_DIR="target\test"`) so it does not fight the dev build over file locks.
 
+Development builds run beside the installed NETRUNNER: they skip the single-instance lock, keep their data in `<appdata>\com.netrunner.app\dev\` (or `NETRUNNER_DATA_DIR`), show "NETRUNNER DEV" in the tray and toggle overlays with `Ctrl+Alt+Shift+O`.
+
 Development builds (`npm run app:dev`) never run automations, so rebuilding does not launch your real programs. Set `NETRUNNER_DEV_AUTOMATION=1` before starting the dev build to test the engine.
 
 ## Adding an automation trigger or action
