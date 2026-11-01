@@ -4,7 +4,6 @@
  */
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 import {
-  Activity,
   BrainCircuit,
   Cable,
   Cpu,
@@ -33,7 +32,6 @@ export type ModuleId =
   | "developer"
   | "github"
   | "neural"
-  | "network"
   | "quick-access"
   | "overlay"
   | "studio"
@@ -92,8 +90,8 @@ export const MODULES: ModuleDef[] = [
     status: "implemented",
     phase: 2,
     group: "main",
-    description: "Windows and hardware monitoring.",
-    planned: ["Audio devices and per-app volume", "Starting/stopping services (needs administrator)", "Fan and CPU temperature providers"],
+    description: "Windows and hardware monitoring: hardware, network and VPN-type adapters, processes, startup, services, power.",
+    planned: ["Audio devices and per-app volume", "Starting/stopping services (needs administrator)", "Fan and CPU temperature providers", "Per-process network usage"],
     component: lazy(() => import("@/modules/system/SystemModule")),
   },
   {
@@ -161,17 +159,6 @@ export const MODULES: ModuleDef[] = [
     description: "Hardened WebView2 browser: ad and tracker blocking, HTTPS-only, isolated profile, private tabs.",
     planned: ["Scriptlet filters (uBlock resources) for in-video ads", "Per-site JavaScript toggle", "Reader mode"],
     component: lazy(() => import("@/modules/browser/BrowserModule")),
-  },
-  {
-    id: "network",
-    label: "Network",
-    icon: Activity,
-    status: "implemented",
-    phase: 2,
-    group: "main",
-    description: "Network monitoring and VPN integrations.",
-    planned: ["Per-process network usage", "VPN control through documented client CLIs"],
-    component: lazy(() => import("@/modules/network/NetworkModule")),
   },
   {
     id: "overlay",

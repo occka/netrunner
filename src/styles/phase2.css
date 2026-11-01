@@ -464,3 +464,9 @@
 .ring__empty {
   place-self: center;
 }
+
+.net-refresh {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}

@@ -9,11 +9,13 @@ import { ProcessesTab } from "./ProcessesTab";
 import { StartupTab } from "./StartupTab";
 import { ServicesTab } from "./ServicesTab";
 import { PowerTab } from "./PowerTab";
+import { NetworkTab } from "./NetworkTab";
 import type { SystemInfo } from "@/types/entities";
 
-type Tab = "hardware" | "processes" | "startup" | "services" | "power";
+type Tab = "hardware" | "network" | "processes" | "startup" | "services" | "power";
 const TABS: { id: Tab; label: string }[] = [
   { id: "hardware", label: "Hardware" },
+  { id: "network", label: "Network" },
   { id: "processes", label: "Processes" },
   { id: "startup", label: "Startup" },
   { id: "services", label: "Services" },
@@ -26,6 +28,12 @@ export default function SystemModule() {
   const section = useShell((s) => s.section);
   const [tab, setTab] = useState<Tab>((TABS.find((t) => t.id === section)?.id as Tab) ?? "hardware");
   const [info, setInfo] = useState<SystemInfo | null>(null);
+
+  // A link to a tab (palette, old NETWORK links) also works while SYSTEM is already open.
+  useEffect(() => {
+    const t = TABS.find((x) => x.id === section);
+    if (t) setTab(t.id);
+  }, [section]);
 
   useEffect(() => {
     api.system.info().then(setInfo, () => setInfo(null));
@@ -66,6 +74,7 @@ export default function SystemModule() {
             })}
           </div>
         )}
+        {tab === "network" && <NetworkTab />}
         {tab === "processes" && <ProcessesTab />}
         {tab === "startup" && <StartupTab />}
         {tab === "services" && <ServicesTab />}

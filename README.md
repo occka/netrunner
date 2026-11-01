@@ -8,8 +8,7 @@ An industrial-cyberpunk control environment for Windows: dashboard, universal la
 |---|---|---|
 | COMMAND | Implemented | 12-col drag/resize dashboard, EDIT LAYOUT with save/cancel, 16 live widgets (incl. Music Player, Image, Notes / To-do and Timer / Alarm: alarms with repeat days, snooze and your own sounds, countdowns, stopwatch; they ring from the tray too), per-widget settings (gear button → Inspector SETTINGS: e.g. clock 12/24 h, size, time zone, date format) |
 | QUICK ACCESS | Implemented | apps, games, files, folders, websites, CMD/PowerShell commands, projects |
-| SYSTEM | Implemented | hardware, processes (guarded termination), startup apps (toggle per-user entries), services (read-only), power plans |
-| NETWORK | Implemented | Windows connectivity state, adapters, throughput, VPN-type adapter detection |
+| SYSTEM | Implemented | hardware, network (connectivity, adapters, throughput, VPN-type adapter detection), processes (guarded termination), startup apps (toggle per-user entries), services (read-only), power plans |
 | GAMES | Implemented | Steam, Epic, GOG and Prism Launcher (Minecraft instances) detection, plus your own games |
 | AUTOMATION | Implemented | triggers: start, app start/stop, profile change, manual; actions: launch program, launch entry, switch profile, notify, show/hide overlay |
 | OVERLAY | Implemented | any widget as an always-on-top window with its own settings; per-profile overlay sets (switching profile swaps them); click-through when locked; snapping to screen edges and to each other; **web overlays** for music and video (YouTube, SoundCloud, Spotify, Yandex Music, Twitch, any URL) in the hardened browser profile; pop a playing BROWSER tab out without reloading |

@@ -59,7 +59,7 @@ Done so far: GITHUB code browsing, Widget Studio, per-profile overlay sets, clic
 - **Visual rule editor**: trigger → conditions → several actions, with a dry-run preview.
 - **New triggers**: time of day / schedule, file created in a folder, download finished, network or VPN-type adapter up/down, game started (from the GAMES library), battery / power plan change.
 - **New actions**: set volume, switch power plan, open a URL in BROWSER, show/hide an overlay set, wait N seconds.
-- **NETWORK moves into SYSTEM** as a tab (connectivity, adapters, throughput next to hardware, processes, startup, services, power); the separate module goes away and old links open the new tab.
+- ✅ **NETWORK moves into SYSTEM** as a tab (connectivity, adapters, throughput next to hardware, processes, startup, services, power); the separate module goes away and old links open the new tab.
 - **GAMES library upgrade**:
   - playtime per game (tracked while the game process runs) and totals for a chosen period (today, week, month, all time), with a per-game history chart;
   - optional banner view (toggle): each game shown with its Steam artwork (header/capsule images by app id, cached locally), falling back to a generated cover for non-Steam games; the current compact list stays available;

@@ -50,7 +50,7 @@ On boot the frontend loads only settings, profiles and Quick Access entries. Eac
                            │                                    FRAME_SETTINGS shared by all widgets)
             ┌──────────────┼───────────────────────────┐
             ▼              ▼                           ▼
-   COMMAND dashboard   OVERLAY window (overlay-<id>)   SYSTEM / NETWORK panels
+   COMMAND dashboard   OVERLAY window (overlay-<id>)   SYSTEM panels         
    WidgetFrame          OverlayApp                     (defaults only)
    config: layout       config: overlays.config_json
    widget.config

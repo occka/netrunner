@@ -30,7 +30,9 @@ export const useShell = create<ShellStore>((set) => ({
   inspectorTab: null,
   paletteOpen: false,
   paletteQuery: "",
-  navigate: (module, section) => set({ module, section: section ?? null }),
+  navigate: (module, section) =>
+    // NETWORK became a SYSTEM tab in 0.7; links made before that still arrive as "network".
+    (module as string) === "network" ? set({ module: "system", section: "network" }) : set({ module, section: section ?? null }),
   select: (selection) => set({ selection }),
   pin: (pinned) => set({ pinned }),
   inspect: (selection, inspectorTab) => set({ selection, inspectorTab }),

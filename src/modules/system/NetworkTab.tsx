@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { RefreshCw, ShieldQuestion } from "lucide-react";
-import { ModuleHeader } from "@/components/ModuleHeader";
 import { api } from "@/services/api";
 import { usePolled } from "@/hooks/usePolled";
 import { useSystemSnapshot } from "@/hooks/useSystemSnapshot";
@@ -14,7 +13,8 @@ function formatSpeed(bps: number | null) {
   return bps >= 1e9 ? `${(bps / 1e9).toFixed(1)} Gbps` : `${Math.round(bps / 1e6)} Mbps`;
 }
 
-export default function NetworkModule() {
+/** SYSTEM → Network: connectivity, VPN-type adapters, throughput and the adapter list. */
+export function NetworkTab() {
   const { data, error, reload } = usePolled(() => api.network.status(), 10000);
   const { snapshot } = useSystemSnapshot();
   const Throughput = WIDGETS.network.component!;
@@ -22,14 +22,13 @@ export default function NetworkModule() {
   const vpn = data?.adapters.filter((a) => a.vpnLike) ?? [];
 
   return (
-    <div className="module">
-      <ModuleHeader id="network">
-        <button className="icon-btn" title="Refresh" onClick={() => void reload()}>
-          <RefreshCw size={14} />
+    <>
+      <div className="net-refresh">
+        <button className="btn btn--sm btn--ghost" title="Refresh adapters" onClick={() => void reload()}>
+          <RefreshCw size={12} /> Refresh
         </button>
-      </ModuleHeader>
-      <div className="module__scroll">
-        {error && <div className="unavailable">{error}</div>}
+      </div>
+      {error && <div className="unavailable">{error}</div>}
         <div className="net-top">
           <section className="panel">
             <header className="panel__header">
@@ -120,7 +119,6 @@ export default function NetworkModule() {
             })}
           </tbody>
         </table>
-      </div>
-    </div>
+    </>
   );
 }
