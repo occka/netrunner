@@ -44,8 +44,7 @@ export function App() {
 
   useEffect(() => {
     const root = document.documentElement;
-    if (motion === "system") delete root.dataset.motion;
-    else root.dataset.motion = motion;
+    root.dataset.motion = motion;
   }, [motion]);
 
   if (boot.state === "ready") return <AppShell />;

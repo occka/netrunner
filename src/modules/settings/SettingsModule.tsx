@@ -234,12 +234,21 @@ export default function SettingsModule() {
             <div className="settings-row">
               <div>
                 <div>Animations</div>
-                <div className="field__hint">“System” follows the Windows reduced-motion preference.</div>
+                <div className="field__hint">
+                  “Follow Windows” uses Windows' Animation effects setting
+                  {window.matchMedia("(prefers-reduced-motion: reduce)").matches ? ", which is currently off" : ""}.
+                </div>
               </div>
               <div className="segmented">
-                {(["system", "reduced", "full"] as const).map((m) => (
+                {(
+                  [
+                    ["full", "Full"],
+                    ["reduced", "Reduced"],
+                    ["system", "Follow Windows"],
+                  ] as const
+                ).map(([m, label]) => (
                   <button key={m} aria-pressed={values["ui.motion"] === m} onClick={() => void save("ui.motion", m)}>
-                    {m}
+                    {label}
                   </button>
                 ))}
               </div>

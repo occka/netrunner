@@ -7,13 +7,13 @@ use webview2_com::Microsoft::Web::WebView2::Win32::*;
 use webview2_com::{
     take_pwstr, AcceleratorKeyPressedEventHandler, ClearBrowsingDataCompletedHandler, ContainsFullScreenElementChangedEventHandler, FaviconChangedEventHandler,
     GetFaviconCompletedHandler, HistoryChangedEventHandler, IsDocumentPlayingAudioChangedEventHandler, IsMutedChangedEventHandler,
-    LaunchingExternalUriSchemeEventHandler, WebResourceRequestedEventHandler,
+    LaunchingExternalUriSchemeEventHandler, SourceChangedEventHandler, WebResourceRequestedEventHandler,
 };
 use windows::core::{Interface, BOOL, HSTRING, PWSTR};
 use windows::Win32::System::Com::IStream;
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyState, VK_CONTROL, VK_F5, VK_MENU, VK_SHIFT, VK_TAB};
 
-use super::{emit_tab, notice, Browser};
+use super::{emit_tab, notice, on_source_changed, Browser};
 
 /// adblock request type for a WebView2 resource context.
 fn request_kind(ctx: COREWEBVIEW2_WEB_RESOURCE_CONTEXT, is_top_document: bool) -> &'static str {
@@ -169,6 +169,19 @@ unsafe fn setup(
                     let _ = headers.SetHeader(&HSTRING::from("Sec-GPC"), &HSTRING::from("1"));
                     let _ = headers.SetHeader(&HSTRING::from("DNT"), &HSTRING::from("1"));
                 }
+                Ok(())
+            })),
+            &mut token,
+        )?;
+    }
+
+    {
+        let (app, label) = (app.clone(), label.to_string());
+        core.add_SourceChanged(
+            &SourceChangedEventHandler::create(Box::new(move |sender, _| {
+                let Some(sender) = sender else { return Ok(()) };
+                let url = pwstr(|p| sender.Source(p));
+                on_source_changed(&app, &label, &url);
                 Ok(())
             })),
             &mut token,

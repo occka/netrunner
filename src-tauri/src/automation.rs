@@ -46,12 +46,19 @@ fn last_runs() -> &'static std::sync::Mutex<HashMap<i64, Instant>> {
 }
 
 /// Fires all enabled rules matching `kind`/`value`.
+/// Development builds never run automations (they would launch the
+/// developer's real programs on every rebuild). `NETRUNNER_DEV_AUTOMATION=1`
+/// turns them back on for testing the engine.
+pub fn disabled_in_dev() -> bool {
+    cfg!(debug_assertions) && std::env::var_os("NETRUNNER_DEV_AUTOMATION").is_none()
+}
+
 pub fn fire(app: &AppHandle, kind: &str, value: &str) {
     fire_depth(app, kind, value, 0);
 }
 
 fn fire_depth(app: &AppHandle, kind: &str, value: &str, depth: u8) {
-    if depth > MAX_DEPTH {
+    if depth > MAX_DEPTH || disabled_in_dev() {
         return;
     }
     let state = app.state::<AppState>();
@@ -69,6 +76,9 @@ fn fire_depth(app: &AppHandle, kind: &str, value: &str, depth: u8) {
 /// `manual` bypasses the rate limit and profile condition. `Ok(None)` means
 /// the rule was skipped by its condition or rate limit.
 pub fn run_rule(app: &AppHandle, rule: &Rule, depth: u8, manual: bool) -> Result<Option<String>, AppError> {
+    if disabled_in_dev() {
+        return Err(AppError::Invalid("automations are disabled in development builds (set NETRUNNER_DEV_AUTOMATION=1 to allow)".into()));
+    }
     let state = app.state::<AppState>();
     if !manual {
         if let Some(required) = rule.condition_profile_id {
@@ -148,6 +158,10 @@ fn execute(app: &AppHandle, rule: &Rule, depth: u8) -> Result<String, AppError> 
 
 /// Background process watcher for app_started / app_stopped rules.
 pub fn start_process_watcher(app: AppHandle) {
+    if disabled_in_dev() {
+        log::info!("automation: disabled in this development build");
+        return;
+    }
     std::thread::Builder::new()
         .name("nr-automation".into())
         .spawn(move || {

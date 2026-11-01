@@ -41,8 +41,9 @@
   color-scheme: dark;
 }
 
+/* Windows "Animation effects" off: only honoured in "Follow Windows" mode. */
 @media (prefers-reduced-motion: reduce) {
-  :root {
+  :root[data-motion="system"] {
     --dur-fast: 0ms;
     --dur: 0ms;
   }

@@ -117,6 +117,20 @@ pub fn record_visit(conn: &Connection, url: &str, title: &str) -> AppResult<()> 
     Ok(())
 }
 
+/// Updates the title of the latest visit to `url` (pages often retitle
+/// themselves after loading); never adds an entry.
+pub fn retitle(conn: &Connection, url: &str, title: &str) -> AppResult<()> {
+    let Ok((url, title)) = clean(url, title) else { return Ok(()) };
+    if title.is_empty() {
+        return Ok(());
+    }
+    conn.execute(
+        "UPDATE browser_history SET title = ?1 WHERE id = (SELECT MAX(id) FROM browser_history WHERE url = ?2)",
+        params![title, url],
+    )?;
+    Ok(())
+}
+
 pub fn history(conn: &Connection, query: &str, limit: i64) -> AppResult<Vec<HistoryEntry>> {
     let pattern = format!("%{}%", query.trim().replace(['%', '_'], ""));
     let mut stmt = conn.prepare(
@@ -185,10 +199,12 @@ mod tests {
         record_visit(&conn, "https://a.example/", "").unwrap();
         record_visit(&conn, "https://a.example/", "A").unwrap();
         record_visit(&conn, "https://b.example/", "B").unwrap();
+        retitle(&conn, "https://a.example/", "A2").unwrap();
+        retitle(&conn, "https://never.example/", "X").unwrap();
         record_visit(&conn, "javascript:alert(1)", "x").unwrap();
         let h = history(&conn, "", 50).unwrap();
         assert_eq!(h.len(), 2);
-        assert_eq!(h[1].title, "A");
+        assert_eq!(h[1].title, "A2", "retitle updates the latest visit without adding one");
         assert_eq!(history(&conn, "b.ex", 50).unwrap().len(), 1);
         clear_history(&conn).unwrap();
         assert!(history(&conn, "", 50).unwrap().is_empty());

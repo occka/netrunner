@@ -439,17 +439,39 @@ fn on_page_load(app: &AppHandle, label: &str, url: &Url, finished: bool) {
     if finished {
         if let Some(t) = &tab {
             let prefs = browser.prefs();
-            if prefs.history && !t.private {
-                if let Some(state) = app.try_state::<AppState>() {
-                    if let Ok(conn) = state.db.conn() {
-                        let _ = data::record_visit(&conn, &t.url, &t.title);
-                    }
-                }
-            }
+            remember_visit(app, &browser, t);
             if prefs.adblock && prefs.cosmetic && !browser.is_exception(&t.url) {
                 inject_cosmetics(app.clone(), label.to_string(), t.url.clone());
             }
         }
+    }
+    emit_tab(app, tab);
+}
+
+/// Adds the tab's page to history (not for private tabs or with history off).
+/// Repeated calls for the same page only refresh its title.
+fn remember_visit(app: &AppHandle, browser: &Browser, t: &Tab) {
+    if !browser.prefs().history || t.private {
+        return;
+    }
+    if let Some(state) = app.try_state::<AppState>() {
+        if let Ok(conn) = state.db.conn() {
+            let _ = data::record_visit(&conn, &t.url, &t.title);
+        }
+    }
+}
+
+/// Address changes inside a page (single-page apps such as YouTube switch
+/// videos with `history.pushState`, without a page load). Keeps the address
+/// bar, the saved session and history on the page actually shown.
+pub(crate) fn on_source_changed(app: &AppHandle, label: &str, url: &str) {
+    let Some(browser) = app.try_state::<Browser>() else { return };
+    if Url::parse(url).is_err() {
+        return;
+    }
+    let tab = browser.update(label, |t| t.url = url.to_string());
+    if let Some(t) = &tab {
+        remember_visit(app, &browser, t);
     }
     emit_tab(app, tab);
 }
@@ -534,7 +556,16 @@ macro_rules! configure {
             .on_page_load(move |_, payload| on_page_load(&a2, &l2, payload.url(), payload.event() == PageLoadEvent::Finished))
             .on_document_title_changed(move |_, title| {
                 if let Some(b) = a3.try_state::<Browser>() {
-                    emit_tab(&a3, b.update(&l3, |t| t.title = title.chars().take(300).collect()));
+                    let tab = b.update(&l3, |t| t.title = title.chars().take(300).collect());
+                    // In-page navigations change the title after the address.
+                    if let Some(t) = tab.as_ref().filter(|t| !t.private && b.prefs().history) {
+                        if let Some(state) = a3.try_state::<AppState>() {
+                            if let Ok(conn) = state.db.conn() {
+                                let _ = data::retitle(&conn, &t.url, &t.title);
+                            }
+                        }
+                    }
+                    emit_tab(&a3, tab);
                 }
             })
             .on_download(move |_, event| on_download(&a4, &l4, event))
