@@ -65,7 +65,10 @@ Done so far: GITHUB code browsing, Widget Studio, per-profile overlay sets, clic
   - optional banner view (toggle): each game shown with its Steam artwork (header/capsule images by app id, cached locally), falling back to a generated cover for non-Steam games; the current compact list stays available;
   - sort and filter by playtime, last played, launcher.
 
-### 0.8: System and sound
+### 0.8: DEVELOPER IDE, GitHub link, system and sound
+Detailed working plan: [PLAN-0.8.md](PLAN-0.8.md).
+- **DEVELOPER as a full IDE**: language servers for any language (auto-detected, one-click install in a visible console) with live errors, completion, hover, go to definition, references, rename, formatting and quick fixes; Problems panel; project search and replace; Ctrl+P / symbols; split editor and session restore; run configurations with clickable compiler errors; debugger (DAP: Python, Node, Rust/C++, Go); Git in the editor (gutter changes, blame, hunks, conflict resolution, stash, graph).
+- **Code ↔ GitHub**: publish a project, create pull requests, PR list with CI status, checkout and review PR diffs, branch from an issue, CI status of the current branch, open on GitHub / permalink.
 - **Audio**: output/input device switching and per-app volume (Core Audio), as a module and a widget.
 - **Sensors**: optional HWiNFO shared-memory bridge for CPU/GPU temperatures and fan speeds (read-only, user enables it).
 - **Per-profile Quick Access sets** and hotkeys per entry; hotkey editor in Settings.
