@@ -71,6 +71,23 @@ export interface Game {
   sizeBytes: number | null;
 }
 
+/** Playtime of one game (services/playtime.rs). */
+export interface Playtime {
+  gameId: string;
+  name: string;
+  /** Seconds in the requested period. */
+  seconds: number;
+  sessions: number;
+  /** Unix ms, any period. */
+  lastPlayed: number;
+}
+
+export interface PlayDay {
+  /** Local date, YYYY-MM-DD. */
+  date: string;
+  seconds: number;
+}
+
 export interface LibraryScan {
   games: Game[];
   sources: { source: Game["source"]; detected: boolean; count: number }[];

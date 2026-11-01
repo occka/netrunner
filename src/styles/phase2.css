@@ -470,3 +470,124 @@
   justify-content: flex-end;
   margin-bottom: 8px;
 }
+
+/* ---------- GAMES: playtime, banners, stats ---------- */
+.games-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.games-bar__total {
+  flex: 1;
+  min-width: 200px;
+  font-size: var(--fs-sm);
+}
+.games-bar__total b {
+  color: var(--c-primary);
+}
+.games-bar__sort {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.game__play {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: var(--fs-xs);
+}
+.game__time {
+  color: var(--c-primary);
+}
+.game[data-running="true"],
+.game-banner[data-running="true"] {
+  border-color: var(--c-success);
+}
+.game-banners {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.game-banner {
+  overflow: hidden;
+}
+.game-banner__art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 460 / 215;
+  background-position: center;
+  background-size: cover;
+}
+.game-banner__initials {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: rgb(255 255 255 / 0.85);
+}
+.game-banner__src {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+.game-banner__run {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.game-banner__body {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px 12px;
+}
+.gstats {
+  display: grid;
+  gap: 12px;
+}
+.gstats__totals {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.gstats__totals > div {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius);
+}
+.gstats__totals b {
+  font-size: var(--fs-lg);
+  color: var(--c-primary);
+}
+.gstats__chart {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 160px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--c-line);
+}
+.gstats__col {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  height: 100%;
+}
+.gstats__bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(180deg, var(--c-primary), rgb(var(--c-primary-rgb) / 0.4));
+}
+.gstats__bar[data-empty="true"] {
+  background: rgb(var(--c-border-rgb) / 0.6);
+}
+.gstats__axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-xs);
+}

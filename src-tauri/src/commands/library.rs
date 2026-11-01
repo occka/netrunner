@@ -78,3 +78,27 @@ pub async fn automation_run(app: AppHandle, state: State<'_, AppState>, id: i64)
         .map_err(|e| AppError::Internal(e.to_string()))??;
     Ok(outcome.unwrap_or_else(|| "skipped".into()))
 }
+
+/// Playtime per game since `from` (unix ms; None = all time).
+#[tauri::command]
+pub async fn games_playtime(state: State<'_, AppState>, from: Option<i64>) -> AppResult<Vec<crate::services::playtime::Playtime>> {
+    crate::services::playtime::totals(&*state.db.conn()?, from)
+}
+
+/// Daily playtime of one game for the last `days` days.
+#[tauri::command]
+pub async fn games_history(state: State<'_, AppState>, id: String, days: i64) -> AppResult<Vec<crate::services::playtime::Day>> {
+    crate::services::playtime::history(&*state.db.conn()?, &id, days)
+}
+
+/// Library games running right now (from the playtime tracker).
+#[tauri::command]
+pub async fn games_running() -> Vec<String> {
+    crate::playtime::running()
+}
+
+/// Banner image for a library game (Steam artwork, local cache first) as a data URL.
+#[tauri::command]
+pub async fn games_banner(state: State<'_, AppState>, id: String) -> AppResult<String> {
+    crate::services::artwork::banner(&state.data_dir, &id).await
+}

@@ -73,7 +73,7 @@ pub fn vdf_values(text: &str, key: &str) -> Vec<String> {
         .collect()
 }
 
-fn steam_root() -> Option<PathBuf> {
+pub(crate) fn steam_root() -> Option<PathBuf> {
     use winreg::enums::HKEY_CURRENT_USER;
     let key = winreg::RegKey::predef(HKEY_CURRENT_USER).open_subkey(r"Software\Valve\Steam").ok()?;
     let path: String = key.get_value("SteamPath").ok()?;

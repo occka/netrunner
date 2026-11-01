@@ -16,6 +16,7 @@ mod neural;
 mod alarm;
 mod overlay;
 mod overlay_snap;
+mod playtime;
 mod security;
 mod services;
 mod state;
@@ -115,6 +116,7 @@ pub fn run() {
             }
             overlay::restore_on_startup(&handle);
             alarm::start(&handle, alarm_dir);
+            playtime::start(&handle);
             browser::start_blocker(handle.clone(), false);
             automation::start_process_watcher(handle.clone());
             std::thread::spawn(move || automation::fire(&handle, "netrunner_start", ""));
@@ -166,6 +168,10 @@ pub fn run() {
             commands::library::games_scan,
             commands::library::games_launch,
             commands::library::games_reveal,
+            commands::library::games_playtime,
+            commands::library::games_history,
+            commands::library::games_running,
+            commands::library::games_banner,
             commands::library::integrations_list,
             commands::library::integration_launch,
             commands::library::automation_list,

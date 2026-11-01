@@ -50,6 +50,8 @@ import type {
   AutomationRule,
   Integration,
   LibraryScan,
+  PlayDay,
+  Playtime,
   NetworkStatus,
   Overlay,
   PowerInfo,
@@ -154,6 +156,12 @@ export const api = {
     scan: () => call<LibraryScan>("games_scan"),
     launch: (id: string) => call<void>("games_launch", { id }),
     reveal: (id: string) => call<void>("games_reveal", { id }),
+    /** Playtime per game since `from` (unix ms; null = all time). */
+    playtime: (from: number | null) => call<Playtime[]>("games_playtime", { from }),
+    history: (id: string, days: number) => call<PlayDay[]>("games_history", { id, days }),
+    running: () => call<string[]>("games_running"),
+    /** Steam header artwork as a data URL (Steam's local cache first). */
+    banner: (id: string) => call<string>("games_banner", { id }),
   },
 
   integrations: {
