@@ -39,6 +39,10 @@ Development builds (`npm run app:dev`) never run automations, so rebuilding does
 
 Add a `Spec` to `SPECS` in `dev/lsp/registry.rs`: executable names, arguments, the extension → LSP language id map, the version flag (or `None` if the binary starts serving instead) and the official install command (typed into a visible terminal, never run hidden). Extensions must stay unique (a test checks). No frontend change is needed. `cargo test lsp` runs the bridge against an in-process fake server; set `NETRUNNER_LSP_SMOKE_DIR` to a folder with `npm i typescript@5 typescript-language-server` to run the real-server smoke test.
 
+## Adding a debug adapter
+
+Add it to `adapters` and `Dap::start` in `dev/dap.rs` (stdio with `spawn_stdio`, a local port with `spawn_tcp`), then to `autoDebugConfig` in `modules/developer/debug/configs.ts` with the launch settings it expects. `cargo test dap` runs the session state machine against a fake adapter.
+
 ## Adding a game source
 
 Implement a `fn x_games() -> (bool, Vec<Game>)` in `services/games.rs` (detected?, games), add it to `scan()`, and, if the launcher needs parameters, extend `launch_params`. Add the label in `modules/games/GamesModule.tsx`.

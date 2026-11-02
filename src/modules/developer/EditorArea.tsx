@@ -13,6 +13,7 @@ import { applyFileConfig, cursorMemory, saveOnFocusChange, saveSessionSoon, take
 import { pathKey } from "./lsp/convert";
 import { attachGit, registerConflictLenses } from "./gitEditor";
 import { attachDebug } from "./debug/editorDebug";
+import { prefillNeural } from "@/modules/neural/store";
 
 /** File tabs use real file URIs so language servers and Go to Definition can address them. */
 const modelUri = (tab: EditorTab) => (tab.kind === "file" ? fileModelUri(tab.path).toString() : `inmemory://nr/${encodeURIComponent(tab.key)}`);
@@ -135,6 +136,35 @@ function EditorGroup({ group, onRun }: { group: 0 | 1; onRun: (path: string) => 
         reportError("No GitHub link", err);
       }
     };
+    // NEURAL: fills the composer in the AI panel; nothing is sent until the user presses Send.
+    editor.addAction({
+      id: "netrunner.neural.explain",
+      label: "NEURAL: Explain Selection",
+      contextMenuGroupId: "9_neural",
+      run: () => {
+        const sel = getEditorSelection();
+        if (!sel) return notify.info("Select some code first");
+        useDev.getState().setMode("ai");
+        prefillNeural("Explain this code.", [{ kind: "selection", ...sel }]);
+      },
+    });
+    editor.addAction({
+      id: "netrunner.neural.fix",
+      label: "NEURAL: Fix the Problem Here",
+      contextMenuGroupId: "9_neural",
+      run: () => {
+        const model = editor.getModel();
+        const line = editor.getPosition()?.lineNumber;
+        if (!model || !line || model.uri.scheme !== "file") return;
+        const marker = monaco.editor
+          .getModelMarkers({ resource: model.uri })
+          .filter((m) => m.startLineNumber <= line && m.endLineNumber >= line)
+          .sort((a, b) => b.severity - a.severity)[0];
+        if (!marker) return notify.info("No problem reported on this line");
+        useDev.getState().setMode("ai");
+        prefillNeural(`Fix this problem on line ${marker.startLineNumber}: ${marker.message}\nReply with the whole corrected file in one code block.`, [{ kind: "file", path: model.uri.fsPath }]);
+      },
+    });
     editor.addAction({ id: "netrunner.github.open", label: "Open on GitHub", contextMenuGroupId: "9_git", run: () => void githubLink(false, false) });
     editor.addAction({ id: "netrunner.github.permalink", label: "Copy GitHub Permalink", contextMenuGroupId: "9_git", run: () => void githubLink(true, true) });
     editor.onDidChangeCursorPosition((e) => {

@@ -12,13 +12,10 @@ Not done in Phase 2 (moved later):
 - CPU temperature and fan speed: Windows has no standard API for user apps. A bridge to HWiNFO shared memory is the realistic option.
 - Per-profile Quick Access sets and overlay sets.
 
-## Phase 3: Developer and GitHub (done, partial)
+## Phase 3: Developer and GitHub (done)
 Monaco editor, project explorer, ConPTY terminals, Run file, toolchain detection with path overrides, Git (status, stage, discard, commit, branches, pull, push, history, diff), GitHub (token auth, repos, PRs, issues, clone).
 
-Not done in Phase 3:
-- **Language servers (LSP):** completion beyond Monaco's built-ins, diagnostics, go-to-definition.
-- **Debugger (DAP):** breakpoints and variables. DEBUG mode states this.
-- ~~AI coding assistant~~: delivered in Phase 4 (NEURAL panel + proposal diffs).
+Language servers and the debugger arrived in 0.8. Not done:
 - OAuth device-flow sign-in: needs a registered GitHub OAuth app; PAT is used today.
 
 ## Phase 4: Neural and Files (done, partial)
@@ -66,14 +63,15 @@ Done so far: GITHUB code browsing, Widget Studio, per-profile overlay sets, clic
   - sort and filter by playtime, last played, launcher.
 
 ### 0.8: DEVELOPER IDE, GitHub link, system and sound
-Detailed working plan: [PLAN-0.8.md](PLAN-0.8.md).
-- **DEVELOPER as a full IDE**: language servers for any language (auto-detected, one-click install in a visible console) with live errors, completion, hover, go to definition, references, rename, formatting and quick fixes; Problems panel; project search and replace; Ctrl+P / symbols; split editor and session restore; run configurations with clickable compiler errors; debugger (DAP: Python, Node, Rust/C++, Go); Git in the editor (gutter changes, blame, hunks, conflict resolution, stash, graph).
-- **Code ↔ GitHub**: publish a project, create pull requests, PR list with CI status, checkout and review PR diffs, branch from an issue, CI status of the current branch, open on GitHub / permalink.
-- **Audio**: output/input device switching and per-app volume (Core Audio), as a module and a widget.
-- **Sensors**: optional HWiNFO shared-memory bridge for CPU/GPU temperatures and fan speeds (read-only, user enables it).
-- **Per-profile Quick Access sets** and hotkeys per entry; hotkey editor in Settings.
+- ✅ **DEVELOPER as a full IDE**: language servers (20 languages, auto-detected, install in a visible terminal) with live errors, completion, hover, go to definition, references, rename, formatting and quick fixes; Problems panel; project search and replace; Ctrl+P / symbols; split editor and session restore; editor settings and `.editorconfig`; run configurations with compiler errors in Problems; debugger (DAP: Python, Go, Rust/C/C++); Git in the editor (gutter changes, blame, hunks, conflict resolution, stash, graph, cherry-pick, branch compare); Explain / Fix with NEURAL.
+- ✅ **Code ↔ GitHub**: publish a project, create pull requests, PR list with CI status, checkout and review PR diffs, comments, branch from an issue, CI status of the current branch, open on GitHub / permalink.
+- ✅ **Audio**: output/input devices, default device and per-app volume (Core Audio), as a SYSTEM tab and a widget, with automation actions.
+- ✅ **Sensors**: optional HWiNFO shared-memory bridge for CPU/GPU temperatures and fan speeds (read-only, user enables it).
+- ✅ **Per-profile Quick Access sets** and hotkeys per entry; hotkey editor in Settings.
+- Moved on: Node.js debugging and semantic highlighting from language servers (below); the CodeLLDB adapter is located, not downloaded by NETRUNNER.
 
 ### 0.9: Browser, part 2
+- **DEVELOPER leftovers**: Node.js debugging (js-debug), semantic highlighting from language servers.
 - **uBlock scriptlet resources** so in-video ads on sites like YouTube are blocked too.
 - Per-site JavaScript / autoplay / zoom memory, reader mode, tab groups, tab search, recently closed tabs (Ctrl+Shift+T).
 - Download manager panel with progress and "open folder"; per-site cookie viewer.
@@ -81,7 +79,6 @@ Detailed working plan: [PLAN-0.8.md](PLAN-0.8.md).
 
 ### 1.0: Platform
 - **Plugin architecture**: signed plugins with a declared permission set (commands, widgets, automation triggers), loaded in an isolated webview; no access beyond what they declare.
-- **DEVELOPER**: language servers (TypeScript, Rust, Python) for completion and diagnostics; debugger (DAP) later.
 - **FILES**: zip/7z browsing, duplicate finder, opt-in search index.
 - Export / import of settings, profiles and layouts; backup schedule in STORAGE.
 
@@ -93,7 +90,9 @@ Detailed working plan: [PLAN-0.8.md](PLAN-0.8.md).
 - Reduce the DEVELOPER chunk (Monaco) further; lazy-load language workers on demand.
 
 ## Known limitations
-- Temperatures: usually unavailable to standard-user apps; GPU temperature is not exposed by PDH.
+- Temperatures and fans: usually unavailable to standard-user apps without the optional HWiNFO source.
+- Language servers and debug adapters are your own installs; without one, a language has highlighting only.
+- Changing the default sound device uses an undocumented Windows interface (see SECURITY.md).
 - CPU frequency is the OS-reported value (often the base clock).
 - VPN: NETRUNNER reports a VPN-type adapter being up; it cannot prove traffic is routed through it.
 - Overlays cannot draw over exclusive-fullscreen games (no injection by design).
