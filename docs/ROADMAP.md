@@ -68,6 +68,9 @@ Done so far: GITHUB code browsing, Widget Studio, per-profile overlay sets, clic
 - ✅ **Audio**: output/input devices, default device and per-app volume (Core Audio), as a SYSTEM tab and a widget, with automation actions.
 - ✅ **Sensors**: optional HWiNFO shared-memory bridge for CPU/GPU temperatures and fan speeds (read-only, user enables it).
 - ✅ **Per-profile Quick Access sets** and hotkeys per entry; hotkey editor in Settings.
+- ✅ **Repair of damaged databases at startup** (0.8.2): an integrity check before migrations rebuilds a damaged database and keeps a copy of the original in `backups`.
+- ✅ **Resizable panels** (0.8.2): DEVELOPER, FILES, GITHUB, NEURAL, Widget Studio and the pinned navigation; sizes are remembered.
+- ✅ **Browser page appearance** (0.8.2): dark pages, theme accent and scrollbars, per-site transparency with a tint.
 - Moved on: Node.js debugging and semantic highlighting from language servers (below); the CodeLLDB adapter is located, not downloaded by NETRUNNER.
 
 ### 0.9: Browser, part 2
@@ -98,6 +101,8 @@ Done so far: GITHUB code browsing, Widget Studio, per-profile overlay sets, clic
 - Overlays cannot draw over exclusive-fullscreen games (no injection by design).
 - Browser tabs are native webviews: NETRUNNER's toasts cannot appear on top of a page, and app shortcuts (Ctrl+K) work only while focus is in NETRUNNER's own UI. Dialogs and the palette hide the page while open.
 - Web overlay opacity applies to the frame only; page content is opaque.
+- Browser transparency shows the background only where a site leaves its own page background: elements the site paints stay opaque, and some sites stay fully opaque. Forced dark pages are recoloured by Chromium and can look wrong on some sites; the choice applies to the whole browser and takes effect after a restart.
+- BROWSER's side panels are not resizable yet.
 - The Music Player shows only apps that publish Windows media sessions.
 - Automation process triggers have up to ~3 s latency (polling, only while such rules exist).
 - Monaco is ~3.6 MB, loaded only when DEVELOPER opens.

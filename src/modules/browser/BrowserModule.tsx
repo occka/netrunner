@@ -16,6 +16,7 @@ import {
   Plus,
   RotateCw,
   Search,
+  Palette,
   Shield,
   ShieldOff,
   Star,
@@ -31,11 +32,11 @@ import { usePolled } from "@/hooks/usePolled";
 import { useSetting, useSettings } from "@/stores/settings";
 import { notify, reportError } from "@/stores/notifications";
 import { BrowserSurface } from "./BrowserSurface";
-import { BookmarksPanel, DownloadsPanel, HistoryPanel, PrivacyPanel } from "./BrowserPanels";
+import { AppearancePanel, BookmarksPanel, DownloadsPanel, HistoryPanel, PrivacyPanel } from "./BrowserPanels";
 import { hostOf, mainTabs, stripTabs, useBrowser, type StripTab } from "./store";
 import type { BrowserNotice, BrowserTab } from "@/types/browser";
 
-type Panel = "bookmarks" | "history" | "downloads" | "privacy" | null;
+type Panel = "bookmarks" | "history" | "downloads" | "privacy" | "appearance" | null;
 
 
 const PERMISSION_LABEL: Record<string, string> = {
@@ -56,6 +57,7 @@ const PERMISSION_LABEL: Record<string, string> = {
 export default function BrowserModule() {
   const { tabs, sleeping, order, activeId, ready, init, activate, newTab, close, nextPrivate } = useBrowser();
   const [panel, setPanel] = useState<Panel>(null);
+  const clearSites = useSetting("browser.page_transparent");
   const shown = stripTabs({ tabs, sleeping, order });
   // A sleeping tab has no webview yet: the start page shows while it wakes.
   const tab = mainTabs(tabs).find((t) => t.id === activeId) ?? null;
@@ -126,6 +128,7 @@ export default function BrowserModule() {
 
   const siteHost = tab ? hostOf(tab.url) : "";
   const siteExcepted = !!siteHost && exceptions.some((e) => siteHost === e || siteHost.endsWith(`.${e}`));
+  const clearPage = !!siteHost && clearSites.some((e) => siteHost === e || siteHost.endsWith(`.${e}`));
 
   return (
     <div className={`module browser${tab?.fullscreen ? " browser--fullscreen" : ""}`}>
@@ -160,7 +163,7 @@ export default function BrowserModule() {
 
       <div className="browser__main">
         {tab ? (
-          <BrowserSurface tabId={tab.id} className="browser__view" />
+          <BrowserSurface tabId={tab.id} className={`browser__view${clearPage ? " browser__view--clear" : ""}`} />
         ) : activeId ? (
           <div className="browser__view browser__waking label">Restoring tab…</div>
         ) : (
@@ -179,6 +182,7 @@ export default function BrowserModule() {
               {panel === "history" && <HistoryPanel />}
               {panel === "downloads" && <DownloadsPanel />}
               {panel === "privacy" && <PrivacyPanel site={siteHost} />}
+              {panel === "appearance" && <AppearancePanel site={siteHost} />}
             </div>
           </aside>
         )}
@@ -354,6 +358,7 @@ function Toolbar({
       {panelBtn("bookmarks", <BookmarkIcon size={15} />, "Bookmarks")}
       {panelBtn("history", <History size={15} />, "History")}
       {panelBtn("downloads", <Download size={15} />, "Downloads")}
+      {panelBtn("appearance", <Palette size={15} />, "Page appearance")}
     </div>
   );
 }

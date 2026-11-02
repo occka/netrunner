@@ -27,6 +27,8 @@ Rust tests include `system::smoke` and `dev::smoke`, which call real Windows API
 
 Development builds run beside the installed NETRUNNER: they skip the single-instance lock, keep their data in `<appdata>\com.netrunner.app\dev\` (or `NETRUNNER_DATA_DIR`), show "NETRUNNER DEV" in the tray and toggle overlays with `Ctrl+Alt+Shift+O`.
 
+`NETRUNNER_DEV_BROWSER_PORT=<port>` (debug builds only) opens the DevTools protocol on the BROWSER profile for testing tabs. `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` overrides the arguments NETRUNNER passes, including `WebContentsForceDark`, so leave it unset when testing them.
+
 Development builds (`npm run app:dev`) never run automations, so rebuilding does not launch your real programs. Set `NETRUNNER_DEV_AUTOMATION=1` before starting the dev build to test the engine.
 
 ## Adding an automation trigger or action

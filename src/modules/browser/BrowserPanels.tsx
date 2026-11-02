@@ -116,6 +116,89 @@ export function DownloadsPanel() {
   );
 }
 
+/** How pages look: dark mode, accent colour and, per site, transparency. */
+export function AppearancePanel({ site }: { site: string }) {
+  const dark = useSetting("browser.page_dark");
+  const accent = useSetting("browser.page_accent");
+  const accentOff = useSetting("browser.page_accent_off");
+  const transparent = useSetting("browser.page_transparent");
+  const tint = useSetting("browser.page_tint");
+  // The dark mode that WebView2 was started with: "All sites" takes effect at the next start.
+  const [startedForce] = useState(dark === "force");
+  const isClear = !!site && transparent.includes(site);
+  const isPlain = !!site && accentOff.includes(site);
+  const flip = (list: string[], on: boolean) => (on ? [...list, site] : list.filter((s) => s !== site));
+
+  return (
+    <div className="browser__panel-stack">
+      <h3 className="label">Dark pages</h3>
+      <div className="segmented">
+        {(
+          [
+            ["off", "Off"],
+            ["prefer", "Dark sites"],
+            ["force", "All sites"],
+          ] as const
+        ).map(([v, label]) => (
+          <button key={v} aria-pressed={dark === v} onClick={() => void save("browser.page_dark", v)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="muted browser__hint">
+        Dark sites: pages that have their own dark theme use it. All sites: the browser also darkens the rest, sometimes with odd colours.
+      </p>
+      {(dark === "force") !== startedForce && <p className="browser__hint browser__notice">Restart NETRUNNER to {dark === "force" ? "turn on" : "turn off"} All sites.</p>}
+
+      <h3 className="label">Accent</h3>
+      <label className="check browser__opt">
+        <input type="checkbox" checked={accent} onChange={(e) => void save("browser.page_accent", e.target.checked)} />
+        <span>
+          Theme colour for scrollbars, selection, checkboxes and sliders
+          <span className="muted browser__hint">Works on nearly every site. It changes only how the page looks here.</span>
+        </span>
+      </label>
+      {site && accent && (
+        <label className="check browser__opt">
+          <input type="checkbox" checked={isPlain} onChange={(e) => void save("browser.page_accent_off", flip(accentOff, e.target.checked))} />
+          <span>
+            Not on <span className="mono">{site}</span>
+          </span>
+        </label>
+      )}
+
+      <h3 className="label">Transparency (experimental)</h3>
+      {site ? (
+        <label className="check browser__opt">
+          <input type="checkbox" checked={isClear} onChange={(e) => void save("browser.page_transparent", flip(transparent, e.target.checked))} />
+          <span>
+            Show NETRUNNER's background behind <span className="mono">{site}</span>
+            <span className="muted browser__hint">Sites paint their own blocks, so it works on some sites and only partly on others. Text can get harder to read.</span>
+          </span>
+        </label>
+      ) : (
+        <p className="muted browser__hint">Open a site to turn this on for it.</p>
+      )}
+      <label className="browser__range">
+        <span>Dark layer over the background: {tint}%</span>
+        <input type="range" min={0} max={100} step={5} value={tint} onChange={(e) => void save("browser.page_tint", Number(e.target.value))} />
+      </label>
+      {transparent.length > 0 && (
+        <ul className="browser__lists">
+          {transparent.map((s) => (
+            <li key={s} className="browser__site">
+              <span className="mono truncate">{s}</span>
+              <button className="btn btn--sm btn--ghost" onClick={() => void save("browser.page_transparent", transparent.filter((x) => x !== s))}>
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function PrivacyPanel({ site }: { site: string }) {
   const { data: status, reload } = usePolled(() => api.browser.status(), 3000);
   const { data: perms, reload: reloadPerms } = usePolled(() => api.browser.permissions());

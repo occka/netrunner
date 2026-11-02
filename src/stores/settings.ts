@@ -111,6 +111,15 @@ export interface SettingsSchema {
   /** Reopen the tabs of the last session when BROWSER is first opened. */
   "browser.restore_tabs": boolean;
   "browser.session": BrowserSession;
+  /** Dark mode for pages: only sites that have a dark theme, or all (from the next start). */
+  "browser.page_dark": "off" | "prefer" | "force";
+  /** The theme's accent colour and scrollbars on pages. */
+  "browser.page_accent": boolean;
+  "browser.page_accent_off": string[];
+  /** Experimental: sites shown over NETRUNNER's background. */
+  "browser.page_transparent": string[];
+  /** Opacity in % of the dark layer behind a transparent page. */
+  "browser.page_tint": number;
   // Appearance (styles/appearance.ts).
   "appearance.background": BackgroundSpec;
   "appearance.dashboard_background": BackgroundSpec;
@@ -169,6 +178,11 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "browser.home": "",
   "browser.restore_tabs": true,
   "browser.session": { tabs: [], active: 0 },
+  "browser.page_dark": "off",
+  "browser.page_accent": false,
+  "browser.page_accent_off": [],
+  "browser.page_transparent": [],
+  "browser.page_tint": 60,
   "appearance.background": DEFAULT_BACKGROUND,
   "appearance.dashboard_background": DEFAULT_BACKGROUND,
   "appearance.panel_opacity": 100,
@@ -213,6 +227,7 @@ function coerce(raw: Record<string, unknown>): SettingsSchema {
   }
   values["monitor.interval_ms"] = Math.min(10000, Math.max(500, values["monitor.interval_ms"]));
   values["browser.session"] = sanitizeSession(values["browser.session"]);
+  values["browser.page_tint"] = Math.min(100, Math.max(0, values["browser.page_tint"]));
   values["appearance.background"] = sanitizeBackground(values["appearance.background"]);
   values["appearance.dashboard_background"] = sanitizeBackground(values["appearance.dashboard_background"]);
   values["appearance.panel_opacity"] = Math.min(100, Math.max(30, values["appearance.panel_opacity"]));
