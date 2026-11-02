@@ -108,6 +108,7 @@ pub fn run() {
             app.manage(AppState::new(db, data_dir));
             app.manage(dev::terminal::Terminals::default());
             app.manage(std::sync::Arc::new(dev::lsp::bridge::Lsp::default()));
+            app.manage(std::sync::Arc::new(dev::dap::Dap::default()));
 
             let handle = app.handle().clone();
             desktop::build_tray(&handle)?;
@@ -279,6 +280,10 @@ pub fn run() {
             commands::dev::git_push,
             commands::dev::git_init,
             commands::dev::git_clone,
+            commands::dap::dap_adapters,
+            commands::dap::dap_start,
+            commands::dap::dap_request,
+            commands::dap::dap_stop,
             commands::lsp::lsp_subscribe,
             commands::lsp::lsp_servers,
             commands::lsp::lsp_running,
@@ -372,6 +377,9 @@ pub fn run() {
                 // Language servers get a polite shutdown instead of a broken pipe.
                 if let Some(lsp) = app.try_state::<std::sync::Arc<dev::lsp::bridge::Lsp>>() {
                     lsp.stop_all();
+                }
+                if let Some(dap) = app.try_state::<std::sync::Arc<dev::dap::Dap>>() {
+                    dap.stop();
                 }
             }
         });

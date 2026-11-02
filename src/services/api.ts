@@ -6,6 +6,8 @@ import { invoke, type Channel } from "@tauri-apps/api/core";
 import type { AudioDevices, AudioSession } from "@/types/audio";
 import type {
   BlameLine,
+  DapEvent,
+  DebugAdapterStatus,
   GhChecks,
   GhComment,
   GhOrigin,
@@ -241,6 +243,14 @@ export const api = {
     request: <T = unknown>(server: string, method: string, params: unknown) => call<T>("lsp_request", { server, method, params }),
     restart: (server: string) => call<void>("lsp_restart", { server }),
     configure: (spec: string, path: string | null, disabled: boolean) => call<void>("lsp_configure", { spec, path, disabled }),
+  },
+
+  dap: {
+    adapters: (root: string) => call<DebugAdapterStatus[]>("dap_adapters", { root }),
+    start: (root: string, adapter: string, request: string, config: unknown, breakpoints: { path: string; breakpoints: { line: number; condition?: string }[] }[], onEvent: Channel<DapEvent>) =>
+      call<void>("dap_start", { root, adapter, request, config, breakpoints, onEvent }),
+    request: <T = unknown>(command: string, args: unknown) => call<T>("dap_request", { command, arguments: args }),
+    stop: () => call<void>("dap_stop"),
   },
 
   term: {

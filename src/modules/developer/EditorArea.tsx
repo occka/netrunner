@@ -12,6 +12,7 @@ import { LspStatus } from "./lsp/LspStatus";
 import { applyFileConfig, cursorMemory, saveOnFocusChange, saveSessionSoon, takeRestoredCursor } from "./editorPrefs";
 import { pathKey } from "./lsp/convert";
 import { attachGit, registerConflictLenses } from "./gitEditor";
+import { attachDebug } from "./debug/editorDebug";
 
 /** File tabs use real file URIs so language servers and Go to Definition can address them. */
 const modelUri = (tab: EditorTab) => (tab.kind === "file" ? fileModelUri(tab.path).toString() : `inmemory://nr/${encodeURIComponent(tab.key)}`);
@@ -113,7 +114,11 @@ function EditorGroup({ group, onRun }: { group: 0 | 1; onRun: (path: string) => 
     editor.onDidBlurEditorWidget(saveOnFocusChange);
     editor.onDidChangeModel(() => onModel(editor));
     const git = attachGit(editor);
-    editor.onDidDispose(() => git.dispose());
+    const debug = attachDebug(editor);
+    editor.onDidDispose(() => {
+      git.dispose();
+      debug.dispose();
+    });
     // Links to the file on GitHub (when the project's origin is a GitHub repository).
     const githubLink = async (permalink: boolean, copy: boolean) => {
       const model = editor.getModel();
@@ -253,6 +258,7 @@ function EditorGroup({ group, onRun }: { group: 0 | 1; onRun: (path: string) => 
             onChange={(value) => setContent(tab.key, value ?? "")}
             options={{
               readOnly: tab.readOnly,
+              glyphMargin: true,
               fontFamily: prefs.fontFamily,
               fontSize: prefs.fontSize,
               fontLigatures: true,

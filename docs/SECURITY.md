@@ -28,6 +28,7 @@
 | Git amend / cherry-pick / stash drop | Confirmation required (backend enforces `confirmed`); amend warns when the commit is already on the remote. Revisions from the UI are checked so they can never be read as git options |
 | GitHub from DEVELOPER | Publish (shows whether the repository is public), Create pull request (pushes the branch) and comments need a confirmation and the backend's `confirmed` flag. Reading uses the stored token only; an existing `origin` is never replaced |
 | Hotkeys | An entry's global key launches through the same `launcher` path and policy as a click: a flagged command never runs without confirmation in the main window |
+| Debugger | Only the known adapters start, on an open project, when the user asks; the program runs with the user's rights, like Run. TCP adapters listen on 127.0.0.1 only. The UI can send only allow-listed debug requests. **Install** types the official command into a visible terminal |
 | Sound | Volume, mute and per-app volume use documented Core Audio. **Changing the default device uses `IPolicyConfig`, an undocumented Windows interface** (no public API exists); a failure is reported and the Windows sound settings are offered instead. Automations can use both |
 | Git clone | https URLs only; target folder must not exist |
 | Terminals | Allowlisted shells only (PowerShell, pwsh, cmd, Git Bash); cwd must be inside a project |

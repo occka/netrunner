@@ -7,6 +7,7 @@ pub mod activity;
 pub mod alarms;
 pub mod app;
 pub mod browser;
+pub mod dap;
 pub mod dev;
 pub mod files;
 pub mod github_link;

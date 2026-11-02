@@ -319,7 +319,7 @@ export const useDev = create<DevStore>((set, get) => ({
       reportError("Could not compare files", err);
     }
   },
-  setMode: (mode) => set({ mode, terminalOpen: mode === "debug" ? true : get().terminalOpen }),
+  setMode: (mode) => set({ mode }),
   setSide: (side) => set({ side }),
   toggleTerminal: (open) => set((s) => ({ terminalOpen: open ?? !s.terminalOpen })),
   bump: () => set((s) => ({ revision: s.revision + 1 })),

@@ -129,6 +129,8 @@ export interface SettingsSchema {
   "developer.editor": EditorPrefs;
   /** Keyed by project root. */
   "developer.session": Record<string, DevSession>;
+  /** Breakpoints by file path. */
+  "developer.breakpoints": Record<string, { line: number; condition?: string }[]>;
 }
 
 export const SETTINGS_DEFAULTS: SettingsSchema = {
@@ -176,6 +178,7 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "developer.format_on_save": false,
   "developer.editor": DEFAULT_EDITOR,
   "developer.session": {},
+  "developer.breakpoints": {},
 };
 
 export type SettingKey = keyof SettingsSchema;

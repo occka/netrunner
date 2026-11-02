@@ -282,3 +282,21 @@ export interface GhComment {
   created_at: string;
   html_url: string;
 }
+
+// ---------- Debugger (DAP) ----------
+
+export type DapEvent =
+  | { type: "event"; event: string; body: any }
+  | { type: "failed"; message: string }
+  | { type: "closed" };
+
+export interface DebugAdapterStatus {
+  id: "debugpy" | "delve" | "codelldb";
+  name: string;
+  languages: string;
+  found: boolean;
+  path: string | null;
+  note: string | null;
+  install: string | null;
+  docs: string;
+}
