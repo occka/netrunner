@@ -42,6 +42,8 @@ pub struct Snapshot {
     /// Temperatures exposed by the OS. On Windows this is frequently empty
     /// (ACPI thermal zones need elevation); the UI shows "unavailable" then.
     pub temperatures: Vec<TemperatureReading>,
+    /// Filled from HWiNFO when that source is on (`system::sensors`).
+    pub sensors: Option<crate::system::sensors::Sensors>,
     /// `None` when Windows performance counters are unavailable.
     pub gpu: Option<GpuMetrics>,
     /// Physical disk throughput; `None` until two samples exist.
@@ -290,6 +292,7 @@ impl SystemMonitor {
             disks,
             network,
             temperatures,
+            sensors: None,
             gpu,
             disk_io,
         }

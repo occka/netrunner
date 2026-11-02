@@ -154,6 +154,10 @@ export const api = {
     clear: () => call<void>("activity_clear"),
   },
 
+  sensors: {
+    status: () => call<{ available: boolean; message: string; temperatures: number; fans: number }>("sensors_status"),
+  },
+
   audio: {
     devices: () => call<AudioDevices>("audio_devices"),
     sessions: (device?: string) => call<AudioSession[]>("audio_sessions", { device }),

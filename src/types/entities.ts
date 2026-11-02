@@ -151,6 +151,13 @@ export interface SystemSnapshot {
     }[];
   };
   temperatures: { label: string; celsius: number }[];
+  /** From HWiNFO, when that optional source is on and running. */
+  sensors: {
+    cpu: number | null;
+    gpu: number | null;
+    temperatures: { label: string; celsius: number }[];
+    fans: { label: string; rpm: number }[];
+  } | null;
   gpu: GpuMetrics | null;
   diskIo: DiskIo | null;
 }

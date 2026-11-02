@@ -175,6 +175,7 @@ pub fn run() {
             commands::system::system_power,
             commands::system::system_power_set_plan,
             commands::system::network_status,
+            commands::system::sensors_status,
             commands::system::audio_devices,
             commands::system::audio_sessions,
             commands::system::audio_set_volume,

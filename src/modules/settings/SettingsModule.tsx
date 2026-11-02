@@ -126,6 +126,33 @@ function AutostartRow() {
   );
 }
 
+/** The optional HWiNFO sensor source, with whether it can be read right now. */
+function HwinfoRow() {
+  const on = useSettings((s) => s.values["sensors.hwinfo"]);
+  const set = useSettings((s) => s.set);
+  const [status, setStatus] = useState<{ available: boolean; message: string } | null>(null);
+  useEffect(() => {
+    if (!on) return setStatus(null);
+    const check = () => void api.sensors.status().then(setStatus, () => setStatus(null));
+    check();
+    const id = window.setInterval(check, 5000);
+    return () => window.clearInterval(id);
+  }, [on]);
+  return (
+    <div className="settings-row">
+      <div>
+        <div>Temperatures and fans from HWiNFO</div>
+        <div className="field__hint">Needs HWiNFO running with Shared Memory Support on (its Settings). NETRUNNER only reads the values; no administrator rights.</div>
+        {status && <div className={status.available ? "field__hint" : "field__error"}>{status.message}</div>}
+      </div>
+      <label className="check">
+        <input type="checkbox" checked={on} onChange={(e) => void set("sensors.hwinfo", e.target.checked)} />
+        Use HWiNFO
+      </label>
+    </div>
+  );
+}
+
 export default function SettingsModule() {
   const values = useSettings((s) => s.values);
   const section = useShell((s) => s.section);
@@ -225,6 +252,7 @@ export default function SettingsModule() {
                 ))}
               </div>
             </div>
+            <HwinfoRow />
           </div>
         </section>
 

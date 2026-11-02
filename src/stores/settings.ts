@@ -124,6 +124,8 @@ export interface SettingsSchema {
   "appearance.scanlines": boolean;
   "appearance.glow": boolean;
   "appearance.vignette": boolean;
+  /** Read temperatures and fans from HWiNFO's shared memory. */
+  "sensors.hwinfo": boolean;
   /** DEVELOPER: format with the language server before saving. */
   "developer.format_on_save": boolean;
   "developer.editor": EditorPrefs;
@@ -175,6 +177,7 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "appearance.scanlines": false,
   "appearance.glow": false,
   "appearance.vignette": false,
+  "sensors.hwinfo": false,
   "developer.format_on_save": false,
   "developer.editor": DEFAULT_EDITOR,
   "developer.session": {},

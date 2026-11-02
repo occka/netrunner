@@ -97,7 +97,7 @@ const defs: WidgetDef[] = [
     description: "CPU, memory, storage, network and sensors at a glance.",
     icon: Gauge,
     status: "live",
-    dataSource: "Windows performance data via sysinfo. GPU, temperatures and fans show as unavailable unless the OS exposes them.",
+    dataSource: "Windows performance data via sysinfo. GPU, temperatures and fans show as unavailable unless the OS exposes them or the optional HWiNFO source is on.",
     keywords: ["hardware", "metrics", "performance", "temperature"],
     defaultSize: { w: 5, h: 9 },
     minSize: { w: 3, h: 6 },

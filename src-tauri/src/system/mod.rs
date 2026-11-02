@@ -7,6 +7,7 @@ pub mod monitor;
 pub mod network;
 pub mod perf;
 pub mod power;
+pub mod sensors;
 pub mod services;
 pub mod startup;
 

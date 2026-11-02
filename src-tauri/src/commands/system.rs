@@ -5,7 +5,7 @@ use crate::services::activity::{self, Level};
 use crate::state::AppState;
 use crate::system::monitor::{ProcessInfo, Snapshot, SystemInfo};
 use crate::system::audio::{self, AudioDevices, Session, SessionTarget};
-use crate::system::{network, power, services, startup};
+use crate::system::{network, power, sensors, services, startup};
 
 #[tauri::command]
 pub async fn system_info(state: State<'_, AppState>) -> AppResult<SystemInfo> {
@@ -14,7 +14,18 @@ pub async fn system_info(state: State<'_, AppState>) -> AppResult<SystemInfo> {
 
 #[tauri::command]
 pub async fn system_snapshot(state: State<'_, AppState>) -> AppResult<Snapshot> {
-    state.with_monitor(|m| m.snapshot())
+    let mut snapshot = state.with_monitor(|m| m.snapshot())?;
+    let hwinfo = crate::services::settings::get(&*state.db.conn()?, sensors::SETTING_KEY)?.and_then(|v| v.as_bool()).unwrap_or(false);
+    if hwinfo {
+        snapshot.sensors = sensors::read().ok();
+    }
+    Ok(snapshot)
+}
+
+/// Whether HWiNFO's shared memory can be read now (for the setting's hint).
+#[tauri::command]
+pub async fn sensors_status() -> AppResult<sensors::Status> {
+    Ok(sensors::status())
 }
 
 #[derive(serde::Serialize)]
