@@ -2,5 +2,6 @@
 
 mod db;
 mod migrations;
+mod repair;
 
 pub use db::Database;

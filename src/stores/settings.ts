@@ -124,6 +124,8 @@ export interface SettingsSchema {
   "appearance.scanlines": boolean;
   "appearance.glow": boolean;
   "appearance.vignette": boolean;
+  /** Sizes of resizable panels in px, by panel name; absent means the layout's default. */
+  "ui.panes": Record<string, number>;
   /** Read temperatures and fans from HWiNFO's shared memory. */
   "sensors.hwinfo": boolean;
   /** DEVELOPER: format with the language server before saving. */
@@ -177,6 +179,7 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "appearance.scanlines": false,
   "appearance.glow": false,
   "appearance.vignette": false,
+  "ui.panes": {},
   "sensors.hwinfo": false,
   "developer.format_on_save": false,
   "developer.editor": DEFAULT_EDITOR,
@@ -218,6 +221,7 @@ function coerce(raw: Record<string, unknown>): SettingsSchema {
   values["appearance.scale"] = Math.min(150, Math.max(70, values["appearance.scale"]));
   if (!FONTS.some((f) => f.id === values["appearance.font"])) values["appearance.font"] = "plex";
   values["inspector.width"] = Math.min(520, Math.max(240, values["inspector.width"]));
+  values["ui.panes"] = Object.fromEntries(Object.entries(values["ui.panes"] ?? {}).filter(([, v]) => typeof v === "number" && v > 0 && v < 5000));
   values["developer.editor"] = sanitizeEditor(values["developer.editor"]);
   if (Array.isArray(values["developer.session"])) values["developer.session"] = {};
   return values;

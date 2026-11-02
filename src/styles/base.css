@@ -23,7 +23,7 @@
   --topbar-h: 44px;
   --statusbar-h: 24px;
   --nav-w: 52px;
-  --nav-w-open: 208px;
+  --nav-w-open: var(--pane-nav, 208px);
 
   --dur-fast: 120ms;
   --dur: 180ms;

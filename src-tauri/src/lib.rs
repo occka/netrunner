@@ -104,6 +104,9 @@ pub fn run() {
             }
             let prefs = browser::Prefs::load(&*db.conn()?);
             app.manage(browser::Browser::new(&data_dir, &local_dir, prefs));
+            if let Some(report) = db.repair_report() {
+                activity::record(&*db.conn()?, Level::Warn, "core", report);
+            }
             let alarm_dir = data_dir.clone();
             app.manage(AppState::new(db, data_dir));
             app.manage(dev::terminal::Terminals::default());
@@ -375,6 +378,9 @@ pub fn run() {
         .expect("error while building NETRUNNER")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                if let Some(state) = app.try_state::<AppState>() {
+                    state.db.checkpoint();
+                }
                 // Language servers get a polite shutdown instead of a broken pipe.
                 if let Some(lsp) = app.try_state::<std::sync::Arc<dev::lsp::bridge::Lsp>>() {
                     lsp.stop_all();

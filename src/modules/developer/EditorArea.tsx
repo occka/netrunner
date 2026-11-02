@@ -13,6 +13,7 @@ import { applyFileConfig, cursorMemory, saveOnFocusChange, saveSessionSoon, take
 import { pathKey } from "./lsp/convert";
 import { attachGit, registerConflictLenses } from "./gitEditor";
 import { attachDebug } from "./debug/editorDebug";
+import { ResizeHandle } from "@/components/ResizeHandle";
 import { prefillNeural } from "@/modules/neural/store";
 
 /** File tabs use real file URIs so language servers and Go to Definition can address them. */
@@ -56,6 +57,7 @@ export function EditorArea({ onRun }: { onRun: (path: string) => void }) {
   return (
     <div className={`editor-area${split ? " editor-area--split" : ""}`}>
       <EditorGroup group={0} onRun={onRun} />
+      {split && <ResizeHandle pane="dev-split" of="prev" min={200} max={3000} rest={200} />}
       {split && <EditorGroup group={1} onRun={onRun} />}
     </div>
   );

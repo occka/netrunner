@@ -1,3 +1,4 @@
+import { usePaneSizes } from "@/components/ResizeHandle";
 import { useEffect, useState } from "react";
 import { AlertOctagon } from "lucide-react";
 import { useAppearance, useSettings } from "@/stores/settings";
@@ -41,6 +42,7 @@ export function App() {
 
   useEffect(() => applyTheme(theme), [theme]);
   useAppearance();
+  usePaneSizes();
 
   useEffect(() => {
     const root = document.documentElement;

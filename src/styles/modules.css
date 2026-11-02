@@ -401,7 +401,7 @@
 /* ---------- Widget Studio ---------- */
 .studio {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: var(--pane-studio-side, 240px) 0 minmax(0, 1fr);
   flex: 1;
   min-height: 0;
 }

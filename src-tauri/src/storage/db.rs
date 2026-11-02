@@ -3,7 +3,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use rusqlite::Connection;
 
-use super::migrations;
+use super::{migrations, repair};
 use crate::error::{AppError, AppResult};
 
 /// Single shared SQLite connection.
@@ -13,6 +13,8 @@ use crate::error::{AppError, AppResult};
 pub struct Database {
     conn: Mutex<Connection>,
     path: Option<PathBuf>,
+    /// Set when the startup check found damage (see `repair`).
+    repair_report: Option<String>,
 }
 
 impl Database {
@@ -26,13 +28,18 @@ impl Database {
         let mut conn = Connection::open(path)?;
         configure(&conn)?;
 
+        // Before anything reads or writes through a possibly damaged index.
+        let found = if existed { repair::problems(&conn).unwrap_or_else(|e| vec![e.to_string()]) } else { Vec::new() };
+        let repair_report = if found.is_empty() { None } else { Some(repair::repair(&conn, path, backup_dir, &found)?) };
+
         let current = migrations::current_version(&conn)?;
         if existed && current > 0 && current < migrations::LATEST_VERSION {
             backup(&conn, backup_dir, current)?;
         }
         migrations::apply(&mut conn)?;
+        checkpoint(&conn);
 
-        Ok(Self { conn: Mutex::new(conn), path: Some(path.to_path_buf()) })
+        Ok(Self { conn: Mutex::new(conn), path: Some(path.to_path_buf()), repair_report })
     }
 
     /// In-memory database for tests.
@@ -41,11 +48,23 @@ impl Database {
         let mut conn = Connection::open_in_memory()?;
         configure(&conn)?;
         migrations::apply(&mut conn)?;
-        Ok(Self { conn: Mutex::new(conn), path: None })
+        Ok(Self { conn: Mutex::new(conn), path: None, repair_report: None })
     }
 
     pub fn conn(&self) -> AppResult<MutexGuard<'_, Connection>> {
         self.conn.lock().map_err(|_| AppError::Internal("database lock poisoned".into()))
+    }
+
+    pub fn repair_report(&self) -> Option<&str> {
+        self.repair_report.as_deref()
+    }
+
+    /// Moves the journal into the database file. Called on exit, so the file
+    /// on disk is complete and no long-lived `-wal` file has to stay next to it.
+    pub fn checkpoint(&self) {
+        if let Ok(conn) = self.conn() {
+            checkpoint(&conn);
+        }
     }
 
     pub fn path(&self) -> Option<&Path> {
@@ -54,6 +73,12 @@ impl Database {
 
     pub fn schema_version(&self) -> AppResult<i64> {
         migrations::current_version(&*self.conn()?)
+    }
+}
+
+fn checkpoint(conn: &Connection) {
+    if let Err(e) = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);") {
+        log::warn!("database checkpoint failed: {e}");
     }
 }
 

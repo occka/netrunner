@@ -16,6 +16,7 @@ import { ToolsPanel } from "./ToolsPanel";
 import { SearchPanel } from "./SearchPanel";
 import { QuickOpen } from "./QuickOpen";
 import { RunBar } from "./RunBar";
+import { ResizeHandle } from "@/components/ResizeHandle";
 import { DebugPanel, startForActiveFile } from "./debug/DebugPanel";
 import { useDebug } from "./debug/store";
 import { monaco } from "./monaco";
@@ -219,10 +220,17 @@ export default function DeveloperModule() {
                 )}
               </div>
             </aside>
+          <ResizeHandle pane="dev-side" of="prev" min={170} max={700} rest={320} />
           <div className="ide-center">
             <EditorArea onRun={(p) => void run(p)} />
-            {showTerminal && <TerminalPanel />}
+            {showTerminal && (
+              <>
+                <ResizeHandle pane="dev-terminal" of="next" axis="y" min={100} max={1400} rest={120} />
+                <TerminalPanel />
+              </>
+            )}
           </div>
+          {mode !== "code" && <ResizeHandle pane="dev-right" of="next" min={220} max={1000} rest={320} />}
           {mode === "debug" && (
             <aside className="ide-right">
               <div className="tree__head">
