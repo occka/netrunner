@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { runPlan } from "../src/modules/developer/run";
+import { forPowerShell, runPlan } from "../src/modules/developer/run";
 import { languageFor } from "../src/modules/developer/languages";
+
+describe("forPowerShell", () => {
+  it("avoids the .ps1 shims that the default execution policy blocks", () => {
+    expect(forPowerShell("npm i -g vscode-langservers-extracted")).toBe("npm.cmd i -g vscode-langservers-extracted");
+    expect(forPowerShell("npx --yes tsx 'D:\\a.ts'")).toBe("npx.cmd --yes tsx 'D:\\a.ts'");
+    expect(forPowerShell("yarn run dev")).toBe("yarn.cmd run dev");
+    expect(forPowerShell("gem install solargraph")).toBe("gem.cmd install solargraph");
+    expect(forPowerShell("pnpm run dev")).toBe("cmd /c pnpm run dev");
+    expect(forPowerShell("bun run dev")).toBe("cmd /c bun run dev");
+    expect(forPowerShell("npm run a; npm run b")).toBe("npm.cmd run a; npm.cmd run b");
+  });
+
+  it("leaves everything else alone", () => {
+    for (const c of ["cargo test", "python -m pip install npm", "npm.cmd test", "& 'D:\\npm\\x.exe' npm", "rustup component add rust-analyzer", "echo npm"]) {
+      expect(forPowerShell(c)).toBe(c);
+    }
+  });
+});
 
 describe("runPlan", () => {
   it("builds PowerShell commands with safe quoting", () => {

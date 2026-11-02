@@ -2767,7 +2767,7 @@ dependencies = [
 
 [[package]]
 name = "netrunner"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "adblock",
  "base64 0.22.1",
