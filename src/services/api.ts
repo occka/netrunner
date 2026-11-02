@@ -56,6 +56,7 @@ import type {
   ProcessList,
   Profile,
   ProfilesState,
+  HotkeyBinding,
   QuickAccessEntry,
   QuickAccessInput,
   SystemInfo,
@@ -132,11 +133,18 @@ export const api = {
     create: (input: QuickAccessInput) => call<QuickAccessEntry>("qa_create", { input }),
     update: (id: number, input: QuickAccessInput) => call<QuickAccessEntry>("qa_update", { id, input }),
     setFavorite: (id: number, favorite: boolean) => call<QuickAccessEntry>("qa_set_favorite", { id, favorite }),
+    setProfile: (id: number, profileId: number | null) => call<QuickAccessEntry>("qa_set_profile", { id, profileId }),
     reorder: (ids: number[]) => call<void>("qa_reorder", { ids }),
     remove: (id: number) => call<void>("qa_delete", { id }),
     launch: (id: number, confirmed = false) => call<QuickAccessEntry>("qa_launch", { id, confirmed }),
     reveal: (id: number) => call<void>("qa_reveal", { id }),
     assessCommand: (command: string) => call<CommandAssessment>("qa_assess_command", { command }),
+  },
+
+  hotkeys: {
+    list: () => call<HotkeyBinding[]>("hotkeys_list"),
+    set: (id: string, keys: string) => call<HotkeyBinding[]>("hotkey_set", { id, keys }),
+    reset: () => call<HotkeyBinding[]>("hotkeys_reset"),
   },
 
   activity: {

@@ -10,6 +10,7 @@ import { useShell } from "@/stores/shell";
 import { reportError } from "@/stores/notifications";
 import { DEFAULT_THEME, THEME_PRESETS, THEME_TOKENS, TOKEN_LABELS, type ThemeColors } from "@/styles/theme";
 import { EditorSettings } from "./EditorSettings";
+import { HotkeySettings } from "./HotkeySettings";
 
 const INTERVALS = [500, 1000, 1500, 3000, 5000];
 
@@ -325,31 +326,7 @@ export default function SettingsModule() {
 
         <UpdatesSection />
 
-        <section className="panel settings-group">
-          <header className="panel__header">
-            <h2 className="panel__title">Keyboard</h2>
-          </header>
-          <div className="panel__body">
-            <dl className="shortcuts">
-              <dt>
-                <kbd>Ctrl</kbd> <kbd>K</kbd>
-              </dt>
-              <dd>Search & command palette</dd>
-              <dt>
-                <kbd>Ctrl</kbd> <kbd>I</kbd>
-              </dt>
-              <dd>Toggle inspector</dd>
-              <dt>
-                <kbd>↑</kbd> <kbd>↓</kbd>
-              </dt>
-              <dd>Move between navigation items</dd>
-              <dt>
-                <kbd>Enter</kbd>
-              </dt>
-              <dd>Launch focused Quick Access entry</dd>
-            </dl>
-          </div>
-        </section>
+        <HotkeySettings />
       </div>
     </div>
   );

@@ -732,3 +732,20 @@
   gap: 1px;
   font-size: var(--fs-xs);
 }
+
+/* ---------- Hotkeys ---------- */
+.hotkey-rec {
+  min-width: 120px;
+  padding: 3px 10px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius);
+  background: var(--c-elevated);
+  color: var(--c-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.hotkey-rec--on {
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+}

@@ -36,24 +36,12 @@ fn bool_setting(app: &AppHandle, key: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
-/// Development builds run beside the installed app, so they take another
-/// overlay hotkey and a different tray name.
-pub const OVERLAY_HOTKEY_LABEL: &str = if cfg!(debug_assertions) { "Ctrl+Alt+Shift+O" } else { "Ctrl+Alt+O" };
+/// Development builds run beside the installed app, so the tray tells them apart.
 const TRAY_NAME: &str = if cfg!(debug_assertions) { "NETRUNNER DEV" } else { "NETRUNNER" };
-
-pub fn overlay_hotkey_modifiers() -> tauri_plugin_global_shortcut::Modifiers {
-    use tauri_plugin_global_shortcut::Modifiers;
-    if cfg!(debug_assertions) {
-        Modifiers::CONTROL | Modifiers::ALT | Modifiers::SHIFT
-    } else {
-        Modifiers::CONTROL | Modifiers::ALT
-    }
-}
 
 pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", format!("Open {TRAY_NAME}"), true, None::<&str>)?;
-    let overlays =
-        MenuItem::with_id(app, "overlays", format!("Toggle overlays   {OVERLAY_HOTKEY_LABEL}"), true, None::<&str>)?;
+    let overlays = MenuItem::with_id(app, "overlays", "Toggle overlays", true, None::<&str>)?;
     let unlock = MenuItem::with_id(app, "overlays-unlock", "Unlock click-through overlays", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", format!("Quit {TRAY_NAME}"), true, None::<&str>)?;

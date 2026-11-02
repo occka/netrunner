@@ -17,6 +17,7 @@ export const SETTINGS_SECTIONS = [
     title: "Code editor (DEVELOPER)",
     keywords: ["font", "tab size", "indent", "word wrap", "minimap", "auto save", "format on save", "whitespace", "editor"],
   },
+  { id: "keyboard", title: "Keyboard shortcuts", keywords: ["hotkey", "shortcut", "keys", "горячие клавиши", "conflict", "binding"] },
   { id: "startup", title: "Startup & tray", keywords: ["autostart", "windows startup", "tray", "background"] },
 ] as const;
 

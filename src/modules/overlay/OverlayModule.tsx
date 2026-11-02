@@ -83,7 +83,7 @@ export default function OverlayModule() {
   return (
     <div className="module">
       <ModuleHeader id="overlay">
-        <button className="btn" onClick={() => void api.overlays.toggleAll()} title="Same as Ctrl+Alt+O">
+        <button className="btn" onClick={() => void api.overlays.toggleAll()} title="Same as the overlay hotkey (Settings → Keyboard)">
           <Layers size={14} /> Hide / show all
         </button>
       </ModuleHeader>

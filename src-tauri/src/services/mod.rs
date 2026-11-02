@@ -8,6 +8,7 @@ pub mod artwork;
 pub mod automation;
 pub mod games;
 pub mod integrations;
+pub mod hotkeys;
 pub mod launcher;
 pub mod notes;
 pub mod overlays;

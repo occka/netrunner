@@ -20,6 +20,8 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (10, include_str!("../../migrations/0010_widget_studio.sql")),
     (11, include_str!("../../migrations/0011_game_playtime.sql")),
     (12, include_str!("../../migrations/0012_automation_chains.sql")),
+    (13, include_str!("../../migrations/0013_quick_access_profiles.sql")),
+    (14, include_str!("../../migrations/0014_quick_access_hotkey.sql")),
 ];
 
 pub const LATEST_VERSION: i64 = MIGRATIONS[MIGRATIONS.len() - 1].0;
@@ -48,6 +50,29 @@ pub fn apply(conn: &mut Connection) -> AppResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Entries from before 0.8 stay visible everywhere and have no key.
+    #[test]
+    fn quick_access_entries_survive_profile_and_hotkey_columns() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", true).unwrap();
+        for (version, sql) in MIGRATIONS.iter().filter(|(v, _)| *v <= 12) {
+            conn.execute_batch(sql).unwrap();
+            conn.pragma_update(None, "user_version", version).unwrap();
+        }
+        conn.execute("INSERT INTO quick_access (kind, name, target) VALUES ('app', 'Old', 'old.exe')", []).unwrap();
+        apply(&mut conn).unwrap();
+        let (name, profile, hotkey): (String, Option<i64>, String) =
+            conn.query_row("SELECT name, profile_id, hotkey FROM quick_access", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap();
+        assert_eq!((name.as_str(), profile, hotkey.as_str()), ("Old", None, ""));
+        // Deleting a profile keeps its entries, visible in every profile.
+        conn.execute("INSERT INTO profiles (name, kind, layout_json) VALUES ('Work', 'custom', '[]')", []).unwrap();
+        let id = conn.last_insert_rowid();
+        conn.execute("UPDATE quick_access SET profile_id = ?1", [id]).unwrap();
+        conn.execute("DELETE FROM profiles WHERE id = ?1", [id]).unwrap();
+        let profile: Option<i64> = conn.query_row("SELECT profile_id FROM quick_access", [], |r| r.get(0)).unwrap();
+        assert_eq!(profile, None);
+    }
 
     #[test]
     fn migrates_fresh_database_to_latest() {

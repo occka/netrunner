@@ -9,6 +9,7 @@ mod automation;
 mod browser;
 mod commands;
 mod dev;
+mod hotkeys;
 mod desktop;
 mod error;
 mod files;
@@ -24,7 +25,7 @@ mod storage;
 mod system;
 
 use tauri::Manager;
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::ShortcutState;
 
 use services::activity::{self, Level};
 use state::AppState;
@@ -61,8 +62,6 @@ fn data_dirs(app: &tauri::AppHandle) -> tauri::Result<(std::path::PathBuf, std::
 }
 
 pub fn run() {
-    let overlay_hotkey = Shortcut::new(Some(desktop::overlay_hotkey_modifiers()), Code::KeyO);
-
     let mut builder = tauri::Builder::default();
     // Must be first: a second launch focuses the running instance instead.
     // Development builds skip it, so they run beside the installed app.
@@ -88,9 +87,9 @@ pub fn run() {
         ))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(move |app, shortcut, event| {
-                    if shortcut == &overlay_hotkey && event.state() == ShortcutState::Pressed {
-                        overlay::toggle_all(app);
+                .with_handler(|app, shortcut, event| {
+                    if event.state() == ShortcutState::Pressed {
+                        hotkeys::pressed(app, shortcut.id());
                     }
                 })
                 .build(),
@@ -115,9 +114,9 @@ pub fn run() {
             desktop::apply_launch_mode(&handle);
             #[cfg(windows)]
             desktop::repair_autostart(&handle);
-            if let Err(err) = app.global_shortcut().register(overlay_hotkey) {
-                // Another app may own the combination; everything else still works.
-                log::warn!("overlay hotkey {} unavailable: {err}", desktop::OVERLAY_HOTKEY_LABEL);
+            app.manage(hotkeys::Hotkeys::default());
+            if let Err(err) = hotkeys::sync(&handle) {
+                log::warn!("global hotkeys unavailable: {err}");
             }
             overlay::restore_on_startup(&handle);
             alarm::start(&handle, alarm_dir);
@@ -154,7 +153,11 @@ pub fn run() {
             commands::quick_access::qa_create,
             commands::quick_access::qa_update,
             commands::quick_access::qa_set_favorite,
+            commands::quick_access::qa_set_profile,
             commands::quick_access::qa_reorder,
+            commands::hotkeys::hotkeys_list,
+            commands::hotkeys::hotkey_set,
+            commands::hotkeys::hotkeys_reset,
             commands::quick_access::qa_delete,
             commands::quick_access::qa_launch,
             commands::quick_access::qa_reveal,

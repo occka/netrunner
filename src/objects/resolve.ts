@@ -4,6 +4,7 @@
  * object representation.
  */
 import {
+  Layers,
   ExternalLink,
   FolderOpen,
   Pencil,
@@ -86,6 +87,14 @@ export function entryObject(entry: QuickAccessEntry): NrObject {
         icon: entry.favorite ? StarOff : Star,
         run: () => qa.toggleFavorite(entry),
       },
+      entry.profileId == null
+        ? {
+            id: "profile-only",
+            label: `Show only in ${useProfiles.getState().profiles.find((p) => p.id === useProfiles.getState().activeId)?.name ?? "this profile"}`,
+            icon: Layers,
+            run: () => qa.setProfile(entry, useProfiles.getState().activeId),
+          }
+        : { id: "profile-all", label: "Show in all profiles", icon: Layers, run: () => qa.setProfile(entry, null) },
       { id: "remove", label: "Remove", icon: Trash2, danger: true, run: () => qa.remove(entry) },
     ],
   };

@@ -7,7 +7,7 @@ An industrial-cyberpunk control environment for Windows: dashboard, universal la
 | Module | Status | What works |
 |---|---|---|
 | COMMAND | Implemented | 12-col drag/resize dashboard, EDIT LAYOUT with save/cancel, 16 live widgets (incl. Music Player, Image, Notes / To-do and Timer / Alarm: alarms with repeat days, snooze and your own sounds, countdowns, stopwatch; they ring from the tray too), per-widget settings (gear button → Inspector SETTINGS: e.g. clock 12/24 h, size, time zone, date format) |
-| QUICK ACCESS | Implemented | apps, games, files, folders, websites, CMD/PowerShell commands, projects |
+| QUICK ACCESS | Implemented | apps, games, files, folders, websites, CMD/PowerShell commands, projects. Entries per profile, global hotkey per entry |
 | SYSTEM | Implemented | hardware, network (connectivity, adapters, throughput, VPN-type adapter detection), processes (guarded termination), startup apps (toggle per-user entries), services (read-only), power plans; Audio tab: input and output devices with volume, mute and levels, default device, volume per app (Audio Mixer widget too) |
 | GAMES | Implemented | Steam, Epic, GOG and Prism Launcher (Minecraft instances) detection, plus your own games; playtime per game (today / week / month / all time, 7–90-day chart), banner view with Steam artwork, sort by playtime, last played or launcher |
 | AUTOMATION | Implemented | visual editor: one trigger → conditions → a chain of actions, with a dry run. Triggers: start, manual, app or game start/stop, profile change, time of day, every N minutes, new file in a folder, BROWSER download finished, network or VPN-type adapter up/down, AC/battery, power plan. Conditions: profile, time range, weekdays, app running or not, power source, VPN. Actions: launch program or entry, switch profile, notify, show/hide an overlay or an overlay set, set volume, power plan, open a page in BROWSER, wait |
@@ -44,7 +44,7 @@ cd src-tauri && cargo test && cargo clippy --all-targets
 
 ## Keyboard
 
-`Ctrl+K` palette · `Ctrl+I` inspector · `Ctrl+Alt+O` show/hide overlays (global) · DEVELOPER: `Ctrl+S` save file · `` Ctrl+` `` terminal · `Ctrl+P` go to file · `Ctrl+Shift+F` search in project · `F12` definition · `F2` rename · `Shift+Alt+F` format.
+`Ctrl+K` palette · `Ctrl+I` inspector · `Ctrl+Alt+O` show/hide overlays (global), all changeable in Settings → Keyboard · DEVELOPER: `Ctrl+S` save file · `` Ctrl+` `` terminal · `Ctrl+P` go to file · `Ctrl+Shift+F` search in project · `F12` definition · `F2` rename · `Shift+Alt+F` format.
 
 ## Documentation
 

@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { AlertTriangle, FolderSearch } from "lucide-react";
 import { Dialog } from "@/components/Dialog";
 import { api } from "@/services/api";
 import { emptyInput, useQuickAccess } from "@/stores/quickAccess";
 import { useShell } from "@/stores/shell";
+import { useProfiles } from "@/stores/profiles";
+import { HotkeyRecorder } from "@/components/HotkeyRecorder";
 import { notify } from "@/stores/notifications";
 import { ENTRY_KIND_META, ENTRY_KINDS, ICON_CHOICES } from "./entryMeta";
 import type { CommandAssessment, EntryKind, QuickAccessInput } from "@/types/entities";
@@ -27,9 +29,13 @@ export function EntryEditor() {
           category: existing.category,
           favorite: existing.favorite,
           requireConfirm: existing.requireConfirm,
+          profileId: existing.profileId,
+          hotkey: existing.hotkey,
         }
       : { ...emptyInput(editor.initial?.kind), ...editor.initial },
   );
+  const profiles = useProfiles((s) => s.profiles);
+  const setHotkey = useCallback((keys: string) => setForm((f) => ({ ...f, hotkey: keys })), []);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [assessment, setAssessment] = useState<CommandAssessment | null>(null);
@@ -271,6 +277,22 @@ export function EntryEditor() {
             ))}
           </select>
           <span className="field__hint">Executable icon extraction is planned (Phase 2).</span>
+        </div>
+        <div className="field">
+          <span className="label">Show in</span>
+          <select className="input" value={form.profileId ?? ""} onChange={(e) => set("profileId", e.target.value ? Number(e.target.value) : null)}>
+            <option value="">All profiles</option>
+            {profiles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} only
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <span className="label">Hotkey</span>
+          <HotkeyRecorder value={form.hotkey} onChange={setHotkey} />
+          <span className="field__hint">Works in any program. Commands still ask for confirmation.</span>
         </div>
         <div className="field">
           <span className="label">Options</span>

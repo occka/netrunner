@@ -1,11 +1,14 @@
 import { Plus } from "lucide-react";
-import { useQuickAccess } from "@/stores/quickAccess";
+import { inProfile, useQuickAccess } from "@/stores/quickAccess";
+import { useProfiles } from "@/stores/profiles";
 import { EntryTile } from "@/modules/quick-access/EntryTile";
 import type { WidgetProps } from "./registry";
 import type { ConfigOf, QUICK_ACCESS_SETTINGS } from "./settings";
 
 export default function QuickAccessWidget({ editing, config: c }: WidgetProps<ConfigOf<typeof QUICK_ACCESS_SETTINGS>>) {
-  const all = useQuickAccess((s) => s.entries);
+  const stored = useQuickAccess((s) => s.entries);
+  const activeProfile = useProfiles((s) => s.activeId);
+  const all = stored.filter((e) => inProfile(e, activeProfile));
   const entries =
     c.filter === "favorites"
       ? all.filter((e) => e.favorite)

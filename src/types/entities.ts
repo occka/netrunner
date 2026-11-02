@@ -16,6 +16,10 @@ export interface QuickAccessEntry {
   favorite: boolean;
   requireConfirm: boolean;
   sortOrder: number;
+  /** null: shown in every profile. */
+  profileId: number | null;
+  /** Global key, e.g. Ctrl+Alt+1; empty means none. */
+  hotkey: string;
   launchCount: number;
   lastLaunchedAt: string | null;
   createdAt: string;
@@ -33,6 +37,18 @@ export interface QuickAccessInput {
   category: string;
   favorite: boolean;
   requireConfirm: boolean;
+  profileId: number | null;
+  hotkey: string;
+}
+
+export interface HotkeyBinding {
+  id: string;
+  label: string;
+  keys: string;
+  default: string | null;
+  global: boolean;
+  entryId: number | null;
+  error: string | null;
 }
 
 export interface CommandAssessment {

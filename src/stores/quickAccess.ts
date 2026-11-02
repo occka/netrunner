@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { ApiError, api } from "@/services/api";
 import { refreshActivity } from "@/stores/activity";
+import { useHotkeys } from "@/stores/hotkeys";
 import { confirmAction } from "@/stores/confirm";
 import { notify, reportError } from "@/stores/notifications";
 import type { QuickAccessEntry, QuickAccessInput } from "@/types/entities";
@@ -15,11 +16,15 @@ interface QuickAccessStore {
   update: (id: number, input: QuickAccessInput) => Promise<QuickAccessEntry>;
   remove: (entry: QuickAccessEntry) => Promise<void>;
   toggleFavorite: (entry: QuickAccessEntry) => Promise<void>;
+  setProfile: (entry: QuickAccessEntry, profileId: number | null) => Promise<void>;
   launch: (entry: QuickAccessEntry) => Promise<void>;
   reveal: (entry: QuickAccessEntry) => Promise<void>;
   openEditor: (id: number | null, initial?: Partial<QuickAccessInput>) => void;
   closeEditor: () => void;
 }
+
+/** Entries without a profile show everywhere; the others only in their profile. */
+export const inProfile = (e: QuickAccessEntry, activeId: number | null) => e.profileId == null || e.profileId === activeId;
 
 function upsert(list: QuickAccessEntry[], entry: QuickAccessEntry) {
   return list.some((e) => e.id === entry.id) ? list.map((e) => (e.id === entry.id ? entry : e)) : [...list, entry];
@@ -35,12 +40,14 @@ export const useQuickAccess = create<QuickAccessStore>((set) => ({
   create: async (input) => {
     const entry = await api.quickAccess.create(input);
     set((s) => ({ entries: upsert(s.entries, entry) }));
+    void useHotkeys.getState().load();
     refreshActivity();
     return entry;
   },
   update: async (id, input) => {
     const entry = await api.quickAccess.update(id, input);
     set((s) => ({ entries: upsert(s.entries, entry) }));
+    void useHotkeys.getState().load();
     refreshActivity();
     return entry;
   },
@@ -67,6 +74,14 @@ export const useQuickAccess = create<QuickAccessStore>((set) => ({
       set((s) => ({ entries: upsert(s.entries, updated) }));
     } catch (err) {
       reportError("Could not update favorite", err);
+    }
+  },
+  setProfile: async (entry, profileId) => {
+    try {
+      const updated = await api.quickAccess.setProfile(entry.id, profileId);
+      set((s) => ({ entries: upsert(s.entries, updated) }));
+    } catch (err) {
+      reportError("Could not change the entry's profile", err);
     }
   },
   launch: async (entry) => {
@@ -124,4 +139,6 @@ export const emptyInput = (kind: QuickAccessInput["kind"] = "app"): QuickAccessI
   category: "",
   favorite: false,
   requireConfirm: kind === "command",
+  profileId: null,
+  hotkey: "",
 });
