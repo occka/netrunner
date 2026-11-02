@@ -3,6 +3,7 @@
  * calls `invoke` directly.
  */
 import { invoke, type Channel } from "@tauri-apps/api/core";
+import type { AudioDevices, AudioSession } from "@/types/audio";
 import type {
   BlameLine,
   GhChecks,
@@ -141,6 +142,16 @@ export const api = {
   activity: {
     list: (limit = 100) => call<ActivityEntry[]>("activity_list", { limit }),
     clear: () => call<void>("activity_clear"),
+  },
+
+  audio: {
+    devices: () => call<AudioDevices>("audio_devices"),
+    sessions: (device?: string) => call<AudioSession[]>("audio_sessions", { device }),
+    setVolume: (id: string, percent: number) => call<void>("audio_set_volume", { id, percent }),
+    setMute: (id: string, mute: boolean) => call<void>("audio_set_mute", { id, mute }),
+    setDefault: (id: string, name: string) => call<void>("audio_set_default", { id, name }),
+    sessionSet: (id: string, volume?: number, mute?: boolean) => call<void>("audio_session_set", { id, volume, mute }),
+    openSettings: () => call<void>("audio_open_settings"),
   },
 
   system: {

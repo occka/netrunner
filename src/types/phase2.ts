@@ -139,6 +139,8 @@ export type ActionKind =
   | "show_overlay_set"
   | "hide_overlay_set"
   | "set_volume"
+  | "set_output_device"
+  | "set_app_volume"
   | "power_plan"
   | "open_url"
   | "wait";

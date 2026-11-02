@@ -19,7 +19,7 @@ pub const TRIGGERS: &[&str] = &[
 pub const CONDITIONS: &[&str] = &["profile", "time_between", "weekday", "process_running", "process_not_running", "power_source", "vpn"];
 pub const ACTIONS: &[&str] = &[
     "launch_program", "launch_entry", "switch_profile", "notify", "show_overlay", "hide_overlay", "show_overlay_set",
-    "hide_overlay_set", "set_volume", "power_plan", "open_url", "wait",
+    "hide_overlay_set", "set_volume", "set_output_device", "set_app_volume", "power_plan", "open_url", "wait",
 ];
 const MAX_CONDITIONS: usize = 8;
 const MAX_ACTIONS: usize = 12;
@@ -199,6 +199,14 @@ fn action(a: &Action) -> AppResult<Action> {
         "notify" if v.is_empty() => return Err(AppError::Invalid("notification text is required".into())),
         "notify" => v.chars().take(300).collect(),
         "set_volume" => int_in(v, 0, 100, "volume")?,
+        "set_output_device" if v.is_empty() => return Err(AppError::Invalid("choose an output device".into())),
+        "set_app_volume" => {
+            args = a.args.trim().trim_end_matches(".exe").to_string();
+            if args.is_empty() {
+                return Err(AppError::Invalid("enter the app's process name".into()));
+            }
+            int_in(v, 0, 100, "volume")?
+        }
         "power_plan" if v.is_empty() => return Err(AppError::Invalid("choose a power plan".into())),
         "open_url" => crate::security::targets::validate_web_url(v)?,
         "wait" => int_in(v, 1, 600, "the wait in seconds")?,
@@ -368,6 +376,12 @@ mod tests {
         assert!(create(&conn, input("time", "25:00", vec![act("notify", "x")])).is_err());
         assert!(create(&conn, input("manual", "", vec![act("open_url", "javascript:alert(1)")])).is_err());
         assert!(create(&conn, input("manual", "", vec![act("set_volume", "150")])).is_err());
+        assert!(create(&conn, input("manual", "", vec![act("set_output_device", " ")])).is_err());
+        assert!(create(&conn, input("manual", "", vec![act("set_app_volume", "40")])).is_err());
+        let app = Action { kind: "set_app_volume".into(), value: "40".into(), args: "Spotify.exe".into() };
+        let saved = create(&conn, input("manual", "", vec![app])).unwrap();
+        assert_eq!((saved.actions[0].value.as_str(), saved.actions[0].args.as_str()), ("40", "Spotify"));
+        delete(&conn, saved.id).unwrap();
 
         let r = create(&conn, input("app_started", "Cyberpunk2077", vec![act("set_volume", "40"), act("wait", "3"), act("notify", "Gaming")])).unwrap();
         assert_eq!(r.trigger_value, "cyberpunk2077.exe");

@@ -9,6 +9,7 @@ export interface Choices {
   overlays: Option[];
   games: Option[];
   plans: Option[];
+  outputs: Option[];
   adapters: Option[];
 }
 
@@ -175,6 +176,18 @@ export function ValueInput(p: Props) {
         <span className="flow__unit flow__volume">
           <input type="range" min={0} max={100} step={5} value={Number(value) || 0} onChange={(e) => onChange(e.target.value)} />
           <span className="mono">{value}%</span>
+        </span>
+      );
+    case "action:set_output_device":
+      return <Pick value={value} options={c.outputs} onChange={onChange} />;
+    case "action:set_app_volume":
+      return (
+        <span className="flow__program">
+          <Text value={p.args ?? ""} placeholder="Process name, e.g. Spotify" onChange={(v) => onChange(value, v)} />
+          <span className="flow__unit flow__volume">
+            <input type="range" min={0} max={100} step={5} value={Number(value) || 0} onChange={(e) => onChange(e.target.value, p.args)} />
+            <span className="mono">{value}%</span>
+          </span>
         </span>
       );
     case "action:power_plan":

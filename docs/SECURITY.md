@@ -27,6 +27,7 @@
 | Git discard / push | Confirmation required (backend enforces `confirmed`); push explains it publishes commits |
 | Git amend / cherry-pick / stash drop | Confirmation required (backend enforces `confirmed`); amend warns when the commit is already on the remote. Revisions from the UI are checked so they can never be read as git options |
 | GitHub from DEVELOPER | Publish (shows whether the repository is public), Create pull request (pushes the branch) and comments need a confirmation and the backend's `confirmed` flag. Reading uses the stored token only; an existing `origin` is never replaced |
+| Sound | Volume, mute and per-app volume use documented Core Audio. **Changing the default device uses `IPolicyConfig`, an undocumented Windows interface** (no public API exists); a failure is reported and the Windows sound settings are offered instead. Automations can use both |
 | Git clone | https URLs only; target folder must not exist |
 | Terminals | Allowlisted shells only (PowerShell, pwsh, cmd, Git Bash); cwd must be inside a project |
 | Language servers | Only executables from the registry's known names (or a path the user picked) start, in the project folder, without a window. The UI may send only allow-listed LSP methods, for files inside open projects. Server edits to files that are not open are written only after confirmation; file create/rename/delete steps are skipped. **Install** types the official command into a visible terminal after confirmation; NETRUNNER never installs a server itself |

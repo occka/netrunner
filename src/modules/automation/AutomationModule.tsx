@@ -49,6 +49,8 @@ export const ACTIONS: Record<ActionKind, string> = {
   show_overlay_set: "Show overlay set",
   hide_overlay_set: "Hide overlay set",
   set_volume: "Set volume",
+  set_output_device: "Set output device",
+  set_app_volume: "Set app volume",
   power_plan: "Switch power plan",
   open_url: "Open page in BROWSER",
   wait: "Wait",
@@ -62,6 +64,7 @@ function useChoices(): Choices {
   const games = usePolled(() => api.games.scan());
   const power = usePolled(() => api.system.power());
   const network = usePolled(() => api.network.status());
+  const audio = usePolled(() => api.audio.devices());
   return useMemo(
     () => ({
       entries: entries.map((e) => ({ id: String(e.id), label: `${e.name} (${e.kind})` })),
@@ -75,9 +78,10 @@ function useChoices(): Choices {
         ...(games.data?.games ?? []).map((g) => ({ id: g.id, label: g.name })),
       ],
       plans: (power.data?.plans ?? []).map((p) => ({ id: p.guid, label: p.name })),
+      outputs: (audio.data?.outputs ?? []).map((d) => ({ id: d.name, label: d.name })),
       adapters: (network.data?.adapters ?? []).map((a) => ({ id: a.name, label: `${a.name}${a.vpnLike ? " (VPN-type)" : ""}` })),
     }),
-    [entries, profiles, overlays.data, games.data, power.data, network.data],
+    [entries, profiles, overlays.data, games.data, power.data, network.data, audio.data],
   );
 }
 
@@ -158,6 +162,10 @@ export function describeAction(a: RuleAction, c: Choices): string {
       return `${a.kind === "show_overlay_set" ? "Show" : "Hide"} overlays of ${a.value === "all" ? "every profile" : label(c.profiles, a.value)}`;
     case "set_volume":
       return `Volume ${a.value}%`;
+    case "set_output_device":
+      return `Output device "${a.value}"`;
+    case "set_app_volume":
+      return `${a.args || "App"} volume ${a.value}%`;
     case "power_plan":
       return `Power plan "${label(c.plans, a.value)}"`;
     case "open_url":
@@ -315,7 +323,7 @@ function defaultCondition(kind: ConditionKind, c: Choices): RuleCondition {
   return { kind, value };
 }
 function defaultAction(kind: ActionKind): RuleAction {
-  const value = kind === "set_volume" ? "50" : kind === "wait" ? "5" : kind === "show_overlay_set" || kind === "hide_overlay_set" ? "all" : "";
+  const value = kind === "set_volume" || kind === "set_app_volume" ? "50" : kind === "wait" ? "5" : kind === "show_overlay_set" || kind === "hide_overlay_set" ? "all" : "";
   return { kind, value, args: "" };
 }
 

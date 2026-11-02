@@ -65,14 +65,16 @@ pub fn session_name(display: &str, process: Option<&str>, system: bool) -> Strin
 }
 
 #[cfg(windows)]
+// IPolicyConfig keeps the COM method names.
+#[allow(non_snake_case)]
 mod win {
     use super::*;
     use windows::core::{interface, Interface, IUnknown, IUnknown_Vtbl, HRESULT, PCWSTR, PWSTR};
     use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
     use windows::Win32::Media::Audio::Endpoints::{IAudioEndpointVolume, IAudioMeterInformation};
     use windows::Win32::Media::Audio::{
-        eAll, eCapture, eCommunications, eConsole, eMultimedia, eRender, AudioSessionStateExpired, EDataFlow, IAudioSessionControl2, IAudioSessionManager2, IMMDevice,
-        IMMDeviceEnumerator, IMMEndpoint, ISimpleAudioVolume, MMDeviceEnumerator, DEVICE_STATE_ACTIVE, ERole,
+        eCapture, eCommunications, eConsole, eMultimedia, eRender, AudioSessionStateExpired, EDataFlow, IAudioSessionControl2, IAudioSessionManager2, IMMDevice,
+        IMMDeviceEnumerator, ISimpleAudioVolume, MMDeviceEnumerator, DEVICE_STATE_ACTIVE, ERole,
     };
     use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoTaskMemFree, CLSCTX_ALL, COINIT_MULTITHREADED, STGM_READ};
 
@@ -212,23 +214,26 @@ mod win {
         Ok(())
     }
 
-    /// Whether a device id is an output (render) or input endpoint.
-    pub fn is_output(id: &str) -> AppResult<bool> {
-        let d = device(id)?;
-        // SAFETY: querying the endpoint's data flow.
-        unsafe {
-            let ep: IMMEndpoint = d.cast().map_err(err("not an audio endpoint"))?;
-            let flow = ep.GetDataFlow().map_err(err("unknown data flow"))?;
-            Ok(flow == eRender || flow == eAll)
-        }
-    }
+    /// Process names by pid: the mixer polls several times a second.
+    static NAMES: std::sync::Mutex<Option<std::collections::HashMap<u32, String>>> = std::sync::Mutex::new(None);
 
     fn process_name(pid: u32) -> Option<String> {
         use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
+        let mut cache = NAMES.lock().ok()?;
+        let cache = cache.get_or_insert_with(Default::default);
+        if let Some(n) = cache.get(&pid) {
+            return Some(n.clone());
+        }
         let mut sys = System::new();
-        let pid = Pid::from_u32(pid);
-        sys.refresh_processes_specifics(ProcessesToUpdate::Some(&[pid]), true, ProcessRefreshKind::nothing());
-        sys.process(pid).map(|p| p.name().to_string_lossy().into_owned())
+        let p = Pid::from_u32(pid);
+        sys.refresh_processes_specifics(ProcessesToUpdate::Some(&[p]), true, ProcessRefreshKind::nothing());
+        let name = sys.process(p).map(|x| x.name().to_string_lossy().into_owned())?;
+        // Pids get reused: forget everything now and then.
+        if cache.len() > 256 {
+            cache.clear();
+        }
+        cache.insert(pid, name.clone());
+        Some(name)
     }
 
     fn for_sessions(device_id: Option<&str>, mut f: impl FnMut(&IAudioSessionControl2, &ISimpleAudioVolume) -> bool) -> AppResult<()> {
@@ -281,7 +286,7 @@ mod win {
             }
             true
         })?;
-        out.sort_by(|a, b| b.system.cmp(&a.system).reverse().then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
+        out.sort_by(|a, b| a.system.cmp(&b.system).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
         Ok(out)
     }
 
@@ -322,7 +327,7 @@ pub enum SessionTarget {
 }
 
 #[cfg(windows)]
-pub use win::{devices, is_output, sessions, set_default, set_device_mute, set_device_volume, set_session};
+pub use win::{devices, sessions, set_default, set_device_mute, set_device_volume, set_session};
 
 /// Sets the default playback device's master volume, 0–100 %.
 #[cfg(windows)]
@@ -378,7 +383,6 @@ mod tests {
         if let Some(d) = all.outputs.iter().find(|d| d.is_default) {
             set_device_volume(Some(&d.id), d.volume).unwrap();
             set_device_mute(&d.id, d.muted).unwrap();
-            assert!(is_output(&d.id).unwrap());
             // Setting the current default again changes nothing.
             set_default(&d.id).unwrap();
             let after = devices().unwrap();
