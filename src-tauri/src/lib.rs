@@ -9,6 +9,7 @@ mod automation;
 mod browser;
 mod commands;
 mod dev;
+mod hotkeys;
 mod desktop;
 mod error;
 mod files;
@@ -24,7 +25,7 @@ mod storage;
 mod system;
 
 use tauri::Manager;
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::ShortcutState;
 
 use services::activity::{self, Level};
 use state::AppState;
@@ -61,11 +62,13 @@ fn data_dirs(app: &tauri::AppHandle) -> tauri::Result<(std::path::PathBuf, std::
 }
 
 pub fn run() {
-    let overlay_hotkey = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyO);
-
-    tauri::Builder::default()
-        // Must be first: a second launch focuses the running instance instead.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| desktop::show_main(app)))
+    let mut builder = tauri::Builder::default();
+    // Must be first: a second launch focuses the running instance instead.
+    // Development builds skip it, so they run beside the installed app.
+    if !cfg!(debug_assertions) {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| desktop::show_main(app)));
+    }
+    builder
         .plugin(
             tauri_plugin_log::Builder::new()
                 .clear_targets()
@@ -84,9 +87,9 @@ pub fn run() {
         ))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(move |app, shortcut, event| {
-                    if shortcut == &overlay_hotkey && event.state() == ShortcutState::Pressed {
-                        overlay::toggle_all(app);
+                .with_handler(|app, shortcut, event| {
+                    if event.state() == ShortcutState::Pressed {
+                        hotkeys::pressed(app, shortcut.id());
                     }
                 })
                 .build(),
@@ -104,15 +107,17 @@ pub fn run() {
             let alarm_dir = data_dir.clone();
             app.manage(AppState::new(db, data_dir));
             app.manage(dev::terminal::Terminals::default());
+            app.manage(std::sync::Arc::new(dev::lsp::bridge::Lsp::default()));
+            app.manage(std::sync::Arc::new(dev::dap::Dap::default()));
 
             let handle = app.handle().clone();
             desktop::build_tray(&handle)?;
             desktop::apply_launch_mode(&handle);
             #[cfg(windows)]
             desktop::repair_autostart(&handle);
-            if let Err(err) = app.global_shortcut().register(overlay_hotkey) {
-                // Another app may own the combination; everything else still works.
-                log::warn!("overlay hotkey Ctrl+Alt+O unavailable: {err}");
+            app.manage(hotkeys::Hotkeys::default());
+            if let Err(err) = hotkeys::sync(&handle) {
+                log::warn!("global hotkeys unavailable: {err}");
             }
             overlay::restore_on_startup(&handle);
             alarm::start(&handle, alarm_dir);
@@ -149,7 +154,11 @@ pub fn run() {
             commands::quick_access::qa_create,
             commands::quick_access::qa_update,
             commands::quick_access::qa_set_favorite,
+            commands::quick_access::qa_set_profile,
             commands::quick_access::qa_reorder,
+            commands::hotkeys::hotkeys_list,
+            commands::hotkeys::hotkey_set,
+            commands::hotkeys::hotkeys_reset,
             commands::quick_access::qa_delete,
             commands::quick_access::qa_launch,
             commands::quick_access::qa_reveal,
@@ -166,6 +175,14 @@ pub fn run() {
             commands::system::system_power,
             commands::system::system_power_set_plan,
             commands::system::network_status,
+            commands::system::sensors_status,
+            commands::system::audio_devices,
+            commands::system::audio_sessions,
+            commands::system::audio_set_volume,
+            commands::system::audio_set_mute,
+            commands::system::audio_set_default,
+            commands::system::audio_session_set,
+            commands::system::audio_open_settings,
             commands::library::games_scan,
             commands::library::games_launch,
             commands::library::games_reveal,
@@ -230,6 +247,9 @@ pub fn run() {
             commands::dev::dev_delete,
             commands::dev::dev_reveal,
             commands::dev::dev_toolchains,
+            commands::dev::dev_files,
+            commands::dev::dev_search,
+            commands::dev::dev_replace,
             commands::dev::term_shells,
             commands::dev::term_spawn,
             commands::dev::term_write,
@@ -241,6 +261,18 @@ pub fn run() {
             commands::dev::git_unstage,
             commands::dev::git_discard,
             commands::dev::git_commit,
+            commands::dev::git_baseline,
+            commands::dev::git_stage_text,
+            commands::dev::git_blame,
+            commands::dev::git_stash_list,
+            commands::dev::git_stash_save,
+            commands::dev::git_stash_action,
+            commands::dev::git_amend,
+            commands::dev::git_head_pushed,
+            commands::dev::git_graph,
+            commands::dev::git_compare,
+            commands::dev::git_file_at,
+            commands::dev::git_cherry_pick,
             commands::dev::git_log,
             commands::dev::git_branches,
             commands::dev::git_checkout,
@@ -249,6 +281,32 @@ pub fn run() {
             commands::dev::git_push,
             commands::dev::git_init,
             commands::dev::git_clone,
+            commands::dap::dap_adapters,
+            commands::dap::dap_start,
+            commands::dap::dap_request,
+            commands::dap::dap_stop,
+            commands::lsp::lsp_subscribe,
+            commands::lsp::lsp_servers,
+            commands::lsp::lsp_running,
+            commands::lsp::lsp_open,
+            commands::lsp::lsp_change,
+            commands::lsp::lsp_save,
+            commands::lsp::lsp_close,
+            commands::lsp::lsp_request,
+            commands::lsp::lsp_restart,
+            commands::lsp::lsp_configure,
+            commands::github_link::gh_origin,
+            commands::github_link::gh_publish,
+            commands::github_link::gh_commits_since,
+            commands::github_link::gh_create_pr,
+            commands::github_link::gh_pr,
+            commands::github_link::gh_pr_files,
+            commands::github_link::gh_comments,
+            commands::github_link::gh_add_comment,
+            commands::github_link::gh_checkout_pr,
+            commands::github_link::gh_checks,
+            commands::github_link::gh_issue_branch,
+            commands::github_link::gh_file_url,
             commands::dev::github_status,
             commands::dev::github_connect,
             commands::dev::github_disconnect,
@@ -313,6 +371,17 @@ pub fn run() {
             commands::system::media_status,
             commands::system::media_control,
         ]))
-        .run(tauri::generate_context!())
-        .expect("error while running NETRUNNER");
+        .build(tauri::generate_context!())
+        .expect("error while building NETRUNNER")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                // Language servers get a polite shutdown instead of a broken pipe.
+                if let Some(lsp) = app.try_state::<std::sync::Arc<dev::lsp::bridge::Lsp>>() {
+                    lsp.stop_all();
+                }
+                if let Some(dap) = app.try_state::<std::sync::Arc<dev::dap::Dap>>() {
+                    dap.stop();
+                }
+            }
+        });
 }

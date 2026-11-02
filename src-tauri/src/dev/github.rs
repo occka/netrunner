@@ -104,17 +104,30 @@ fn client() -> AppResult<reqwest::Client> {
 }
 
 async fn get<T: for<'de> Deserialize<'de>>(token: &str, path: &str) -> AppResult<T> {
-    let resp = client()?
-        .get(format!("{API}{path}"))
+    send(reqwest::Method::GET, token, path, None).await
+}
+
+/// One GitHub REST call. 403 explains which token permissions are needed.
+pub(crate) async fn send<T: for<'de> Deserialize<'de>>(method: reqwest::Method, token: &str, path: &str, body: Option<&serde_json::Value>) -> AppResult<T> {
+    let mut req = client()?
+        .request(method, format!("{API}{path}"))
         .bearer_auth(token)
         .header("Accept", "application/vnd.github+json")
-        .header("X-GitHub-Api-Version", "2022-11-28")
-        .send()
-        .await
-        .map_err(|e| AppError::Launch(format!("GitHub request failed: {e}")))?;
+        .header("X-GitHub-Api-Version", "2022-11-28");
+    if let Some(b) = body {
+        req = req.json(b);
+    }
+    let resp = req.send().await.map_err(|e| AppError::Launch(format!("GitHub request failed: {e}")))?;
     let status = resp.status();
     if status == reqwest::StatusCode::UNAUTHORIZED {
         return Err(AppError::Invalid("GitHub rejected the token (expired or revoked)".into()));
+    }
+    if status == reqwest::StatusCode::FORBIDDEN {
+        let body = resp.text().await.unwrap_or_default();
+        let msg = serde_json::from_str::<serde_json::Value>(&body).ok().and_then(|v| v.get("message").and_then(|m| m.as_str()).map(str::to_string)).unwrap_or_default();
+        return Err(AppError::Launch(format!(
+            "GitHub refused ({status}): {msg}. The token may lack a permission: Contents, Pull requests and Issues (read and write), Checks and Metadata (read). Reconnect GitHub with a token that has them."
+        )));
     }
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
@@ -127,11 +140,11 @@ async fn get<T: for<'de> Deserialize<'de>>(token: &str, path: &str) -> AppResult
     resp.json::<T>().await.map_err(|e| AppError::Internal(format!("unexpected GitHub response: {e}")))
 }
 
-fn require_token() -> AppResult<String> {
+pub(crate) fn require_token() -> AppResult<String> {
     token()?.ok_or_else(|| AppError::Invalid("GitHub is not connected".into()))
 }
 
-fn valid_slug(s: &str) -> bool {
+pub(crate) fn valid_slug(s: &str) -> bool {
     !s.is_empty() && s.len() <= 100 && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')) && s != ".."
 }
 

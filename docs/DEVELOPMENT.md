@@ -25,6 +25,8 @@ cd src-tauri && cargo test && cargo clippy --all-targets
 
 Rust tests include `system::smoke` and `dev::smoke`, which call real Windows APIs and the git CLI on your machine. If `npm run app:dev` is running, give `cargo test` its own target dir (`$env:CARGO_TARGET_DIR="target\test"`) so it does not fight the dev build over file locks.
 
+Development builds run beside the installed NETRUNNER: they skip the single-instance lock, keep their data in `<appdata>\com.netrunner.app\dev\` (or `NETRUNNER_DATA_DIR`), show "NETRUNNER DEV" in the tray and toggle overlays with `Ctrl+Alt+Shift+O`.
+
 Development builds (`npm run app:dev`) never run automations, so rebuilding does not launch your real programs. Set `NETRUNNER_DEV_AUTOMATION=1` before starting the dev build to test the engine.
 
 ## Adding an automation trigger or action
@@ -32,6 +34,14 @@ Development builds (`npm run app:dev`) never run automations, so rebuilding does
 1. Add the kind to `TRIGGERS` / `CONDITIONS` / `ACTIONS` in `services/automation.rs` and its value check to `trigger_value` / `condition` / `action` there (no migration needed). Matching (`trigger_matches`) and conditions (`condition_met`) are pure: add a test.
 2. Fire triggers with `automation::fire(app, kind, value)` from wherever the event originates (or add it to `start_event_watcher`); implement actions in `automation::execute` and describe them in `dry_run`.
 3. Add the label in `modules/automation/AutomationModule.tsx` (and `describe…`) and its value field in `ValueInput.tsx`.
+
+## Adding a language server
+
+Add a `Spec` to `SPECS` in `dev/lsp/registry.rs`: executable names, arguments, the extension → LSP language id map, the version flag (or `None` if the binary starts serving instead) and the official install command (typed into a visible terminal, never run hidden). Extensions must stay unique (a test checks). No frontend change is needed. `cargo test lsp` runs the bridge against an in-process fake server; set `NETRUNNER_LSP_SMOKE_DIR` to a folder with `npm i typescript@5 typescript-language-server` to run the real-server smoke test.
+
+## Adding a debug adapter
+
+Add it to `adapters` and `Dap::start` in `dev/dap.rs` (stdio with `spawn_stdio`, a local port with `spawn_tcp`), then to `autoDebugConfig` in `modules/developer/debug/configs.ts` with the launch settings it expects. `cargo test dap` runs the session state machine against a fake adapter.
 
 ## Adding a game source
 

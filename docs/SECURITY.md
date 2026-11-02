@@ -23,9 +23,17 @@
 | Process termination | UI confirmation plus backend `confirmed` flag; protected system processes and NETRUNNER itself are refused |
 | Startup entries | Only per-user entries can be toggled (Explorer's reversible StartupApproved flag; nothing is deleted) |
 | Project files | Canonicalised paths must stay inside opened project roots; `..` rejected; `.git` read-only; deletes go to the Recycle Bin |
+| Replace in files | Confirmation listing the files; only files inside open projects; refused while an affected tab has unsaved changes |
 | Git discard / push | Confirmation required (backend enforces `confirmed`); push explains it publishes commits |
+| Git amend / cherry-pick / stash drop | Confirmation required (backend enforces `confirmed`); amend warns when the commit is already on the remote. Revisions from the UI are checked so they can never be read as git options |
+| GitHub from DEVELOPER | Publish (shows whether the repository is public), Create pull request (pushes the branch) and comments need a confirmation and the backend's `confirmed` flag. Reading uses the stored token only; an existing `origin` is never replaced |
+| Hotkeys | An entry's global key launches through the same `launcher` path and policy as a click: a flagged command never runs without confirmation in the main window |
+| Debugger | Only the known adapters start, on an open project, when the user asks; the program runs with the user's rights, like Run. TCP adapters listen on 127.0.0.1 only. The UI can send only allow-listed debug requests. **Install** types the official command into a visible terminal |
+| HWiNFO sensors | Off by default. Read-only view of HWiNFO's shared memory, treated as untrusted input: a damaged block gives "unavailable", never a crash |
+| Sound | Volume, mute and per-app volume use documented Core Audio. **Changing the default device uses `IPolicyConfig`, an undocumented Windows interface** (no public API exists); a failure is reported and the Windows sound settings are offered instead. Automations can use both |
 | Git clone | https URLs only; target folder must not exist |
 | Terminals | Allowlisted shells only (PowerShell, pwsh, cmd, Git Bash); cwd must be inside a project |
+| Language servers | Only executables from the registry's known names (or a path the user picked) start, in the project folder, without a window. The UI may send only allow-listed LSP methods, for files inside open projects. Server edits to files that are not open are written only after confirmation; file create/rename/delete steps are skipped. **Install** types the official command into a visible terminal after confirmation; NETRUNNER never installs a server itself |
 
 The command policy is a safety net, not a sandbox: a confirmed command runs with your rights.
 

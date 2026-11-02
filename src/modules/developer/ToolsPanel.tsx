@@ -65,8 +65,7 @@ export function ToolsPanel() {
         </div>
       ))}
       <p className="muted tools__note">
-        NETRUNNER uses your installed toolchains and does not ship compilers. Language servers (LSP) and a debugger (DAP)
-        are planned; Monaco provides syntax highlighting for all listed languages today.
+        NETRUNNER uses your installed toolchains and does not ship compilers.
       </p>
     </div>
   );

@@ -266,6 +266,8 @@ mod tests {
             favorite: false,
             require_confirm: false,
             sort_order: 0,
+            profile_id: None,
+            hotkey: String::new(),
             launch_count: 0,
             last_launched_at: None,
             created_at: String::new(),

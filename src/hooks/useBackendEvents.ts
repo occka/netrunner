@@ -16,9 +16,10 @@ export function useBackendEvents() {
       listen<{ rule: string; entryId: number }>("automation://confirm", async (e) => {
         const entry = useQuickAccess.getState().entries.find((x) => x.id === e.payload.entryId);
         if (!entry) return;
+        const byKey = e.payload.rule.startsWith("Hotkey ");
         const ok = await confirmAction({
-          title: "Automation wants to run a command",
-          message: `Rule "${e.payload.rule}" wants to run "${entry.name}".`,
+          title: byKey ? "Run this command?" : "Automation wants to run a command",
+          message: byKey ? `${e.payload.rule} runs "${entry.name}".` : `Rule "${e.payload.rule}" wants to run "${entry.name}".`,
           detail: entry.target,
           confirmLabel: "Run command",
           danger: true,

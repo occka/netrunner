@@ -221,6 +221,12 @@ fn execute(app: &AppHandle, rule: &Rule, action: &Action, depth: u8) -> Result<S
             crate::system::audio::set_master_volume(v)?;
             Ok(format!("volume {v}%"))
         }
+        "set_output_device" => Ok(format!("output device '{}'", crate::system::audio::set_output_by_name(&action.value)?)),
+        "set_app_volume" => {
+            let v: u8 = action.value.parse().map_err(|_| AppError::Invalid("invalid volume".into()))?;
+            let n = crate::system::audio::set_session(&crate::system::audio::SessionTarget::Process(action.args.clone()), Some(v), None)?;
+            Ok(if n == 0 { format!("{} is not playing sound; volume unchanged", action.args) } else { format!("{} volume {v}%", action.args) })
+        }
         "power_plan" => Ok(format!("power plan '{}'", crate::system::power::set_active(&action.value)?)),
         "open_url" => {
             crate::desktop::open_in_browser(app, &action.value)?;
@@ -306,6 +312,15 @@ pub fn dry_run(app: &AppHandle, input: RuleInput) -> AppResult<DryRun> {
                     format!("{} {n} overlay(s)", if a.kind == "show_overlay_set" { "show" } else { "hide" })
                 }
                 "set_volume" => format!("set the volume to {}%", a.value),
+                "set_output_device" => {
+                    let names = crate::system::audio::devices().map(|d| d.outputs).unwrap_or_default();
+                    let needle = a.value.to_lowercase();
+                    match names.iter().find(|d| d.name.to_lowercase().contains(&needle)) {
+                        Some(d) => format!("make '{}' the default output", d.name),
+                        None => format!("✗ no output device matches '{}' now", a.value),
+                    }
+                }
+                "set_app_volume" => format!("set {} to {}% (if it is playing sound)", a.args, a.value),
                 "power_plan" => match crate::system::power::info().plans.into_iter().find(|p| p.guid.eq_ignore_ascii_case(&a.value)) {
                     Some(p) => format!("switch power plan to '{}'", p.name),
                     None => "✗ the power plan no longer exists".into(),

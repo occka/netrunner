@@ -1,4 +1,6 @@
 import { Suspense, useEffect } from "react";
+import { keysOf, useHotkeys } from "@/stores/hotkeys";
+import { matchesCombo } from "@/utils/hotkeys";
 import { MODULE_BY_ID, moduleComponent } from "@/app/modules";
 import { useShell } from "@/stores/shell";
 import { useSettings } from "@/stores/settings";
@@ -58,15 +60,15 @@ export function AppShell() {
 
 function useGlobalHotkeys() {
   useEffect(() => {
+    void useHotkeys.getState().load().catch(() => undefined);
     const onKey = (e: KeyboardEvent) => {
-      if (!e.ctrlKey || e.altKey) return;
-      const key = e.key.toLowerCase();
-      if (key === "k" || (key === "p" && e.shiftKey)) {
+      const { bindings } = useHotkeys.getState();
+      if (matchesCombo(e, keysOf(bindings, "palette", "Ctrl+K")) || matchesCombo(e, "Ctrl+Shift+P")) {
         e.preventDefault();
         const shell = useShell.getState();
         if (shell.paletteOpen) shell.closePalette();
         else shell.openPalette();
-      } else if (key === "i" && !e.shiftKey) {
+      } else if (matchesCombo(e, keysOf(bindings, "inspector", "Ctrl+I"))) {
         e.preventDefault();
         const visible = useSettings.getState().values["inspector.visible"];
         useSettings

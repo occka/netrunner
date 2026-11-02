@@ -107,6 +107,7 @@ pub fn create(conn: &Connection, widget_type: &str, profile_id: Option<i64>) -> 
         "neural" => (420, 600),
         "quick-access" | "activity" | "tasks" | "notes" => (360, 420),
         "music" => (380, 170),
+        "audio-mixer" => (340, 320),
         "alarm" => (340, 400),
         _ => (340, 260),
     };

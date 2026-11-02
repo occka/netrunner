@@ -239,6 +239,11 @@ export const NETWORK_SETTINGS = defineSettings([
   { key: "connectivity", kind: "toggle", label: "Connectivity and VPN line", default: true },
 ]);
 
+export const AUDIO_SETTINGS = defineSettings([
+  { key: "apps", kind: "range", label: "Apps listed", min: 0, max: 12, step: 1, default: 5 },
+  { key: "meters", kind: "toggle", label: "Level meters", default: true },
+]);
+
 export const TASKS_SETTINGS = defineSettings([
   { key: "count", kind: "range", label: "Processes shown", min: 3, max: 30, step: 1, default: 12 },
   { key: "sort", kind: "select", label: "Sort by", options: [

@@ -14,7 +14,9 @@ export default function SystemOverviewWidget({ config: c }: WidgetProps<ConfigOf
   // Prefer the Windows system volume; fall back to the first fixed disk.
   const sysDisk = disks.find((d) => d.mountPoint.toUpperCase().startsWith("C:")) ?? disks.find((d) => !d.removable);
   const diskPct = sysDisk && sysDisk.totalBytes ? ((sysDisk.totalBytes - sysDisk.availableBytes) / sysDisk.totalBytes) * 100 : null;
-  const cpuTemp = temperatures.find((t) => /cpu|package|core|tz/i.test(t.label));
+  const hw = snapshot.sensors;
+  const cpuCelsius = hw?.cpu ?? temperatures.find((t) => /cpu|package|core|tz/i.test(t.label))?.celsius;
+  const fans = hw?.fans ?? [];
 
   return (
     <div className="overview">
@@ -54,8 +56,8 @@ export default function SystemOverviewWidget({ config: c }: WidgetProps<ConfigOf
         {c.sensors && (
           <MetricRow
             label="CPU temp"
-            value={cpuTemp ? `${cpuTemp.celsius.toFixed(0)} °C` : undefined}
-            unavailable={cpuTemp ? undefined : "Windows does not expose a CPU sensor to standard-user apps"}
+            value={cpuCelsius != null ? `${cpuCelsius.toFixed(0)} °C` : undefined}
+            unavailable={cpuCelsius != null ? undefined : "Windows does not expose a CPU sensor to standard-user apps; HWiNFO can (Settings → System monitoring)"}
           />
         )}
         {snapshot.gpu?.usagePercent != null ? (
@@ -70,8 +72,20 @@ export default function SystemOverviewWidget({ config: c }: WidgetProps<ConfigOf
             unavailable={snapshot.gpu ? undefined : "Windows GPU counters unavailable"}
           />
         )}
-        {c.sensors && <MetricRow label="GPU temp" unavailable="Not exposed by Windows performance counters" />}
-        {c.sensors && <MetricRow label="Fans" unavailable="Windows has no standard fan interface for applications" />}
+        {c.sensors && (
+          <MetricRow
+            label="GPU temp"
+            value={hw?.gpu != null ? `${hw.gpu.toFixed(0)} °C` : undefined}
+            unavailable={hw?.gpu != null ? undefined : "Not exposed by Windows performance counters; HWiNFO can (Settings → System monitoring)"}
+          />
+        )}
+        {c.sensors && (
+          <MetricRow
+            label="Fans"
+            value={fans.length ? fans.slice(0, 2).map((f) => `${f.rpm.toFixed(0)} RPM`).join(" · ") : undefined}
+            unavailable={fans.length ? undefined : "Windows has no standard fan interface for applications; HWiNFO can (Settings → System monitoring)"}
+          />
+        )}
         {!c.io ? null : snapshot.diskIo ? (
           <MetricRow
             label="Disk activity"

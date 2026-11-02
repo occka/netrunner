@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::error::{AppError, AppResult};
 use crate::security::command_policy::{self, CommandAssessment};
@@ -13,18 +13,28 @@ pub async fn qa_list(state: State<'_, AppState>) -> AppResult<Vec<Entry>> {
 }
 
 #[tauri::command]
-pub async fn qa_create(state: State<'_, AppState>, input: EntryInput) -> AppResult<Entry> {
-    let conn = state.db.conn()?;
-    let entry = quick_access::create(&conn, input)?;
-    activity::record(&conn, Level::Info, "quick-access", &format!("Added {} '{}'", entry.kind, entry.name));
+pub async fn qa_create(app: AppHandle, state: State<'_, AppState>, input: EntryInput) -> AppResult<Entry> {
+    let entry = {
+        let conn = state.db.conn()?;
+        let entry = quick_access::create(&conn, input)?;
+        activity::record(&conn, Level::Info, "quick-access", &format!("Added {} '{}'", entry.kind, entry.name));
+        entry
+    };
+    if !entry.hotkey.is_empty() {
+        crate::hotkeys::sync(&app)?;
+    }
     Ok(entry)
 }
 
 #[tauri::command]
-pub async fn qa_update(state: State<'_, AppState>, id: i64, input: EntryInput) -> AppResult<Entry> {
-    let conn = state.db.conn()?;
-    let entry = quick_access::update(&conn, id, input)?;
-    activity::record(&conn, Level::Info, "quick-access", &format!("Updated '{}'", entry.name));
+pub async fn qa_update(app: AppHandle, state: State<'_, AppState>, id: i64, input: EntryInput) -> AppResult<Entry> {
+    let entry = {
+        let conn = state.db.conn()?;
+        let entry = quick_access::update(&conn, id, input)?;
+        activity::record(&conn, Level::Info, "quick-access", &format!("Updated '{}'", entry.name));
+        entry
+    };
+    crate::hotkeys::sync(&app)?;
     Ok(entry)
 }
 
@@ -34,15 +44,26 @@ pub async fn qa_set_favorite(state: State<'_, AppState>, id: i64, favorite: bool
 }
 
 #[tauri::command]
+pub async fn qa_set_profile(state: State<'_, AppState>, id: i64, profile_id: Option<i64>) -> AppResult<Entry> {
+    quick_access::set_profile(&*state.db.conn()?, id, profile_id)
+}
+
+#[tauri::command]
 pub async fn qa_reorder(state: State<'_, AppState>, ids: Vec<i64>) -> AppResult<()> {
     quick_access::reorder(&*state.db.conn()?, &ids)
 }
 
 #[tauri::command]
-pub async fn qa_delete(state: State<'_, AppState>, id: i64) -> AppResult<()> {
-    let conn = state.db.conn()?;
-    let entry = quick_access::delete(&conn, id)?;
-    activity::record(&conn, Level::Info, "quick-access", &format!("Removed '{}'", entry.name));
+pub async fn qa_delete(app: AppHandle, state: State<'_, AppState>, id: i64) -> AppResult<()> {
+    let entry = {
+        let conn = state.db.conn()?;
+        let entry = quick_access::delete(&conn, id)?;
+        activity::record(&conn, Level::Info, "quick-access", &format!("Removed '{}'", entry.name));
+        entry
+    };
+    if !entry.hotkey.is_empty() {
+        crate::hotkeys::sync(&app)?;
+    }
     Ok(())
 }
 

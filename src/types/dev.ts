@@ -112,3 +112,191 @@ export interface GitHubIssue {
   updatedAt: string;
   draft: boolean | null;
 }
+
+// ---------- Language servers (LSP) ----------
+
+export type LspEvent =
+  | { type: "status"; server: string; spec: string; state: "starting" | "ready" | "crashed" | "stopped"; message: string | null }
+  | { type: "diagnostics"; server: string; uri: string; path: string | null; version: number | null; diagnostics: LspDiagnostic[] }
+  | { type: "log"; server: string; level: number; message: string }
+  | { type: "progress"; server: string; token: unknown; value: { kind?: string; title?: string; message?: string; percentage?: number } | null }
+  | { type: "applyEdit"; server: string; label: string | null; edit: LspWorkspaceEdit };
+
+export type LspOpened =
+  | { state: "ready"; server: string; spec: string; name: string; uri: string; languageId: string; capabilities: Record<string, unknown> }
+  | { state: "missing"; spec: string; name: string; server: string; install: string | null }
+  | { state: "disabled"; spec: string; name: string }
+  | { state: "failed"; spec: string; name: string; message: string }
+  | { state: "unsupported" };
+
+export interface LspServerStatus {
+  id: string;
+  name: string;
+  server: string;
+  extensions: string[];
+  found: boolean;
+  path: string | null;
+  version: string | null;
+  customPath: boolean;
+  disabled: boolean;
+  install: string | null;
+  docs: string;
+}
+
+export interface LspPosition {
+  line: number;
+  character: number;
+}
+export interface LspRange {
+  start: LspPosition;
+  end: LspPosition;
+}
+export interface LspDiagnostic {
+  range: LspRange;
+  severity?: number;
+  code?: string | number | { value: string | number };
+  source?: string;
+  message: string;
+  tags?: number[];
+}
+export interface LspTextEdit {
+  range: LspRange;
+  newText: string;
+}
+export interface LspWorkspaceEdit {
+  changes?: Record<string, LspTextEdit[]>;
+  documentChanges?: (
+    | { textDocument: { uri: string; version?: number | null }; edits: LspTextEdit[] }
+    | { kind: "create" | "rename" | "delete"; uri?: string; oldUri?: string; newUri?: string }
+  )[];
+}
+
+// ---------- Project search ----------
+
+export interface SearchQuery {
+  pattern: string;
+  regex: boolean;
+  caseSensitive: boolean;
+  wholeWord: boolean;
+  include: string;
+  exclude: string;
+}
+
+export interface SearchMatch {
+  line: number;
+  column: number;
+  length: number;
+  preview: string;
+  previewColumn: number;
+}
+
+export interface SearchResult {
+  files: { path: string; matches: SearchMatch[] }[];
+  total: number;
+  truncated: boolean;
+  searched: number;
+}
+
+// ---------- Git in the editor ----------
+
+export interface GitBaseline {
+  text: string | null;
+  tracked: boolean;
+}
+
+export interface BlameLine {
+  line: number;
+  hash: string;
+  author: string;
+  time: number;
+  summary: string;
+  committed: boolean;
+}
+
+export interface GitStash {
+  index: number;
+  name: string;
+  message: string;
+}
+
+export interface GraphRow {
+  graph: string;
+  hash: string | null;
+  refs: string;
+  subject: string;
+  author: string;
+  date: string;
+}
+
+export interface ChangedFile {
+  status: string;
+  path: string;
+}
+
+// ---------- DEVELOPER ↔ GITHUB ----------
+
+export interface GhOrigin {
+  owner: string;
+  repo: string;
+  branch: string | null;
+  head: string | null;
+}
+
+export interface GhCheck {
+  name: string;
+  status: string;
+  conclusion: string | null;
+  url: string | null;
+}
+
+export interface GhChecks {
+  state: "success" | "failure" | "pending" | "none";
+  checks: GhCheck[];
+}
+
+/** Raw GitHub API objects (snake_case, as GitHub sends them). */
+export interface GhPrDetail {
+  number: number;
+  title: string;
+  body: string | null;
+  state: string;
+  draft: boolean | null;
+  html_url: string;
+  head: { ref: string; sha: string };
+  base: { ref: string; sha: string };
+  user: { login: string };
+}
+
+export interface GhPrFile {
+  filename: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  previous_filename: string | null;
+}
+
+export interface GhComment {
+  id: number;
+  body: string;
+  user: { login: string };
+  created_at: string;
+  html_url: string;
+}
+
+// ---------- Debugger (DAP) ----------
+
+export type DapEvent =
+  | { type: "event"; event: string; body: any }
+  | { type: "failed"; message: string }
+  | { type: "closed" };
+
+export interface DebugAdapterStatus {
+  id: "debugpy" | "delve" | "codelldb";
+  name: string;
+  languages: string;
+  found: boolean;
+  path: string | null;
+  note: string | null;
+  install: string | null;
+  docs: string;
+}

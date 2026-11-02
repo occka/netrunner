@@ -4,7 +4,8 @@ use crate::error::{AppError, AppResult};
 use crate::services::activity::{self, Level};
 use crate::state::AppState;
 use crate::system::monitor::{ProcessInfo, Snapshot, SystemInfo};
-use crate::system::{network, power, services, startup};
+use crate::system::audio::{self, AudioDevices, Session, SessionTarget};
+use crate::system::{network, power, sensors, services, startup};
 
 #[tauri::command]
 pub async fn system_info(state: State<'_, AppState>) -> AppResult<SystemInfo> {
@@ -13,7 +14,18 @@ pub async fn system_info(state: State<'_, AppState>) -> AppResult<SystemInfo> {
 
 #[tauri::command]
 pub async fn system_snapshot(state: State<'_, AppState>) -> AppResult<Snapshot> {
-    state.with_monitor(|m| m.snapshot())
+    let mut snapshot = state.with_monitor(|m| m.snapshot())?;
+    let hwinfo = crate::services::settings::get(&*state.db.conn()?, sensors::SETTING_KEY)?.and_then(|v| v.as_bool()).unwrap_or(false);
+    if hwinfo {
+        snapshot.sensors = sensors::read().ok();
+    }
+    Ok(snapshot)
+}
+
+/// Whether HWiNFO's shared memory can be read now (for the setting's hint).
+#[tauri::command]
+pub async fn sensors_status() -> AppResult<sensors::Status> {
+    Ok(sensors::status())
 }
 
 #[derive(serde::Serialize)]
@@ -75,6 +87,49 @@ pub async fn system_power_set_plan(state: State<'_, AppState>, guid: String) -> 
     let name = power::set_active(&guid)?;
     activity::record(&*state.db.conn()?, Level::Info, "system", &format!("Switched power plan to '{name}'"));
     Ok(())
+}
+
+async fn blocking<T: Send + 'static>(f: impl FnOnce() -> AppResult<T> + Send + 'static) -> AppResult<T> {
+    tauri::async_runtime::spawn_blocking(f).await.map_err(|e| AppError::Internal(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn audio_devices() -> AppResult<AudioDevices> {
+    blocking(audio::devices).await
+}
+
+/// App sessions of a device (the default output when `device` is omitted).
+#[tauri::command]
+pub async fn audio_sessions(device: Option<String>) -> AppResult<Vec<Session>> {
+    blocking(move || audio::sessions(device.as_deref())).await
+}
+
+#[tauri::command]
+pub async fn audio_set_volume(id: String, percent: u8) -> AppResult<()> {
+    blocking(move || audio::set_device_volume(Some(&id), percent)).await
+}
+
+#[tauri::command]
+pub async fn audio_set_mute(id: String, mute: bool) -> AppResult<()> {
+    blocking(move || audio::set_device_mute(&id, mute)).await
+}
+
+/// Makes a device the default (undocumented Windows interface, see system/audio.rs).
+#[tauri::command]
+pub async fn audio_set_default(state: State<'_, AppState>, id: String, name: String) -> AppResult<()> {
+    blocking(move || audio::set_default(&id)).await?;
+    activity::record(&*state.db.conn()?, Level::Info, "system", &format!("Default sound device: {name}"));
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn audio_session_set(id: String, volume: Option<u8>, mute: Option<bool>) -> AppResult<()> {
+    blocking(move || audio::set_session(&SessionTarget::Id(id), volume, mute).map(|_| ())).await
+}
+
+#[tauri::command]
+pub async fn audio_open_settings() -> AppResult<()> {
+    crate::services::launcher::shell_open("ms-settings:sound", "", None)
 }
 
 #[tauri::command]

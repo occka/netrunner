@@ -1,6 +1,6 @@
 [package]
 name = "netrunner"
-version = "0.7.0"
+version = "0.8.0"
 description = "NETRUNNER — industrial control environment for Windows"
 edition = "2021"
 rust-version = "1.80"
@@ -43,6 +43,9 @@ feed-rs = "3"
 # Brave's content-blocking engine (EasyList / uBlock syntax). Without the
 # default `single-thread` feature the engine is Send + Sync.
 adblock = { version = "0.13", default-features = false, features = ["embedded-domain-resolver", "full-regex-handling"] }
+# DEVELOPER project search: .gitignore-aware walking and regex matching.
+ignore = "0.4"
+regex = "1"
 
 # NETRUNNER targets Windows only; these back the native integrations.
 [target.'cfg(windows)'.dependencies]
@@ -52,6 +55,9 @@ keyring = { version = "3", features = ["windows-native"] }
 webview2-com = "0.39"
 windows = { version = "0.62", features = [
   "Foundation",
+  "Win32_Devices_FunctionDiscovery",
+  "Win32_Foundation",
+  "Win32_UI_Shell_PropertiesSystem",
   "Media_Control",
   "Storage_Streams",
   "Win32_Media_Audio",
@@ -62,6 +68,8 @@ windows = { version = "0.62", features = [
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
 ] }
+# The `#[interface]` macro (IPolicyConfig) expands to `windows_core` paths.
+windows-core = "0.62"
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
@@ -70,6 +78,7 @@ windows-sys = { version = "0.59", features = [
   "Win32_Networking_WinSock",
   "Win32_Security",
   "Win32_System_Com",
+  "Win32_System_Memory",
   "Win32_System_Performance",
   "Win32_System_Power",
   "Win32_System_Registry",

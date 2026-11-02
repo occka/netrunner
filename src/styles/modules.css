@@ -668,3 +668,84 @@
   align-items: center;
   font-size: var(--fs-xs);
 }
+
+/* ---------- Audio ---------- */
+.audio__top {
+  display: flex;
+  justify-content: flex-end;
+}
+.audio-list {
+  display: grid;
+  gap: 10px;
+}
+.audio-row {
+  display: grid;
+  gap: 2px;
+}
+.audio-row__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+}
+.audio-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.audio-control__track {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.audio-control__track input[type="range"] {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--c-primary);
+}
+.audio-control__meter {
+  height: 3px;
+  background: var(--c-line-soft);
+  overflow: hidden;
+}
+.audio-control__meter span {
+  display: block;
+  height: 100%;
+  background: var(--c-success);
+}
+.audio-control__value {
+  width: 26px;
+  text-align: right;
+  font-size: var(--fs-xs);
+}
+.audio-mixer {
+  display: grid;
+  gap: 6px;
+  font-size: var(--fs-sm);
+}
+.audio-mixer__app {
+  display: grid;
+  gap: 1px;
+  font-size: var(--fs-xs);
+}
+
+/* ---------- Hotkeys ---------- */
+.hotkey-rec {
+  min-width: 120px;
+  padding: 3px 10px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius);
+  background: var(--c-elevated);
+  color: var(--c-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.hotkey-rec--on {
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+}

@@ -7,7 +7,7 @@ use tauri::ipc::Channel;
 use tauri::State;
 
 use crate::dev::terminal::{ShellOption, TermEvent, Terminals};
-use crate::dev::{git, github, toolchains, workspace};
+use crate::dev::{git, git_more, github, search, toolchains, workspace};
 use crate::error::{AppError, AppResult};
 use crate::services::activity::{self, Level};
 use crate::services::settings;
@@ -117,6 +117,30 @@ pub async fn dev_toolchains(state: State<'_, AppState>) -> AppResult<Vec<toolcha
     blocking(move || Ok(toolchains::detect(&overrides))).await
 }
 
+// ---------- Search ----------
+
+/// Project files for Go to file (relative paths).
+#[tauri::command]
+pub async fn dev_files(state: State<'_, AppState>, root: String) -> AppResult<Vec<String>> {
+    let root = project(&state, &root)?;
+    blocking(move || search::list_files(&root)).await
+}
+
+#[tauri::command]
+pub async fn dev_search(state: State<'_, AppState>, root: String, query: search::Query) -> AppResult<search::SearchResult> {
+    let root = project(&state, &root)?;
+    blocking(move || search::search(&root, &query)).await
+}
+
+/// Replace in files; the UI previews the matches and confirms first.
+#[tauri::command]
+pub async fn dev_replace(state: State<'_, AppState>, query: search::Query, replacement: String, paths: Vec<String>) -> AppResult<usize> {
+    let r = roots(&state)?;
+    let count = blocking(move || search::replace(&r, &query, &replacement, &paths)).await?;
+    log(&state, "developer", &format!("Replaced {count} match(es) in the project"));
+    Ok(count)
+}
+
 // ---------- Terminal ----------
 
 #[tauri::command]
@@ -135,7 +159,8 @@ pub async fn term_spawn(
     on_event: Channel<TermEvent>,
 ) -> AppResult<u32> {
     let dir = match cwd {
-        Some(c) => Some(workspace::resolve(&roots(&state)?, &c, true)?),
+        // Without the `\\?\` prefix: npm and node fail in such a working directory.
+        Some(c) => Some(PathBuf::from(workspace::display(&workspace::resolve(&roots(&state)?, &c, true)?))),
         None => None,
     };
     terminals.spawn(&shell, dir, cols, rows, on_event)
@@ -192,6 +217,100 @@ pub async fn git_discard(state: State<'_, AppState>, root: String, path: String,
     blocking(move || git::discard(&p, &path, untracked)).await?;
     log(&state, "git", &format!("Discarded changes in {shown}"));
     Ok(())
+}
+
+#[tauri::command]
+pub async fn git_baseline(state: State<'_, AppState>, root: String, path: String) -> AppResult<git_more::Baseline> {
+    let p = project(&state, &root)?;
+    blocking(move || git_more::baseline(&p, &path)).await
+}
+
+/// Stages edited text as the index version (Stage change on a gutter hunk).
+#[tauri::command]
+pub async fn git_stage_text(state: State<'_, AppState>, root: String, path: String, content: String) -> AppResult<()> {
+    let p = project(&state, &root)?;
+    blocking(move || git_more::stage_text(&p, &path, &content)).await
+}
+
+#[tauri::command]
+pub async fn git_blame(state: State<'_, AppState>, root: String, path: String, from: Option<usize>, to: Option<usize>) -> AppResult<Vec<git_more::BlameLine>> {
+    let p = project(&state, &root)?;
+    blocking(move || git_more::blame(&p, &path, from.zip(to))).await
+}
+
+#[tauri::command]
+pub async fn git_stash_list(state: State<'_, AppState>, root: String) -> AppResult<Vec<git_more::Stash>> {
+    let p = project(&state, &root)?;
+    blocking(move || git_more::stash_list(&p)).await
+}
+
+#[tauri::command]
+pub async fn git_stash_save(state: State<'_, AppState>, root: String, message: String, untracked: bool) -> AppResult<()> {
+    let p = project(&state, &root)?;
+    blocking(move || git_more::stash_save(&p, &message, untracked)).await?;
+    log(&state, "git", "Stashed local changes");
+    Ok(())
+}
+
+/// apply / pop / drop. Dropping deletes the stash, so it needs `confirmed`.
+#[tauri::command]
+pub async fn git_stash_action(state: State<'_, AppState>, root: String, action: String, index: usize, confirmed: bool) -> AppResult<String> {
+    if action == "drop" && !confirmed {
+        return Err(AppError::ConfirmationRequired("a dropped stash cannot be restored from NETRUNNER".into()));
+    }
+    let p = project(&state, &root)?;
+    let shown = format!("{action} stash@{{{index}}}");
+    let out = blocking(move || git_more::stash_action(&p, &action, index)).await?;
+    log(&state, "git", &format!("Stash: {shown}"));
+    Ok(out)
+}
+
+/// Amends HEAD. Needs `confirmed`; the UI warns when HEAD was already pushed.
+#[tauri::command]
+pub async fn git_amend(state: State<'_, AppState>, root: String, message: String, confirmed: bool) -> AppResult<String> {
+    if !confirmed {
+        return Err(AppError::ConfirmationRequired("amending rewrites the last commit".into()));
+    }
+    let p = project(&state, &root)?;
+    let hash = blocking(move || git_more::amend(&p, &message)).await?;
+    log(&state, "git", &format!("Amended the last commit ({hash})"));
+    Ok(hash)
+}
+
+#[tauri::command]
+pub async fn git_head_pushed(state: State<'_, AppState>, root: String) -> AppResult<bool> {
+    let p = project(&state, &root)?;
+    blocking(move || Ok(git_more::head_pushed(&p))).await
+}
+
+#[tauri::command]
+pub async fn git_graph(state: State<'_, AppState>, root: String, limit: Option<u32>) -> AppResult<Vec<git_more::GraphRow>> {
+    let p = project(&state, &root)?;
+    blocking(move || git_more::graph(&p, limit.unwrap_or(200))).await
+}
+
+#[tauri::command]
+pub async fn git_compare(state: State<'_, AppState>, root: String, base: String, head: String) -> AppResult<Vec<git_more::ChangedFile>> {
+    let p = project(&state, &root)?;
+    blocking(move || git_more::compare(&p, &base, &head)).await
+}
+
+#[tauri::command]
+pub async fn git_file_at(state: State<'_, AppState>, root: String, revision: String, path: String) -> AppResult<String> {
+    let p = project(&state, &root)?;
+    blocking(move || git_more::file_at(&p, &revision, &path)).await
+}
+
+#[tauri::command]
+pub async fn git_cherry_pick(state: State<'_, AppState>, root: String, hash: String, confirmed: bool) -> AppResult<String> {
+    if !confirmed {
+        return Err(AppError::ConfirmationRequired("cherry-pick creates a commit on the current branch".into()));
+    }
+    let p = project(&state, &root)?;
+    let shown = hash.clone();
+    let out = blocking(move || git_more::cherry_pick(&p, &hash)).await?;
+    log(&state, "git", &format!("Cherry-picked {shown}"));
+    Ok(out)
 }
 
 #[tauri::command]

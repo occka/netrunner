@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Plus, Rocket } from "lucide-react";
 import { ModuleHeader } from "@/components/ModuleHeader";
-import { useQuickAccess } from "@/stores/quickAccess";
+import { inProfile, useQuickAccess } from "@/stores/quickAccess";
+import { useProfiles } from "@/stores/profiles";
 import { EntryTile } from "./EntryTile";
 import { ENTRY_KIND_META, ENTRY_KINDS } from "./entryMeta";
 import type { EntryKind } from "@/types/entities";
@@ -9,7 +10,10 @@ import type { EntryKind } from "@/types/entities";
 type Filter = EntryKind | "all" | "favorites";
 
 export default function QuickAccessModule() {
-  const entries = useQuickAccess((s) => s.entries);
+  const all = useQuickAccess((s) => s.entries);
+  const activeProfile = useProfiles((s) => s.activeId);
+  const [scope, setScope] = useState<"profile" | "all">("profile");
+  const entries = useMemo(() => (scope === "all" ? all : all.filter((e) => inProfile(e, activeProfile))), [all, scope, activeProfile]);
   const openEditor = useQuickAccess((s) => s.openEditor);
   const [filter, setFilter] = useState<Filter>("all");
   const [text, setText] = useState("");
@@ -41,6 +45,14 @@ export default function QuickAccessModule() {
   return (
     <div className="module">
       <ModuleHeader id="quick-access">
+        <div className="segmented" role="group" aria-label="Which entries">
+          <button aria-pressed={scope === "profile"} onClick={() => setScope("profile")} title="Entries for all profiles and this one">
+            This profile
+          </button>
+          <button aria-pressed={scope === "all"} onClick={() => setScope("all")}>
+            All
+          </button>
+        </div>
         <input
           className="input qa-search"
           placeholder="Filter entries…"

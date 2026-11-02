@@ -120,11 +120,11 @@ export const MODULES: ModuleDef[] = [
     id: "developer",
     label: "Developer",
     icon: SquareTerminal,
-    status: "partial",
+    status: "implemented",
     phase: 3,
     group: "main",
     description: "Integrated development environment built on Monaco.",
-    planned: ["Language servers (LSP): completion, diagnostics, go-to-definition", "Debugger via Debug Adapter Protocol", "Formatter integration", "Gemini assistant (Phase 4)", "Extensions"],
+    planned: ["Node.js debugging", "Semantic highlighting from language servers", "Extensions"],
     component: lazy(() => import("@/modules/developer/DeveloperModule")),
   },
   {

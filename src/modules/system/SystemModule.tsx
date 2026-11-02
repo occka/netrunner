@@ -10,12 +10,14 @@ import { StartupTab } from "./StartupTab";
 import { ServicesTab } from "./ServicesTab";
 import { PowerTab } from "./PowerTab";
 import { NetworkTab } from "./NetworkTab";
+import { AudioTab } from "./AudioTab";
 import type { SystemInfo } from "@/types/entities";
 
-type Tab = "hardware" | "network" | "processes" | "startup" | "services" | "power";
+type Tab = "hardware" | "network" | "audio" | "processes" | "startup" | "services" | "power";
 const TABS: { id: Tab; label: string }[] = [
   { id: "hardware", label: "Hardware" },
   { id: "network", label: "Network" },
+  { id: "audio", label: "Audio" },
   { id: "processes", label: "Processes" },
   { id: "startup", label: "Startup" },
   { id: "services", label: "Services" },
@@ -75,6 +77,7 @@ export default function SystemModule() {
           </div>
         )}
         {tab === "network" && <NetworkTab />}
+        {tab === "audio" && <AudioTab />}
         {tab === "processes" && <ProcessesTab />}
         {tab === "startup" && <StartupTab />}
         {tab === "services" && <ServicesTab />}

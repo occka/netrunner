@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
 use crate::security::{command_policy, targets};
+use crate::services::hotkeys;
 
 pub const KINDS: &[&str] = &["app", "game", "file", "folder", "website", "command", "project"];
 
@@ -23,6 +24,10 @@ pub struct Entry {
     pub favorite: bool,
     pub require_confirm: bool,
     pub sort_order: i64,
+    /// None: shown in every profile.
+    pub profile_id: Option<i64>,
+    /// Global key (normalised); empty means none.
+    pub hotkey: String,
     pub launch_count: i64,
     pub last_launched_at: Option<String>,
     pub created_at: String,
@@ -50,10 +55,14 @@ pub struct EntryInput {
     pub favorite: bool,
     #[serde(default)]
     pub require_confirm: bool,
+    #[serde(default)]
+    pub profile_id: Option<i64>,
+    #[serde(default)]
+    pub hotkey: String,
 }
 
 const SELECT: &str = "SELECT id, kind, name, target, args, working_dir, shell, icon, category, favorite,
-    require_confirm, sort_order, launch_count, last_launched_at, created_at, updated_at FROM quick_access";
+    require_confirm, sort_order, launch_count, last_launched_at, created_at, updated_at, profile_id, hotkey FROM quick_access";
 
 fn from_row(row: &Row) -> rusqlite::Result<Entry> {
     Ok(Entry {
@@ -73,6 +82,8 @@ fn from_row(row: &Row) -> rusqlite::Result<Entry> {
         last_launched_at: row.get(13)?,
         created_at: row.get(14)?,
         updated_at: row.get(15)?,
+        profile_id: row.get(16)?,
+        hotkey: row.get(17)?,
     })
 }
 
@@ -88,29 +99,40 @@ pub fn get(conn: &Connection, id: i64) -> AppResult<Entry> {
         .ok_or_else(|| AppError::NotFound(format!("quick access entry {id} does not exist")))
 }
 
+fn check_profile(conn: &Connection, profile: Option<i64>) -> AppResult<()> {
+    if let Some(p) = profile {
+        crate::services::profiles::get(conn, p)?;
+    }
+    Ok(())
+}
+
 pub fn create(conn: &Connection, input: EntryInput) -> AppResult<Entry> {
-    let input = normalize(input)?;
+    let mut input = normalize(input)?;
+    check_profile(conn, input.profile_id)?;
+    input.hotkey = hotkeys::checked(conn, "entry:new", &input.hotkey)?;
     let next_order: i64 =
         conn.query_row("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM quick_access", [], |r| r.get(0))?;
     conn.execute(
-        "INSERT INTO quick_access (kind, name, target, args, working_dir, shell, icon, category, favorite, require_confirm, sort_order)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        "INSERT INTO quick_access (kind, name, target, args, working_dir, shell, icon, category, favorite, require_confirm, sort_order, profile_id, hotkey)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
         params![
             input.kind, input.name, input.target, input.args, input.working_dir, input.shell,
-            input.icon, input.category, input.favorite, input.require_confirm, next_order
+            input.icon, input.category, input.favorite, input.require_confirm, next_order, input.profile_id, input.hotkey
         ],
     )?;
     get(conn, conn.last_insert_rowid())
 }
 
 pub fn update(conn: &Connection, id: i64, input: EntryInput) -> AppResult<Entry> {
-    let input = normalize(input)?;
+    let mut input = normalize(input)?;
+    check_profile(conn, input.profile_id)?;
+    input.hotkey = hotkeys::checked(conn, &format!("entry:{id}"), &input.hotkey)?;
     let changed = conn.execute(
         "UPDATE quick_access SET kind = ?1, name = ?2, target = ?3, args = ?4, working_dir = ?5, shell = ?6,
-         icon = ?7, category = ?8, favorite = ?9, require_confirm = ?10, updated_at = datetime('now') WHERE id = ?11",
+         icon = ?7, category = ?8, favorite = ?9, require_confirm = ?10, profile_id = ?11, hotkey = ?12, updated_at = datetime('now') WHERE id = ?13",
         params![
             input.kind, input.name, input.target, input.args, input.working_dir, input.shell,
-            input.icon, input.category, input.favorite, input.require_confirm, id
+            input.icon, input.category, input.favorite, input.require_confirm, input.profile_id, input.hotkey, id
         ],
     )?;
     if changed == 0 {
@@ -124,6 +146,20 @@ pub fn set_favorite(conn: &Connection, id: i64, favorite: bool) -> AppResult<Ent
         "UPDATE quick_access SET favorite = ?1, updated_at = datetime('now') WHERE id = ?2",
         params![favorite, id],
     )?;
+    get(conn, id)
+}
+
+/// Shows an entry in every profile (None) or in one.
+pub fn set_profile(conn: &Connection, id: i64, profile: Option<i64>) -> AppResult<Entry> {
+    check_profile(conn, profile)?;
+    conn.execute("UPDATE quick_access SET profile_id = ?1, updated_at = datetime('now') WHERE id = ?2", params![profile, id])?;
+    get(conn, id)
+}
+
+pub fn set_hotkey(conn: &Connection, id: i64, keys: &str) -> AppResult<Entry> {
+    get(conn, id)?;
+    let keys = hotkeys::checked(conn, &format!("entry:{id}"), keys)?;
+    conn.execute("UPDATE quick_access SET hotkey = ?1, updated_at = datetime('now') WHERE id = ?2", params![keys, id])?;
     get(conn, id)
 }
 
@@ -215,7 +251,37 @@ mod tests {
             category: String::new(),
             favorite: false,
             require_confirm: false,
+            profile_id: None,
+            hotkey: String::new(),
         }
+    }
+
+    #[test]
+    fn profile_and_hotkey_round_trip() {
+        let db = Database::open_in_memory().unwrap();
+        let conn = db.conn().unwrap();
+        let profile = crate::services::profiles::ensure_seeded(&conn).map(|_| crate::services::profiles::active_id(&conn).unwrap().unwrap()).unwrap();
+        let mut a = input("app", "a.exe");
+        a.profile_id = Some(profile);
+        a.hotkey = "alt+ctrl+1".into();
+        let a = create(&conn, a).unwrap();
+        assert_eq!((a.profile_id, a.hotkey.as_str()), (Some(profile), "Ctrl+Alt+1"));
+        // The same key cannot go to a second entry, a built-in's neither.
+        let mut b = input("app", "b.exe");
+        b.hotkey = "Ctrl+Alt+1".into();
+        assert!(create(&conn, b.clone()).is_err());
+        b.hotkey = "Ctrl+K".into();
+        assert!(create(&conn, b.clone()).is_err());
+        b.hotkey = String::new();
+        let b = create(&conn, b).unwrap();
+        assert!(set_hotkey(&conn, b.id, "ctrl+alt+1").is_err());
+        assert_eq!(set_hotkey(&conn, b.id, "ctrl+alt+2").unwrap().hotkey, "Ctrl+Alt+2");
+        // An entry keeps its own key when edited.
+        let mut edit = input("app", "a.exe");
+        edit.hotkey = a.hotkey.clone();
+        assert_eq!(update(&conn, a.id, edit).unwrap().hotkey, "Ctrl+Alt+1");
+        assert_eq!(set_profile(&conn, a.id, None).unwrap().profile_id, None);
+        assert!(set_profile(&conn, a.id, Some(9999)).is_err());
     }
 
     #[test]

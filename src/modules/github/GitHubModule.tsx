@@ -91,8 +91,9 @@ function Connect({ onConnected }: { onConnected: () => void }) {
       <form className="panel__body gh-connect__body" onSubmit={(e) => void submit(e)}>
         <p>
           NETRUNNER uses a GitHub <b>personal access token</b>. Create a fine-grained token at GitHub → Settings → Developer
-          settings → Personal access tokens, with read access to <i>Metadata</i>, <i>Contents</i>, <i>Issues</i> and{" "}
-          <i>Pull requests</i> for the repositories you want to see.
+          settings → Personal access tokens. Reading needs <i>Metadata</i>, <i>Contents</i>, <i>Issues</i>, <i>Pull requests</i> and{" "}
+          <i>Checks</i> (read). To publish projects, open pull requests and comment from DEVELOPER, give <i>Contents</i>,{" "}
+          <i>Pull requests</i> and <i>Issues</i> read and write, and allow <i>Administration</i> (write) for creating repositories.
         </p>
         <ul className="muted">
           <li>The token is checked against GitHub, then stored only in Windows Credential Manager (DPAPI).</li>

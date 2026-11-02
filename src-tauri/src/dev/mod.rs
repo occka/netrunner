@@ -1,9 +1,14 @@
 //! DEVELOPER and GITHUB backends: scoped project files, terminals, toolchain
-//! detection, Git (via the git CLI) and the GitHub REST API.
+//! detection, language servers (LSP), Git (via the git CLI) and the GitHub REST API.
 
+pub mod dap;
 pub mod git;
+pub mod git_more;
 pub mod github;
+pub mod github_link;
+pub mod lsp;
 pub mod process;
+pub mod search;
 pub mod terminal;
 pub mod toolchains;
 pub mod workspace;

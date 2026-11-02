@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { BrainCircuit, Bug, DownloadCloud, FolderGit2, FolderOpen, GitBranch, Play, SquareTerminal, Wrench, X } from "lucide-react";
+import { BrainCircuit, Bug, CircleAlert, GitPullRequest, Search, DownloadCloud, FolderGit2, FolderOpen, GitBranch, SquareTerminal, Wrench, X } from "lucide-react";
 import { ModuleHeader } from "@/components/ModuleHeader";
 import { api } from "@/services/api";
 import { useQuickAccess } from "@/stores/quickAccess";
 import { notify, reportError } from "@/stores/notifications";
-import { useDev, type IdeMode, type SidePanel } from "./store";
+import { currentKey, useDev, type IdeMode, type SidePanel } from "./store";
 import { CloneDialog } from "./CloneDialog";
 import { AiPanel } from "./AiPanel";
 import { FileTree } from "./FileTree";
@@ -13,7 +13,18 @@ import { EditorArea } from "./EditorArea";
 import { TerminalPanel } from "./TerminalPanel";
 import { GitPanel } from "./GitPanel";
 import { ToolsPanel } from "./ToolsPanel";
-import { openTerminal, sendToTerminal, useTerminals } from "./terminals";
+import { SearchPanel } from "./SearchPanel";
+import { QuickOpen } from "./QuickOpen";
+import { RunBar } from "./RunBar";
+import { DebugPanel, startForActiveFile } from "./debug/DebugPanel";
+import { useDebug } from "./debug/store";
+import { monaco } from "./monaco";
+import { CiBadge, GitHubPanel } from "./GitHubPanel";
+import { LanguagesPanel } from "./lsp/LanguagesPanel";
+import { ProblemsPanel } from "./lsp/ProblemsPanel";
+import { runInTerminal } from "./terminals";
+import { startLsp } from "./lsp/client";
+import { restoreSession, startEditorPrefs } from "./editorPrefs";
 import { runPlan } from "./run";
 
 const MODES: { id: IdeMode; label: string }[] = [
@@ -23,33 +34,89 @@ const MODES: { id: IdeMode; label: string }[] = [
 ];
 const SIDES: { id: SidePanel; label: string; icon: typeof FolderOpen }[] = [
   { id: "explorer", label: "Explorer", icon: FolderOpen },
+  { id: "search", label: "Search", icon: Search },
   { id: "git", label: "Git", icon: GitBranch },
-  { id: "tools", label: "Toolchains", icon: Wrench },
+  { id: "github", label: "GitHub", icon: GitPullRequest },
+  { id: "problems", label: "Problems", icon: CircleAlert },
+  { id: "tools", label: "Tools", icon: Wrench },
 ];
+
+/** F5, Shift+F5, F9, F10, F11, Shift+F11. True when the key was used. */
+function handleDebugKey(e: KeyboardEvent): boolean {
+  if (e.ctrlKey || e.altKey) return false;
+  const root = useDev.getState().root;
+  const d = useDebug.getState();
+  if (!root) return false;
+  switch (e.code) {
+    case "F5":
+      if (e.shiftKey) void d.stop();
+      else if (d.status === "stopped") void d.resume("continue");
+      else if (d.status === "idle") {
+        useDev.getState().setMode("debug");
+        void startForActiveFile(root);
+      }
+      return true;
+    case "F9": {
+      const s = useDev.getState();
+      const tab = s.tabs.find((t) => t.key === currentKey(s) && t.kind === "file");
+      const line = monaco.editor.getEditors().find((ed) => ed.hasTextFocus())?.getPosition()?.lineNumber;
+      if (tab && line) d.toggleBreakpoint(tab.path, line);
+      return !!(tab && line);
+    }
+    case "F10":
+      if (d.status !== "stopped") return false;
+      void d.resume("next");
+      return true;
+    case "F11":
+      if (d.status !== "stopped") return false;
+      void d.resume(e.shiftKey ? "stepOut" : "stepIn");
+      return true;
+    default:
+      return false;
+  }
+}
 
 export default function DeveloperModule() {
   const { projects, root, mode, side, terminalOpen, loadProjects, openProject, closeProject, setMode, setSide, toggleTerminal } = useDev();
-  const activeTab = useDev((s) => s.tabs.find((t) => t.key === s.active));
   // Select the stable array, then derive: a filtering selector would return a
   // new array each render and loop under zustand v5.
   const entries = useQuickAccess((s) => s.entries);
   const projectEntries = useMemo(() => entries.filter((e) => e.kind === "project"), [entries]);
   const [cloneOpen, setCloneOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [searchFocus, setSearchFocus] = useState(0);
+  const closeQuickOpen = useCallback(() => setQuickOpen(false), []);
 
   useEffect(() => {
     loadProjects().catch((err) => reportError("Could not load projects", err));
+    startLsp();
+    startEditorPrefs();
+    useDebug.getState().loadBreakpoints();
   }, [loadProjects]);
+
+  useEffect(() => {
+    if (root) void restoreSession(root);
+  }, [root]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === "`") {
         e.preventDefault();
         toggleTerminal();
+      } else if (handleDebugKey(e)) {
+        e.preventDefault();
+      } else if (e.ctrlKey && !e.shiftKey && !e.altKey && e.code === "KeyP" && useDev.getState().root) {
+        e.preventDefault();
+        setQuickOpen(true);
+      } else if (e.ctrlKey && e.shiftKey && e.code === "KeyF" && useDev.getState().root) {
+        e.preventDefault();
+        setSide("search");
+        setSearchFocus((n) => n + 1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [toggleTerminal]);
+  }, [toggleTerminal, setSide]);
 
   const pickFolder = async () => {
     const dir = await openDialog({ directory: true, multiple: false, title: "Open project folder" });
@@ -65,21 +132,16 @@ export default function DeveloperModule() {
     });
     if (!plan) return notify.warn("No run command for this file type", "Use the terminal to run it manually.");
     toggleTerminal(true);
-    const terms = useTerminals.getState();
-    let session = terms.sessions.find((s) => s.title === "Run" && !s.exited);
-    if (!session) session = (await openTerminal("powershell", root, "Run")) ?? undefined;
-    if (session) {
-      useTerminals.getState().setActive(session.id);
-      sendToTerminal(session, plan.command);
-      notify.info(`Running with ${plan.description}`);
-    }
+    if (await runInTerminal("Run", plan.command, root)) notify.info(`Running with ${plan.description}`);
   };
 
-  const showTerminal = terminalOpen || mode === "debug";
+  const showTerminal = terminalOpen;
 
   return (
     <div className="module ide">
       <ModuleHeader id="developer" subtitle={root ? <span className="mono">{root}</span> : "Open a project folder to start."}>
+        {root && <CiBadge root={root} />}
+        {root && <RunBar root={root} />}
         <div className="segmented" role="tablist" aria-label="IDE mode">
           {MODES.map((m) => (
             <button key={m.id} aria-pressed={mode === m.id} onClick={() => setMode(m.id)}>
@@ -145,8 +207,16 @@ export default function DeveloperModule() {
               </div>
               <div className="ide-side__body">
                 {side === "explorer" && <FileTree root={root} />}
+                {side === "search" && <SearchPanel root={root} focusTick={searchFocus} />}
                 {side === "git" && <GitPanel root={root} />}
-                {side === "tools" && <ToolsPanel />}
+                {side === "github" && <GitHubPanel root={root} />}
+                {side === "problems" && <ProblemsPanel root={root} />}
+                {side === "tools" && (
+                  <>
+                    <LanguagesPanel root={root} />
+                    <ToolsPanel />
+                  </>
+                )}
               </div>
             </aside>
           <div className="ide-center">
@@ -156,24 +226,10 @@ export default function DeveloperModule() {
           {mode === "debug" && (
             <aside className="ide-right">
               <div className="tree__head">
+                <Bug size={13} className="muted" />
                 <span className="label">Debug</span>
               </div>
-              <div className="ide-right__body">
-                <button
-                  className="btn btn--primary btn--sm"
-                  disabled={!activeTab || activeTab.kind !== "file"}
-                  onClick={() => activeTab && void run(activeTab.path)}
-                >
-                  <Play size={12} /> Run active file
-                </button>
-                <div className="unavailable">
-                  <Bug size={14} />
-                  <span>
-                    Breakpoints, variables and step-through debugging need Debug Adapter Protocol integration. That is planned and
-                    not implemented. Use Run and the terminal for now.
-                  </span>
-                </div>
-              </div>
+              <DebugPanel root={root} />
             </aside>
           )}
           {mode === "ai" && (
@@ -188,6 +244,7 @@ export default function DeveloperModule() {
         </div>
       )}
       {cloneOpen && <CloneDialog onClose={() => setCloneOpen(false)} />}
+      {quickOpen && root && <QuickOpen root={root} onClose={closeQuickOpen} />}
     </div>
   );
 }

@@ -3,8 +3,21 @@
  * calls `invoke` directly.
  */
 import { invoke, type Channel } from "@tauri-apps/api/core";
+import type { AudioDevices, AudioSession } from "@/types/audio";
 import type {
+  BlameLine,
+  DapEvent,
+  DebugAdapterStatus,
+  GhChecks,
+  GhComment,
+  GhOrigin,
+  GhPrDetail,
+  GhPrFile,
+  ChangedFile,
   Commit,
+  GitBaseline,
+  GitStash,
+  GraphRow,
   DirEntry,
   FileContent,
   GitHubEntry,
@@ -13,7 +26,12 @@ import type {
   GitHubRepo,
   GitHubStatus,
   GitHubUser,
+  LspEvent,
+  LspOpened,
+  LspServerStatus,
   RepoStatus,
+  SearchQuery,
+  SearchResult,
   ShellOption,
   TermEvent,
   Toolchain,
@@ -40,6 +58,7 @@ import type {
   ProcessList,
   Profile,
   ProfilesState,
+  HotkeyBinding,
   QuickAccessEntry,
   QuickAccessInput,
   SystemInfo,
@@ -116,6 +135,7 @@ export const api = {
     create: (input: QuickAccessInput) => call<QuickAccessEntry>("qa_create", { input }),
     update: (id: number, input: QuickAccessInput) => call<QuickAccessEntry>("qa_update", { id, input }),
     setFavorite: (id: number, favorite: boolean) => call<QuickAccessEntry>("qa_set_favorite", { id, favorite }),
+    setProfile: (id: number, profileId: number | null) => call<QuickAccessEntry>("qa_set_profile", { id, profileId }),
     reorder: (ids: number[]) => call<void>("qa_reorder", { ids }),
     remove: (id: number) => call<void>("qa_delete", { id }),
     launch: (id: number, confirmed = false) => call<QuickAccessEntry>("qa_launch", { id, confirmed }),
@@ -123,9 +143,29 @@ export const api = {
     assessCommand: (command: string) => call<CommandAssessment>("qa_assess_command", { command }),
   },
 
+  hotkeys: {
+    list: () => call<HotkeyBinding[]>("hotkeys_list"),
+    set: (id: string, keys: string) => call<HotkeyBinding[]>("hotkey_set", { id, keys }),
+    reset: () => call<HotkeyBinding[]>("hotkeys_reset"),
+  },
+
   activity: {
     list: (limit = 100) => call<ActivityEntry[]>("activity_list", { limit }),
     clear: () => call<void>("activity_clear"),
+  },
+
+  sensors: {
+    status: () => call<{ available: boolean; message: string; temperatures: number; fans: number }>("sensors_status"),
+  },
+
+  audio: {
+    devices: () => call<AudioDevices>("audio_devices"),
+    sessions: (device?: string) => call<AudioSession[]>("audio_sessions", { device }),
+    setVolume: (id: string, percent: number) => call<void>("audio_set_volume", { id, percent }),
+    setMute: (id: string, mute: boolean) => call<void>("audio_set_mute", { id, mute }),
+    setDefault: (id: string, name: string) => call<void>("audio_set_default", { id, name }),
+    sessionSet: (id: string, volume?: number, mute?: boolean) => call<void>("audio_session_set", { id, volume, mute }),
+    openSettings: () => call<void>("audio_open_settings"),
   },
 
   system: {
@@ -192,6 +232,29 @@ export const api = {
     remove: (path: string) => call<void>("dev_delete", { path }),
     reveal: (path: string) => call<void>("dev_reveal", { path }),
     toolchains: () => call<Toolchain[]>("dev_toolchains"),
+    files: (root: string) => call<string[]>("dev_files", { root }),
+    search: (root: string, query: SearchQuery) => call<SearchResult>("dev_search", { root, query }),
+    replace: (query: SearchQuery, replacement: string, paths: string[]) => call<number>("dev_replace", { query, replacement, paths }),
+  },
+
+  lsp: {
+    subscribe: (onEvent: Channel<LspEvent>) => call<void>("lsp_subscribe", { onEvent }),
+    servers: (project: string | null) => call<LspServerStatus[]>("lsp_servers", { project }),
+    open: (path: string, version: number, text: string) => call<LspOpened>("lsp_open", { path, version, text }),
+    change: (uri: string, version: number, text: string) => call<void>("lsp_change", { uri, version, text }),
+    save: (uri: string) => call<void>("lsp_save", { uri }),
+    close: (uri: string) => call<void>("lsp_close", { uri }),
+    request: <T = unknown>(server: string, method: string, params: unknown) => call<T>("lsp_request", { server, method, params }),
+    restart: (server: string) => call<void>("lsp_restart", { server }),
+    configure: (spec: string, path: string | null, disabled: boolean) => call<void>("lsp_configure", { spec, path, disabled }),
+  },
+
+  dap: {
+    adapters: (root: string) => call<DebugAdapterStatus[]>("dap_adapters", { root }),
+    start: (root: string, adapter: string, request: string, config: unknown, breakpoints: { path: string; breakpoints: { line: number; condition?: string }[] }[], onEvent: Channel<DapEvent>) =>
+      call<void>("dap_start", { root, adapter, request, config, breakpoints, onEvent }),
+    request: <T = unknown>(command: string, args: unknown) => call<T>("dap_request", { command, arguments: args }),
+    stop: () => call<void>("dap_stop"),
   },
 
   term: {
@@ -220,6 +283,38 @@ export const api = {
     push: (root: string) => call<string>("git_push", { root, confirmed: true }),
     init: (root: string) => call<void>("git_init", { root }),
     clone: (url: string, parent: string, name: string) => call<string>("git_clone", { url, parent, name }),
+    baseline: (root: string, path: string) => call<GitBaseline>("git_baseline", { root, path }),
+    stageText: (root: string, path: string, content: string) => call<void>("git_stage_text", { root, path, content }),
+    blame: (root: string, path: string, from?: number, to?: number) => call<BlameLine[]>("git_blame", { root, path, from, to }),
+    stashList: (root: string) => call<GitStash[]>("git_stash_list", { root }),
+    stashSave: (root: string, message: string, untracked: boolean) => call<void>("git_stash_save", { root, message, untracked }),
+    stashAction: (root: string, action: "apply" | "pop" | "drop", index: number) =>
+      call<string>("git_stash_action", { root, action, index, confirmed: true }),
+    amend: (root: string, message: string) => call<string>("git_amend", { root, message, confirmed: true }),
+    headPushed: (root: string) => call<boolean>("git_head_pushed", { root }),
+    graph: (root: string, limit = 200) => call<GraphRow[]>("git_graph", { root, limit }),
+    compare: (root: string, base: string, head: string) => call<ChangedFile[]>("git_compare", { root, base, head }),
+    fileAt: (root: string, revision: string, path: string) => call<string>("git_file_at", { root, revision, path }),
+    cherryPick: (root: string, hash: string) => call<string>("git_cherry_pick", { root, hash, confirmed: true }),
+  },
+
+  gh: {
+    origin: (root: string) => call<GhOrigin | null>("gh_origin", { root }),
+    publish: (root: string, name: string, description: string, isPrivate: boolean) =>
+      call<{ full_name: string; clone_url: string; html_url: string }>("gh_publish", { root, name, description, private: isPrivate, confirmed: true }),
+    commitsSince: (root: string, base: string) => call<string[]>("gh_commits_since", { root, base }),
+    createPr: (root: string, title: string, body: string, base: string, draft: boolean) =>
+      call<{ number: number; html_url: string }>("gh_create_pr", { root, title, body, base, draft, confirmed: true }),
+    pr: (owner: string, repo: string, number: number) => call<GhPrDetail>("gh_pr", { owner, repo, number }),
+    prFiles: (owner: string, repo: string, number: number) => call<GhPrFile[]>("gh_pr_files", { owner, repo, number }),
+    comments: (owner: string, repo: string, number: number) => call<GhComment[]>("gh_comments", { owner, repo, number }),
+    addComment: (owner: string, repo: string, number: number, body: string) =>
+      call<GhComment>("gh_add_comment", { owner, repo, number, body, confirmed: true }),
+    checkoutPr: (root: string, number: number) => call<string>("gh_checkout_pr", { root, number }),
+    checks: (owner: string, repo: string, gitRef: string) => call<GhChecks>("gh_checks", { owner, repo, gitRef }),
+    issueBranch: (root: string, number: number, title: string) => call<string>("gh_issue_branch", { root, number, title }),
+    fileUrl: (root: string, path: string, from: number | null, to: number | null, permalink: boolean) =>
+      call<string>("gh_file_url", { root, path, from, to, permalink }),
   },
 
   github: {
