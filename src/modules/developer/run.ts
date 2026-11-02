@@ -5,6 +5,19 @@
  */
 const q = (s: string) => `'${s.replace(/'/g, "''")}'`;
 
+/**
+ * Node tools install a `.ps1` shim next to their `.cmd`. PowerShell prefers the
+ * script, and Windows' default execution policy refuses to load it, so `npm`
+ * fails there. Commands NETRUNNER types go to the `.cmd`, or through cmd.exe for
+ * tools that may be a plain `.exe` instead (standalone pnpm, bun). The user's
+ * execution policy stays as it is.
+ */
+export function forPowerShell(command: string): string {
+  return command.replace(/(^|;\s*)(npm|npx|yarn|gem|pnpm|bun)(?=\s|$)/g, (_m, start: string, tool: string) =>
+    tool === "pnpm" || tool === "bun" ? `${start}cmd /c ${tool}` : `${start}${tool}.cmd`,
+  );
+}
+
 export interface RunPlan {
   command: string;
   description: string;

@@ -11,6 +11,7 @@ import { api } from "@/services/api";
 import { useSettings } from "@/stores/settings";
 import { reportError } from "@/stores/notifications";
 import type { TermEvent } from "@/types/dev";
+import { forPowerShell } from "./run";
 
 export interface TermSession {
   id: number;
@@ -125,7 +126,7 @@ export async function runInTerminal(title: string, command: string, cwd: string 
   if (!session) session = (await openTerminal("powershell", cwd, title)) ?? undefined;
   if (!session) return null;
   useTerminals.getState().setActive(session.id);
-  sendToTerminal(session, command);
+  sendToTerminal(session, forPowerShell(command));
   return session;
 }
 
