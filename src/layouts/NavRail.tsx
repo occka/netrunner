@@ -1,3 +1,4 @@
+import { ResizeHandle } from "@/components/ResizeHandle";
 import { useRef, useState, type KeyboardEvent } from "react";
 import { Pin, PinOff } from "lucide-react";
 import { MODULES, type ModuleDef } from "@/app/modules";
@@ -69,6 +70,7 @@ export function NavRail() {
         onFocus={() => setHovered(true)}
         onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setHovered(false)}
       >
+        {pinned && <ResizeHandle pane="nav" of="parent" min={150} max={420} />}
         <div className="nav__list" ref={listRef} onKeyDown={onKeyDown}>
           {MODULES.filter((m) => m.group === "main").map(item)}
           <div className="nav__sep" />

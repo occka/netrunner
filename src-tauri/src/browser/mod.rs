@@ -18,6 +18,7 @@ pub mod data;
 pub mod media;
 #[cfg(windows)]
 mod native;
+pub mod page_style;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -53,6 +54,16 @@ pub struct Prefs {
     pub exceptions: Vec<String>,
     pub webrtc_protect: bool,
     pub extensions: bool,
+    /// `off`, `prefer` (sites with a dark theme) or `force` (all sites, from the next start).
+    pub page_dark: String,
+    pub page_accent: bool,
+    pub page_accent_off: Vec<String>,
+    /// Sites shown transparently over NETRUNNER's background (experimental).
+    pub page_transparent: Vec<String>,
+    pub page_tint: u8,
+    /// Theme colours, checked with `page_style::valid_hex`.
+    pub page_primary: String,
+    pub page_background: String,
 }
 
 impl Default for Prefs {
@@ -70,6 +81,13 @@ impl Default for Prefs {
             exceptions: Vec::new(),
             webrtc_protect: true,
             extensions: false,
+            page_dark: "off".into(),
+            page_accent: false,
+            page_accent_off: Vec::new(),
+            page_transparent: Vec::new(),
+            page_tint: 60,
+            page_primary: "#ffd400".into(),
+            page_background: "#0b0d10".into(),
         }
     }
 }
@@ -95,6 +113,16 @@ impl Prefs {
         p.exceptions = list("adblock_exceptions").unwrap_or_default();
         p.webrtc_protect = flag("webrtc_protect", p.webrtc_protect);
         p.extensions = flag("extensions", p.extensions);
+        p.page_dark = text("page_dark", &p.page_dark);
+        p.page_accent = flag("page_accent", p.page_accent);
+        p.page_accent_off = list("page_accent_off").unwrap_or_default();
+        p.page_transparent = list("page_transparent").unwrap_or_default();
+        p.page_tint = get("page_tint").and_then(|v| v.as_u64()).map_or(p.page_tint, |t| t.min(100) as u8);
+        if let Some(theme) = settings::get(conn, "theme").ok().flatten() {
+            let color = |k: &str| theme.get(k).and_then(|v| v.as_str()).filter(|c| page_style::valid_hex(c)).map(str::to_string);
+            p.page_primary = color("primary").unwrap_or(p.page_primary);
+            p.page_background = color("background").unwrap_or(p.page_background);
+        }
         p
     }
 }
@@ -149,6 +177,8 @@ pub struct Browser {
     /// Hosts the user chose to load over plain HTTP this session.
     http_allowed: Mutex<HashSet<String>>,
     downloads: Mutex<Vec<Download>>,
+    /// All webviews must share one environment, so its arguments are fixed at first use.
+    args: std::sync::OnceLock<String>,
 }
 
 impl Browser {
@@ -163,7 +193,12 @@ impl Browser {
             extensions_dir: data_dir.join("browser-extensions"),
             http_allowed: Mutex::new(HashSet::new()),
             downloads: Mutex::new(Vec::new()),
+            args: std::sync::OnceLock::new(),
         }
+    }
+
+    fn environment_args(&self, prefs: &Prefs) -> &str {
+        self.args.get_or_init(|| browser_args(prefs))
     }
 
     pub fn prefs(&self) -> Prefs {
@@ -228,6 +263,7 @@ pub fn reload_prefs(app: &AppHandle) {
     if lists_changed {
         start_blocker(app.clone(), false);
     }
+    page_style::apply_all(app);
 }
 
 /// Loads the content blocker on a worker thread, downloading enabled lists
@@ -440,6 +476,7 @@ fn on_page_load(app: &AppHandle, label: &str, url: &Url, finished: bool) {
             t.blocked = 0;
         }
     });
+    page_style::apply(app, label, url.as_str());
     if finished {
         if let Some(t) = &tab {
             let prefs = browser.prefs();
@@ -521,7 +558,14 @@ fn browser_args(prefs: &Prefs) -> String {
     // Unlike NETRUNNER's own webview, SmartScreen stays on here.
     // HardwareMediaKeyHandling publishes playing pages to Windows media
     // sessions (volume flyout, media keys, the Music Player widget).
-    let mut args = String::from("--disable-features=msWebOOUI,msPdfOOUI --enable-features=HardwareMediaKeyHandling");
+    let features = if prefs.page_dark == "force" { "HardwareMediaKeyHandling,WebContentsForceDark" } else { "HardwareMediaKeyHandling" };
+    let mut args = format!("--disable-features=msWebOOUI,msPdfOOUI --enable-features={features}");
+    // Development builds can inspect tabs for automated checks.
+    if cfg!(debug_assertions) {
+        if let Ok(port) = std::env::var("NETRUNNER_DEV_BROWSER_PORT") {
+            args.push_str(&format!(" --remote-debugging-port={port}"));
+        }
+    }
     if prefs.webrtc_protect {
         // WebRTC may only use the default route, so local addresses do not leak.
         args.push_str(" --force-webrtc-ip-handling-policy=default_public_interface_only");
@@ -535,12 +579,15 @@ macro_rules! configure {
         let prefs = $browser.prefs();
         let mut b = $builder
             .data_directory($browser.profile_dir.clone())
-            .additional_browser_args(&browser_args(&prefs))
+            .additional_browser_args($browser.environment_args(&prefs))
             .incognito($private)
             .devtools(cfg!(debug_assertions))
             .zoom_hotkeys_enabled(true)
             .general_autofill_enabled(prefs.autofill)
-            .background_color(tauri::webview::Color(11, 13, 16, 255))
+            .background_color({
+                let (r, g, b) = page_style::rgb(&prefs.page_background);
+                tauri::webview::Color(r, g, b, 255)
+            })
             .browser_extensions_enabled(prefs.extensions);
         if prefs.extensions {
             let _ = std::fs::create_dir_all($browser.extensions_dir());
@@ -793,5 +840,12 @@ mod tests {
     fn local_hosts_are_not_upgraded() {
         assert!(is_local_host("localhost") && is_local_host("10.0.0.2") && is_local_host("printer.local"));
         assert!(!is_local_host("example.com") && !is_local_host("8.8.8.8"));
+    }
+
+    #[test]
+    fn only_forced_dark_pages_add_the_browser_feature() {
+        let args = |dark: &str| browser_args(&Prefs { page_dark: dark.into(), ..Prefs::default() });
+        assert!(args("force").contains("WebContentsForceDark"));
+        assert!(!args("prefer").contains("WebContentsForceDark") && !args("off").contains("WebContentsForceDark"));
     }
 }

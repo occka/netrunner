@@ -15,7 +15,7 @@ pub async fn settings_get_all(state: State<'_, AppState>) -> AppResult<HashMap<S
 #[tauri::command]
 pub async fn settings_set(app: tauri::AppHandle, state: State<'_, AppState>, key: String, value: Value) -> AppResult<()> {
     settings::set(&*state.db.conn()?, &key, &value)?;
-    if key.starts_with("browser.") {
+    if key.starts_with("browser.") || key == "theme" {
         crate::browser::reload_prefs(&app);
     }
     if key == crate::overlay_snap::SETTING_KEY {

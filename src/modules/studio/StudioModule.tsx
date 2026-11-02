@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Code2, Hash, Layers, LayoutDashboard, Link2, Plus, Rss, Save, Trash2, Type, X } from "lucide-react";
 import { emit } from "@tauri-apps/api/event";
 import { ModuleHeader } from "@/components/ModuleHeader";
+import { ResizeHandle } from "@/components/ResizeHandle";
 import { api } from "@/services/api";
 import { useProfiles } from "@/stores/profiles";
 import { confirmAction } from "@/stores/confirm";
@@ -77,6 +78,7 @@ export default function StudioModule() {
             </button>
           ))}
         </aside>
+        <ResizeHandle pane="studio-side" of="prev" min={180} max={600} rest={360} />
         {current ? (
           <Editor key={current.id} widget={current} onDeleted={() => setSelected(null)} />
         ) : (

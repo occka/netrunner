@@ -35,11 +35,10 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: var(--pane-dev-side, 260px) 0 minmax(0, 1fr);
 }
-.ide-body--debug,
-.ide-body--ai {
-  grid-template-columns: 240px minmax(0, 1fr) 280px;
+.ide-body--debug {
+  grid-template-columns: var(--pane-dev-side, 240px) 0 minmax(0, 1fr) 0 var(--pane-dev-right, 320px);
 }
 .ide-side,
 .ide-right {
@@ -83,8 +82,20 @@
   cursor: pointer;
 }
 .ide-side__tabs button[aria-selected="true"] {
+  flex: 0 1 auto;
+  padding: 0 8px;
   color: var(--c-primary);
   border-bottom-color: var(--c-primary);
+}
+/* Six tabs do not fit with text: the active one keeps its label, the others show an icon and a tooltip. */
+.ide-side__tabs button span {
+  display: none;
+}
+.ide-side__tabs button[aria-selected="true"] span {
+  display: inline;
+}
+.ide-side__tabs button:hover {
+  color: var(--c-text);
 }
 .ide-side__body {
   flex: 1;
@@ -237,8 +248,9 @@
 
 /* ---------- Terminal ---------- */
 .terminal-panel {
-  height: 34%;
-  min-height: 160px;
+  height: var(--pane-dev-terminal, 34%);
+  min-height: 100px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--c-line);
@@ -434,8 +446,9 @@
 }
 .gh {
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: var(--pane-github-list, 340px) 0 minmax(0, 1fr);
+  column-gap: 6px;
+  row-gap: 12px;
   align-items: start;
 }
 .gh-list {
@@ -776,6 +789,9 @@
 }
 
 /* ---------- Editor groups ---------- */
+.editor-area--split > .editor-group:first-child {
+  flex: 0 0 var(--pane-dev-split, 50%);
+}
 .editor-area--split {
   flex-direction: row;
 }
@@ -910,6 +926,11 @@
 }
 
 /* ---------- GitHub in DEVELOPER ---------- */
+.dev-gh {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 .text-ok {
   color: var(--c-success);
 }

@@ -111,6 +111,15 @@ export interface SettingsSchema {
   /** Reopen the tabs of the last session when BROWSER is first opened. */
   "browser.restore_tabs": boolean;
   "browser.session": BrowserSession;
+  /** Dark mode for pages: only sites that have a dark theme, or all (from the next start). */
+  "browser.page_dark": "off" | "prefer" | "force";
+  /** The theme's accent colour and scrollbars on pages. */
+  "browser.page_accent": boolean;
+  "browser.page_accent_off": string[];
+  /** Experimental: sites shown over NETRUNNER's background. */
+  "browser.page_transparent": string[];
+  /** Opacity in % of the dark layer behind a transparent page. */
+  "browser.page_tint": number;
   // Appearance (styles/appearance.ts).
   "appearance.background": BackgroundSpec;
   "appearance.dashboard_background": BackgroundSpec;
@@ -124,6 +133,8 @@ export interface SettingsSchema {
   "appearance.scanlines": boolean;
   "appearance.glow": boolean;
   "appearance.vignette": boolean;
+  /** Sizes of resizable panels in px, by panel name; absent means the layout's default. */
+  "ui.panes": Record<string, number>;
   /** Read temperatures and fans from HWiNFO's shared memory. */
   "sensors.hwinfo": boolean;
   /** DEVELOPER: format with the language server before saving. */
@@ -167,6 +178,11 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "browser.home": "",
   "browser.restore_tabs": true,
   "browser.session": { tabs: [], active: 0 },
+  "browser.page_dark": "off",
+  "browser.page_accent": false,
+  "browser.page_accent_off": [],
+  "browser.page_transparent": [],
+  "browser.page_tint": 60,
   "appearance.background": DEFAULT_BACKGROUND,
   "appearance.dashboard_background": DEFAULT_BACKGROUND,
   "appearance.panel_opacity": 100,
@@ -177,6 +193,7 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "appearance.scanlines": false,
   "appearance.glow": false,
   "appearance.vignette": false,
+  "ui.panes": {},
   "sensors.hwinfo": false,
   "developer.format_on_save": false,
   "developer.editor": DEFAULT_EDITOR,
@@ -210,6 +227,7 @@ function coerce(raw: Record<string, unknown>): SettingsSchema {
   }
   values["monitor.interval_ms"] = Math.min(10000, Math.max(500, values["monitor.interval_ms"]));
   values["browser.session"] = sanitizeSession(values["browser.session"]);
+  values["browser.page_tint"] = Math.min(100, Math.max(0, values["browser.page_tint"]));
   values["appearance.background"] = sanitizeBackground(values["appearance.background"]);
   values["appearance.dashboard_background"] = sanitizeBackground(values["appearance.dashboard_background"]);
   values["appearance.panel_opacity"] = Math.min(100, Math.max(30, values["appearance.panel_opacity"]));
@@ -218,6 +236,7 @@ function coerce(raw: Record<string, unknown>): SettingsSchema {
   values["appearance.scale"] = Math.min(150, Math.max(70, values["appearance.scale"]));
   if (!FONTS.some((f) => f.id === values["appearance.font"])) values["appearance.font"] = "plex";
   values["inspector.width"] = Math.min(520, Math.max(240, values["inspector.width"]));
+  values["ui.panes"] = Object.fromEntries(Object.entries(values["ui.panes"] ?? {}).filter(([, v]) => typeof v === "number" && v > 0 && v < 5000));
   values["developer.editor"] = sanitizeEditor(values["developer.editor"]);
   if (Array.isArray(values["developer.session"])) values["developer.session"] = {};
   return values;

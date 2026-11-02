@@ -302,6 +302,25 @@ unsafe fn read_stream(stream: &IStream, limit: usize) -> Option<Vec<u8>> {
     Some(out)
 }
 
+/// Dark mode for the profile (shared by all tabs), and whether the page's
+/// empty background is see-through or the theme's background colour.
+pub fn set_page_appearance(webview: &tauri::Webview, dark: bool, transparent: bool, background: (u8, u8, u8)) {
+    let _ = webview.with_webview(move |pw| unsafe {
+        let controller = pw.controller();
+        if let Ok(core13) = controller.CoreWebView2().and_then(|c| c.cast::<ICoreWebView2_13>()) {
+            if let Ok(profile) = core13.Profile() {
+                let scheme = if dark { COREWEBVIEW2_PREFERRED_COLOR_SCHEME_DARK } else { COREWEBVIEW2_PREFERRED_COLOR_SCHEME_AUTO };
+                let _ = profile.SetPreferredColorScheme(scheme);
+            }
+        }
+        if let Ok(c2) = controller.cast::<ICoreWebView2Controller2>() {
+            let (r, g, b) = background;
+            let color = COREWEBVIEW2_COLOR { A: if transparent { 0 } else { 255 }, R: r, G: g, B: b };
+            let _ = c2.SetDefaultBackgroundColor(color);
+        }
+    });
+}
+
 /// Puts the page above its host window's own webview. In transparent overlay
 /// windows a new child webview can otherwise end up underneath it.
 pub fn raise(webview: &tauri::Webview) {

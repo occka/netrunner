@@ -58,7 +58,7 @@ export function GitHubPanel({ root }: { root: string }) {
   if (connected === null || origin === undefined) return <div className="tree__loading label">Reading GitHub…</div>;
   if (!connected)
     return (
-      <div className="gh">
+      <div className="dev-gh">
         <p className="muted gh__note">Connect GitHub in the GITHUB module to publish projects, open pull requests and see CI here.</p>
         <button className="btn btn--sm" onClick={() => useShell.getState().navigate("github")}>
           Open GITHUB
@@ -69,7 +69,7 @@ export function GitHubPanel({ root }: { root: string }) {
   if (pr !== null) return <PrDetailView root={root} origin={origin} number={pr} onBack={() => setPr(null)} />;
 
   return (
-    <div className="gh">
+    <div className="dev-gh">
       <div className="tree__head">
         <span className="label truncate" title={`${origin.owner}/${origin.repo}`}>
           {origin.owner}/{origin.repo}
@@ -128,7 +128,7 @@ function PublishForm({ root, onDone }: { root: string; onDone: () => void }) {
   };
 
   return (
-    <div className="gh">
+    <div className="dev-gh">
       <div className="tree__head">
         <span className="label">Publish to GitHub</span>
       </div>
@@ -352,7 +352,7 @@ function PrDetailView({ root, origin, number, onBack }: { root: string; origin: 
   };
 
   return (
-    <div className="gh">
+    <div className="dev-gh">
       <div className="tree__head">
         <button className="icon-btn icon-btn--sm" title="Back" onClick={onBack}>
           <ArrowLeft size={12} />

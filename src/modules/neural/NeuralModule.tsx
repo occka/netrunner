@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { FileUp, KeyRound, LogOut, ShieldCheck } from "lucide-react";
 import { ModuleHeader } from "@/components/ModuleHeader";
+import { ResizeHandle } from "@/components/ResizeHandle";
 import { api } from "@/services/api";
 import { confirmAction } from "@/stores/confirm";
 import { notify, reportError } from "@/stores/notifications";
@@ -71,6 +72,7 @@ export default function NeuralModule() {
       ) : (
         <div className="neural-body">
           <ChatList />
+          <ResizeHandle pane="neural-chats" of="prev" min={160} max={600} rest={360} />
           <ChatPanel
             attachControls={
               <>

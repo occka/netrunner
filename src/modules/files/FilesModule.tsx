@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { ModuleHeader } from "@/components/ModuleHeader";
+import { ResizeHandle } from "@/components/ResizeHandle";
 import { useContextMenu } from "@/components/ContextMenu";
 import { api } from "@/services/api";
 import { usePolled } from "@/hooks/usePolled";
@@ -308,6 +309,7 @@ export default function FilesModule() {
             </button>
           ))}
         </aside>
+        <ResizeHandle pane="files-side" of="prev" min={140} max={500} rest={320} />
 
         <div className="files-main" tabIndex={0} ref={listRef}>
           {search && (
@@ -369,6 +371,7 @@ export default function FilesModule() {
           {!error && shown.length === 0 && <div className="empty">{search ? "No matches." : "This folder is empty."}</div>}
         </div>
 
+        <ResizeHandle pane="files-preview" of="next" min={180} max={900} rest={320} />
         <aside className="files-preview">
           {selection.length > 1 ? (
             <div className="empty">

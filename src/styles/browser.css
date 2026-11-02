@@ -408,3 +408,20 @@ label.check.browser__opt {
   display: grid;
   place-items: center;
 }
+
+/* The page is see-through: NETRUNNER's own background shows behind it. */
+.browser__view--clear {
+  background: transparent;
+}
+.browser__range {
+  display: grid;
+  gap: 4px;
+  font-size: var(--fs-sm);
+}
+.browser__range input {
+  width: 100%;
+  accent-color: var(--c-primary);
+}
+.browser__notice {
+  color: var(--c-warning);
+}

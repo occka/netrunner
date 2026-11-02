@@ -27,6 +27,8 @@ Rust tests include `system::smoke` and `dev::smoke`, which call real Windows API
 
 Development builds run beside the installed NETRUNNER: they skip the single-instance lock, keep their data in `<appdata>\com.netrunner.app\dev\` (or `NETRUNNER_DATA_DIR`), show "NETRUNNER DEV" in the tray and toggle overlays with `Ctrl+Alt+Shift+O`.
 
+`NETRUNNER_DEV_BROWSER_PORT=<port>` (debug builds only) opens the DevTools protocol on the BROWSER profile for testing tabs. `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` overrides the arguments NETRUNNER passes, including `WebContentsForceDark`, so leave it unset when testing them.
+
 Development builds (`npm run app:dev`) never run automations, so rebuilding does not launch your real programs. Set `NETRUNNER_DEV_AUTOMATION=1` before starting the dev build to test the engine.
 
 ## Adding an automation trigger or action
@@ -42,6 +44,10 @@ Add a `Spec` to `SPECS` in `dev/lsp/registry.rs`: executable names, arguments, t
 ## Adding a debug adapter
 
 Add it to `adapters` and `Dap::start` in `dev/dap.rs` (stdio with `spawn_stdio`, a local port with `spawn_tcp`), then to `autoDebugConfig` in `modules/developer/debug/configs.ts` with the launch settings it expects. `cargo test dap` runs the session state machine against a fake adapter.
+
+## Making a panel resizable
+
+Put `<ResizeHandle pane="name" of="prev" />` next to the panel (`next` when it is on the other side), add a `0` column for it if the parent is a grid, and use `var(--pane-name, <default>)` for the panel's size in the stylesheet.
 
 ## Adding a game source
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { DownloadCloud, ExternalLink, GitPullRequest, HardDrive, KeyRound, Lock, LogOut, RefreshCw, Star, CircleDot, Unlink } from "lucide-react";
 import { ModuleHeader } from "@/components/ModuleHeader";
+import { ResizeHandle } from "@/components/ResizeHandle";
 import { Tabs } from "@/components/Tabs";
 import { api } from "@/services/api";
 import { usePolled } from "@/hooks/usePolled";
@@ -170,6 +171,7 @@ function Repos() {
           </button>
         ))}
       </div>
+      <ResizeHandle pane="github-list" of="prev" min={220} max={800} rest={360} />
       {selected && (
         <RepoDetail
           repo={selected}
