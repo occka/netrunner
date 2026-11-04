@@ -20,6 +20,11 @@ export interface SleepingTab {
   title: string;
 }
 
+export interface ClosedTab {
+  url: string;
+  title: string;
+}
+
 /** A tab as the strip shows it. */
 export type StripTab = BrowserTab & { sleeping?: boolean };
 
@@ -30,6 +35,8 @@ interface BrowserStore {
   activeId: string | null;
   /** Private mode for the next tab opened from the start page. */
   nextPrivate: boolean;
+  /** Recently closed tabs of this run, newest first. Private tabs are never kept. */
+  closed: ClosedTab[];
   notices: (BrowserNotice & { key: number })[];
   ready: boolean;
   init: () => Promise<void>;
@@ -39,6 +46,8 @@ interface BrowserStore {
   open: (input: string) => Promise<void>;
   go: (input: string) => Promise<void>;
   close: (id: string) => Promise<void>;
+  /** Opens the most recently closed tab again, or the given one. */
+  reopen: (index?: number) => Promise<void>;
   dismiss: (key: number) => void;
 }
 
@@ -72,6 +81,7 @@ function sleeper(s: SleepingTab): StripTab {
     audible: false,
     fullscreen: false,
     favicon: null,
+    zoom: 1,
     sleeping: true,
   };
 }
@@ -149,6 +159,7 @@ export const useBrowser = create<BrowserStore>((set, get) => {
     order: [],
     activeId: null,
     nextPrivate: false,
+    closed: [],
     notices: [],
     ready: false,
     init: async () => {
@@ -240,6 +251,10 @@ export const useBrowser = create<BrowserStore>((set, get) => {
     },
     close: async (id) => {
       const isSleeping = get().sleeping.some((t) => t.id === id);
+      const gone = stripTabs(get()).find((t) => t.id === id);
+      if (gone && !gone.private && /^https?:\/\//.test(gone.url)) {
+        set((s) => ({ closed: [{ url: gone.url, title: gone.title }, ...s.closed].slice(0, 25) }));
+      }
       set((s) => {
         const i = s.order.indexOf(id);
         const order = s.order.filter((x) => x !== id);
@@ -259,6 +274,12 @@ export const useBrowser = create<BrowserStore>((set, get) => {
       } catch (err) {
         reportError("Could not close the tab", err);
       }
+    },
+    reopen: async (index = 0) => {
+      const entry = get().closed[index];
+      if (!entry) return;
+      set((s) => ({ closed: s.closed.filter((_, i) => i !== index), nextPrivate: false }));
+      await get().open(entry.url);
     },
     dismiss: (key) => set((s) => ({ notices: s.notices.filter((n) => n.key !== key) })),
   };

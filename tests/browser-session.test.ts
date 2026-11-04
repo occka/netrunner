@@ -5,6 +5,7 @@ import type { BrowserTab } from "../src/types/browser";
 const live = (id: string, url: string, extra: Partial<BrowserTab> = {}): BrowserTab => ({
   id,
   host: "main",
+  zoom: 1,
   url,
   title: id,
   loading: false,

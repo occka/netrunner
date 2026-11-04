@@ -75,11 +75,12 @@ Done so far: GITHUB code browsing, Widget Studio, per-profile overlay sets, clic
 - Moved on: Node.js debugging and semantic highlighting from language servers (below); the CodeLLDB adapter is located, not downloaded by NETRUNNER.
 
 ### 0.9: Browser, part 2
-- **DEVELOPER leftovers**: Node.js debugging (js-debug), semantic highlighting from language servers.
-- **uBlock scriptlet resources** so in-video ads on sites like YouTube are blocked too.
-- Per-site JavaScript / autoplay / zoom memory, reader mode, tab groups, tab search, recently closed tabs (Ctrl+Shift+T).
-- Download manager panel with progress and "open folder"; per-site cookie viewer.
+- ✅ **Ads on YouTube** removed by our own script instead of uBlock scriptlets (no downloaded code runs in pages).
+- ✅ Per-site JavaScript switch and zoom memory, reader mode, tab search, recently closed tabs (Ctrl+Shift+T; private tab moved to Ctrl+Shift+N).
+- ✅ Download progress and cancel; per-site cookie viewer.
+- Tab groups; per-site autoplay (WebView2 offers only a global policy).
 - Password autofill through Windows Credential Manager (opt-in).
+- **DEVELOPER leftovers**: Node.js debugging (js-debug), semantic highlighting from language servers.
 
 ### 1.0: Platform
 - **Plugin architecture**: signed plugins with a declared permission set (commands, widgets, automation triggers), loaded in an isolated webview; no access beyond what they declare.
@@ -102,6 +103,7 @@ Done so far: GITHUB code browsing, Widget Studio, per-profile overlay sets, clic
 - Overlays cannot draw over exclusive-fullscreen games (no injection by design).
 - Browser tabs are native webviews: NETRUNNER's toasts cannot appear on top of a page, and app shortcuts (Ctrl+K) work only while focus is in NETRUNNER's own UI. Dialogs and the palette hide the page while open.
 - Web overlay opacity applies to the frame only; page content is opaque.
+- YouTube's ad removal can break when YouTube changes, and ads stitched into the video stream can only be played through quickly, not removed. Recently closed tabs last until NETRUNNER closes.
 - Browser transparency shows the background only where a site leaves its own page background: elements the site paints stay opaque, and some sites stay fully opaque. Forced dark pages are recoloured by Chromium and can look wrong on some sites; the choice applies to the whole browser and takes effect after a restart.
 - BROWSER's side panels are not resizable yet.
 - The Music Player shows only apps that publish Windows media sessions.

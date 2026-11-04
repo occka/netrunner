@@ -15,9 +15,10 @@ export interface BrowserTab {
   audible: boolean;
   fullscreen: boolean;
   favicon: string | null;
+  zoom: number;
 }
 
-export type BrowserNoticeKind = "https-upgrade" | "permission" | "external-app" | "blocked-scheme" | "download";
+export type BrowserNoticeKind = "https-upgrade" | "permission" | "external-app" | "blocked-scheme" | "download" | "reader";
 
 export interface BrowserNotice {
   tab: string;
@@ -86,6 +87,18 @@ export interface BrowserDownload {
   url: string;
   path: string | null;
   state: "running" | "done" | "failed";
+  received: number;
+  total: number | null;
+}
+
+/** Names and details only: the backend never passes a cookie's value. */
+export interface BrowserCookie {
+  name: string;
+  domain: string;
+  path: string;
+  expires: number | null;
+  secure: boolean;
+  httpOnly: boolean;
 }
 
 export interface MediaSession {

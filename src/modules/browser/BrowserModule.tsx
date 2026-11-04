@@ -7,9 +7,11 @@ import {
   ArrowLeft,
   ArrowRight,
   Bookmark as BookmarkIcon,
+  BookOpen,
   Download,
   Globe,
   History,
+  Layers,
   Loader2,
   Lock,
   PictureInPicture2,
@@ -32,11 +34,11 @@ import { usePolled } from "@/hooks/usePolled";
 import { useSetting, useSettings } from "@/stores/settings";
 import { notify, reportError } from "@/stores/notifications";
 import { BrowserSurface } from "./BrowserSurface";
-import { AppearancePanel, BookmarksPanel, DownloadsPanel, HistoryPanel, PrivacyPanel } from "./BrowserPanels";
+import { AppearancePanel, BookmarksPanel, DownloadsPanel, HistoryPanel, PrivacyPanel, TabsPanel } from "./BrowserPanels";
 import { hostOf, mainTabs, stripTabs, useBrowser, type StripTab } from "./store";
 import type { BrowserNotice, BrowserTab } from "@/types/browser";
 
-type Panel = "bookmarks" | "history" | "downloads" | "privacy" | "appearance" | null;
+type Panel = "tabs" | "bookmarks" | "history" | "downloads" | "privacy" | "appearance" | null;
 
 
 const PERMISSION_LABEL: Record<string, string> = {
@@ -99,6 +101,11 @@ export default function BrowserModule() {
       } else if (key === "address") focusAddress();
       else if (key === "close") void s.close(tabId);
       else if (key === "reload") void api.browser.action(tabId, "reload").catch(() => undefined);
+      else if (key === "reopen") void s.reopen();
+      else if (key === "tabs") {
+        setPanel("tabs");
+        void getCurrentWebview().setFocus();
+      }
       else if (key === "palette") useShell.getState().openPalette();
       else if ((key === "next" || key === "prev") && order.length > 1)
         s.activate(order[(i + (key === "next" ? 1 : -1) + order.length) % order.length]);
@@ -113,7 +120,14 @@ export default function BrowserModule() {
       const k = e.key.toLowerCase();
       if (k === "t") {
         e.preventDefault();
-        newTab(e.shiftKey);
+        if (e.shiftKey) void useBrowser.getState().reopen();
+        else newTab(false);
+      } else if (k === "n" && e.shiftKey) {
+        e.preventDefault();
+        newTab(true);
+      } else if (k === "a" && e.shiftKey) {
+        e.preventDefault();
+        setPanel("tabs");
       } else if (k === "w" && activeId) {
         e.preventDefault();
         void close(activeId);
@@ -153,7 +167,7 @@ export default function BrowserModule() {
         <button className="icon-btn icon-btn--sm" title="New tab (Ctrl+T)" onClick={() => newTab(false)}>
           <Plus size={14} />
         </button>
-        <button className="icon-btn icon-btn--sm" title="New private tab (Ctrl+Shift+T): no history, cookies cleared when closed" onClick={() => newTab(true)}>
+        <button className="icon-btn icon-btn--sm" title="New private tab (Ctrl+Shift+N): no history, cookies cleared when closed" onClick={() => newTab(true)}>
           <VenetianMask size={14} />
         </button>
       </div>
@@ -178,10 +192,11 @@ export default function BrowserModule() {
               </button>
             </div>
             <div className="browser__panel-body">
+              {panel === "tabs" && <TabsPanel />}
               {panel === "bookmarks" && <BookmarksPanel />}
               {panel === "history" && <HistoryPanel />}
               {panel === "downloads" && <DownloadsPanel />}
-              {panel === "privacy" && <PrivacyPanel site={siteHost} />}
+              {panel === "privacy" && <PrivacyPanel site={siteHost} tabId={tab?.id ?? null} />}
               {panel === "appearance" && <AppearancePanel site={siteHost} />}
             </div>
           </aside>
@@ -340,6 +355,18 @@ function Toolbar({
           }}
         />
       </form>
+      {tab && Math.abs(tab.zoom - 1) > 0.001 && (
+        <button
+          className="btn btn--sm btn--ghost mono"
+          title="This site's zoom is remembered. Click to return to 100%."
+          onClick={() => void api.browser.setZoom(tab.id, 1).catch((err) => reportError("Could not reset zoom", err))}
+        >
+          {Math.round(tab.zoom * 100)}%
+        </button>
+      )}
+      <button className="icon-btn" title="Reader mode: only the article. Reload to return to the page." disabled={!tab} onClick={() => tab && void api.browser.reader(tab.id).catch((err) => reportError("Reader mode failed", err))}>
+        <BookOpen size={15} />
+      </button>
       <button
         className="icon-btn browser__shield"
         title={siteExcepted ? "Blocking is off for this site" : `${tab?.blocked ?? 0} requests blocked on this page`}
@@ -355,6 +382,7 @@ function Toolbar({
       <button className="icon-btn" title="Move to a floating overlay (keeps playing music or video)" disabled={!tab} onClick={() => void popOut()}>
         <PictureInPicture2 size={15} />
       </button>
+      {panelBtn("tabs", <Layers size={15} />, "Search tabs, recently closed (Ctrl+Shift+A)")}
       {panelBtn("bookmarks", <BookmarkIcon size={15} />, "Bookmarks")}
       {panelBtn("history", <History size={15} />, "History")}
       {panelBtn("downloads", <Download size={15} />, "Downloads")}
@@ -375,6 +403,8 @@ function noticeText(n: BrowserNotice): string {
       return `Blocked navigation to ${n.detail.slice(0, 80)}: only web pages open here.`;
     case "download":
       return `Downloading from ${n.host}. Windows SmartScreen checks the file.`;
+    case "reader":
+      return "Reader mode found no article on this page.";
   }
 }
 

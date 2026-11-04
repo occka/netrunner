@@ -52,9 +52,12 @@ The command policy is a safety net, not a sandbox: a confirmed command runs with
 | Downloads | Default Downloads folder; SmartScreen reputation checks stay on (NETRUNNER's own webview disables SmartScreen, the browser profile does not) |
 | WebRTC | `--force-webrtc-ip-handling-policy=default_public_interface_only` hides local IP addresses (applies after restart) |
 | Private tabs | InPrivate WebView2 sessions; nothing is written to history |
+| YouTube ads | `youtube_guard.js`, our own code in the binary, runs on `youtube.com` and `youtube-nocookie.com` only. It edits what those pages receive and show, reads nothing else, sends nothing and has no way back to NETRUNNER. Off in Privacy; off when blocking is off for YouTube |
+| Cookies | The viewer lists names, domains and expiry of the current page's cookies. Values never leave WebView2, because they are often login tokens |
+| JavaScript | Can be turned off per site (`browser.no_script`), applied before each navigation |
 | Page appearance | Off unless the user turns it on. What reaches a page is a stylesheet built from validated hex colours (`page_style.rs` refuses anything else) and never a value the page supplied; it reads nothing and has no way back to NETRUNNER. A page can see the stylesheet and so learn the theme's accent colour, which is a small fingerprinting signal to weigh when turning it on. Transparency applies only to sites the user listed |
 
-Not covered: in-page video ads served from the site's own domain (e.g. YouTube) need uBlock scriptlets, which are not bundled. Loading unpacked extensions (e.g. uBlock Origin Lite) is an opt-in setting; extensions run with the permissions they declare. Fingerprinting resistance beyond WebView2's defaults is not attempted.
+Not covered: uBlock scriptlets (`##+js`) are not bundled, because they would mean running downloaded code in pages, so sites other than YouTube that serve ads from their own domain can still show them. Loading unpacked extensions (e.g. uBlock Origin Lite) is an opt-in setting; extensions run with the permissions they declare. Fingerprinting resistance beyond WebView2's defaults is not attempted.
 
 ## Widget Studio
 
