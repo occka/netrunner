@@ -15,6 +15,7 @@
 
 pub mod blocker;
 pub mod data;
+pub mod logins;
 pub mod media;
 #[cfg(windows)]
 mod native;
@@ -44,6 +45,8 @@ pub const LABEL_PREFIX: &str = "web-";
 pub struct Prefs {
     pub adblock: bool,
     pub cosmetic: bool,
+    /// Removes ads on YouTube (`youtube_guard.js`). From the next tab opened.
+    pub youtube_ads: bool,
     pub https_only: bool,
     pub gpc: bool,
     pub tracking: String,
@@ -64,6 +67,12 @@ pub struct Prefs {
     /// Theme colours, checked with `page_style::valid_hex`.
     pub page_primary: String,
     pub page_background: String,
+    /// Zoom remembered per site. Written by `on_zoom_changed`; 100% is not stored.
+    pub site_zoom: HashMap<String, f64>,
+    /// Sites where the user turned JavaScript off.
+    pub no_script: Vec<String>,
+    /// Sites that may not start media by themselves. From the next tab opened.
+    pub no_autoplay: Vec<String>,
 }
 
 impl Default for Prefs {
@@ -71,6 +80,7 @@ impl Default for Prefs {
         Self {
             adblock: true,
             cosmetic: true,
+            youtube_ads: true,
             https_only: true,
             gpc: true,
             tracking: "strict".into(),
@@ -88,6 +98,9 @@ impl Default for Prefs {
             page_tint: 60,
             page_primary: "#ffd400".into(),
             page_background: "#0b0d10".into(),
+            site_zoom: HashMap::new(),
+            no_script: Vec::new(),
+            no_autoplay: Vec::new(),
         }
     }
 }
@@ -103,6 +116,7 @@ impl Prefs {
         };
         p.adblock = flag("adblock", p.adblock);
         p.cosmetic = flag("cosmetic", p.cosmetic);
+        p.youtube_ads = flag("youtube_ads", p.youtube_ads);
         p.https_only = flag("https_only", p.https_only);
         p.gpc = flag("gpc", p.gpc);
         p.tracking = text("tracking", &p.tracking);
@@ -117,6 +131,11 @@ impl Prefs {
         p.page_accent = flag("page_accent", p.page_accent);
         p.page_accent_off = list("page_accent_off").unwrap_or_default();
         p.page_transparent = list("page_transparent").unwrap_or_default();
+        p.no_script = list("no_script").unwrap_or_default();
+        p.no_autoplay = list("no_autoplay").unwrap_or_default();
+        p.site_zoom = get("site_zoom")
+            .and_then(|v| v.as_object().map(|m| m.iter().filter_map(|(k, v)| Some((k.clone(), v.as_f64()?))).collect()))
+            .unwrap_or_default();
         p.page_tint = get("page_tint").and_then(|v| v.as_u64()).map_or(p.page_tint, |t| t.min(100) as u8);
         if let Some(theme) = settings::get(conn, "theme").ok().flatten() {
             let color = |k: &str| theme.get(k).and_then(|v| v.as_str()).filter(|c| page_style::valid_hex(c)).map(str::to_string);
@@ -144,6 +163,7 @@ pub struct Tab {
     pub audible: bool,
     pub fullscreen: bool,
     pub favicon: Option<String>,
+    pub zoom: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -164,6 +184,23 @@ pub struct Download {
     pub path: Option<String>,
     /// `running`, `done`, `failed`.
     pub state: String,
+    pub received: u64,
+    /// Unknown until the server says.
+    pub total: Option<u64>,
+}
+
+/// A cookie as the UI shows it. The value is left out on purpose: it is often a
+/// login token, and nothing here needs it.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Cookie {
+    pub name: String,
+    pub domain: String,
+    pub path: String,
+    /// Seconds since 1970; `None` for a session cookie.
+    pub expires: Option<f64>,
+    pub secure: bool,
+    pub http_only: bool,
 }
 
 pub struct Browser {
@@ -244,10 +281,87 @@ impl Browser {
         }
     }
 
+    pub(crate) fn download_progress(&self, url: &str, received: u64, total: Option<u64>) {
+        if let Ok(mut d) = self.downloads.lock() {
+            if let Some(entry) = d.iter_mut().rev().find(|x| x.url == url && x.state == "running") {
+                entry.received = received;
+                entry.total = total;
+            }
+        }
+    }
+
     pub(crate) fn is_exception(&self, page_url: &str) -> bool {
         let host = Url::parse(page_url).ok().and_then(|u| u.host_str().map(str::to_string)).unwrap_or_default();
         self.prefs.read().map(|p| p.exceptions.iter().any(|e| host == *e || host.ends_with(&format!(".{e}")))).unwrap_or(false)
     }
+}
+
+fn host_of(url: &str) -> String {
+    Url::parse(url).ok().and_then(|u| u.host_str().map(str::to_string)).unwrap_or_default()
+}
+
+fn host_in(list: &[String], host: &str) -> bool {
+    list.iter().any(|e| host == e || host.ends_with(&format!(".{e}")))
+}
+
+/// WebView2's zoom belongs to the tab, so a tab that moves to another site takes
+/// on the zoom remembered for that site.
+fn apply_site_zoom(app: &AppHandle, browser: &Browser, label: &str, url: &str) {
+    let factor = browser.prefs().site_zoom.get(&host_of(url)).copied().unwrap_or(1.0);
+    if browser.tab(label).is_some_and(|t| (t.zoom - factor).abs() < 0.001) {
+        return;
+    }
+    if let Some(w) = app.get_webview(label) {
+        let _ = w.set_zoom(factor);
+    }
+    emit_tab(app, browser.update(label, |t| t.zoom = factor));
+}
+
+/// WebView2 reports a zoom change only when it did not come from `set_zoom`: the
+/// user zoomed, or a navigation restored WebView2's own zoom for that site. Ours
+/// is the one that counts, so the second kind is simply overruled.
+pub(crate) fn on_zoom_changed(app: &AppHandle, label: &str, factor: f64) {
+    let Some(browser) = app.try_state::<Browser>() else { return };
+    let Some(tab) = browser.update(label, |t| t.zoom = factor) else { return };
+    if tab.loading {
+        apply_site_zoom(app, &browser, label, &tab.url);
+    } else {
+        remember_zoom(app, &browser, &tab, factor);
+        emit_tab(app, Some(tab));
+    }
+}
+
+/// Remembered per site, unless the tab is private. 100% is simply not stored.
+fn remember_zoom(app: &AppHandle, browser: &Browser, tab: &Tab, factor: f64) {
+    let host = host_of(&tab.url);
+    if tab.private || host.is_empty() {
+        return;
+    }
+    let mut zooms = browser.prefs().site_zoom;
+    if (factor - 1.0).abs() < 0.001 {
+        zooms.remove(&host);
+    } else {
+        zooms.insert(host, factor);
+    }
+    if let (Some(state), Ok(value)) = (app.try_state::<AppState>(), serde_json::to_value(&zooms)) {
+        if let Ok(conn) = state.db.conn() {
+            let _ = settings::set(&conn, "browser.site_zoom", &value);
+        }
+    }
+    if let Ok(mut p) = browser.prefs.write() {
+        p.site_zoom = zooms;
+    }
+}
+
+/// The reset button in the toolbar.
+pub fn set_tab_zoom(app: &AppHandle, id: &str, factor: f64) -> AppResult<()> {
+    let browser = app.try_state::<Browser>().ok_or_else(|| AppError::Internal("browser not ready".into()))?;
+    webview(app, id)?.set_zoom(factor).map_err(|e| AppError::Internal(e.to_string()))?;
+    if let Some(tab) = browser.update(id, |t| t.zoom = factor) {
+        remember_zoom(app, &browser, &tab, factor);
+        emit_tab(app, Some(tab));
+    }
+    Ok(())
 }
 
 /// Re-reads `browser.*` settings after the UI changed one, and rebuilds the
@@ -361,6 +475,10 @@ pub fn resolve_input(input: &str, search: &str) -> AppResult<Url> {
 /// plain HTTP is upgraded unless the host is local or allowed this session.
 fn navigation_allowed(app: &AppHandle, label: &str, url: &Url) -> bool {
     let Some(browser) = app.try_state::<Browser>() else { return false };
+    #[cfg(windows)]
+    if let Some(w) = app.get_webview(label) {
+        native::set_scripts(&w, !host_in(&browser.prefs().no_script, url.host_str().unwrap_or_default()));
+    }
     match url.scheme() {
         "https" | "about" | "blob" | "data" => true,
         "http" => {
@@ -443,7 +561,7 @@ fn on_download(app: &AppHandle, label: &str, event: DownloadEvent<'_>) -> bool {
             let id = browser.next_id.fetch_add(1, Ordering::Relaxed);
             let path = (!destination.as_os_str().is_empty()).then(|| destination.display().to_string());
             if let Ok(mut d) = browser.downloads.lock() {
-                d.push(Download { id, url: url.to_string(), path, state: "running".into() });
+                d.push(Download { id, url: url.to_string(), path, state: "running".into(), received: 0, total: None });
                 let excess = d.len().saturating_sub(50);
                 d.drain(..excess);
             }
@@ -477,6 +595,7 @@ fn on_page_load(app: &AppHandle, label: &str, url: &Url, finished: bool) {
         }
     });
     page_style::apply(app, label, url.as_str());
+    apply_site_zoom(app, &browser, label, url.as_str());
     if finished {
         if let Some(t) = &tab {
             let prefs = browser.prefs();
@@ -554,6 +673,14 @@ fn inject_cosmetics(app: AppHandle, label: String, url: String) {
 /// Sends `navigator.globalPrivacyControl = true` to scripts as GPC requires.
 const GPC_SCRIPT: &str = "try{Object.defineProperty(Navigator.prototype,'globalPrivacyControl',{get:()=>true,configurable:true})}catch(e){}";
 
+const YOUTUBE_GUARD: &str = include_str!("youtube_guard.js");
+
+/// Hosts go in as JSON, so a value can never become code.
+fn autoplay_guard(sites: &[String]) -> String {
+    let list = serde_json::to_string(sites).unwrap_or_else(|_| "[]".into());
+    include_str!("autoplay_guard.js").replacen("SITES.some", &format!("{list}.some"), 1)
+}
+
 fn browser_args(prefs: &Prefs) -> String {
     // Unlike NETRUNNER's own webview, SmartScreen stays on here.
     // HardwareMediaKeyHandling publishes playing pages to Windows media
@@ -595,6 +722,13 @@ macro_rules! configure {
         }
         if prefs.gpc {
             b = b.initialization_script_for_all_frames(GPC_SCRIPT);
+        }
+        // All frames: YouTube players are often embedded in other sites.
+        if prefs.adblock && prefs.youtube_ads && !$browser.is_exception("https://www.youtube.com/") {
+            b = b.initialization_script_for_all_frames(YOUTUBE_GUARD);
+        }
+        if !prefs.no_autoplay.is_empty() {
+            b = b.initialization_script_for_all_frames(autoplay_guard(&prefs.no_autoplay));
         }
         b = b.initialization_script(media::HOOK);
         let (a1, l1) = ($app.clone(), $label.clone());
@@ -677,7 +811,7 @@ fn on_new_window(
 }
 
 fn register(app: &AppHandle, browser: &Browser, label: &str, host: &str, url: &Url, private: bool) -> Tab {
-    let tab = Tab { id: label.into(), host: host.into(), url: url.to_string(), loading: true, private, ..Default::default() };
+    let tab = Tab { id: label.into(), host: host.into(), url: url.to_string(), loading: true, private, zoom: 1.0, ..Default::default() };
     if let Ok(mut tabs) = browser.tabs.lock() {
         tabs.insert(label.into(), tab.clone());
     }
@@ -710,7 +844,10 @@ pub fn open_tab(app: &AppHandle, host: &str, url: Url, private: bool) -> AppResu
         })?;
     let _ = webview.hide();
     #[cfg(windows)]
-    native::harden(&webview, app.clone(), label);
+    {
+        native::harden(&webview, app.clone(), label);
+        native::set_scripts(&webview, !host_in(&browser.prefs().no_script, url.host_str().unwrap_or_default()));
+    }
     webview.navigate(url).map_err(|e| AppError::Internal(format!("cannot open page: {e}")))?;
     Ok(tab)
 }
@@ -788,6 +925,62 @@ pub fn move_tab(app: &AppHandle, id: &str, host: &str) -> AppResult<()> {
     Ok(())
 }
 
+/// Shows the page's article alone. The page comes back on reload.
+pub fn reader(app: &AppHandle, id: &str) -> AppResult<()> {
+    let view = webview(app, id)?;
+    let host = app.try_state::<Browser>().and_then(|b| b.tab(id)).map(|t| host_of(&t.url)).unwrap_or_default();
+    let (app, label) = (app.clone(), id.to_string());
+    view.eval_with_callback(include_str!("reader.js"), move |result| {
+        if result.trim() != "true" {
+            notice(&app, &label, "reader", &host, "");
+        }
+    })
+    .map_err(|e| AppError::Internal(e.to_string()))
+}
+
+/// Fills a saved login into the page, on the user's click. Refuses any page but
+/// the exact site it was saved for.
+pub fn fill_login(app: &AppHandle, id: &str, username: &str) -> AppResult<()> {
+    let view = webview(app, id)?;
+    let tab = app.try_state::<Browser>().and_then(|b| b.tab(id)).ok_or_else(|| AppError::NotFound("tab is closed".into()))?;
+    let host = host_of(&tab.url);
+    if !logins::may_fill(&tab.url, &host) {
+        return Err(AppError::Invalid("logins are filled only over HTTPS".into()));
+    }
+    let script = logins::fill_script(username, &logins::password(&host, username)?)?;
+    let (app, label) = (app.clone(), id.to_string());
+    view.eval_with_callback(script, move |result| {
+        if result.trim() != "true" {
+            notice(&app, &label, "login-form", &host, "");
+        }
+    })
+    .map_err(|e| AppError::Internal(e.to_string()))
+}
+
+pub fn cookies(app: &AppHandle, id: &str) -> AppResult<std::sync::mpsc::Receiver<Vec<Cookie>>> {
+    let view = webview(app, id)?;
+    let url = app.try_state::<Browser>().and_then(|b| b.tab(id)).map(|t| t.url).unwrap_or_default();
+    let (tx, rx) = std::sync::mpsc::channel();
+    #[cfg(windows)]
+    native::cookies(&view, url, tx);
+    Ok(rx)
+}
+
+pub fn delete_cookie(app: &AppHandle, id: &str, name: &str, domain: &str, path: &str) -> AppResult<()> {
+    let view = webview(app, id)?;
+    #[cfg(windows)]
+    native::delete_cookie(&view, name.to_string(), domain.to_string(), path.to_string());
+    Ok(())
+}
+
+pub fn cancel_download(app: &AppHandle, url: &str) -> AppResult<()> {
+    let browser = app.try_state::<Browser>().ok_or_else(|| AppError::Internal("browser not ready".into()))?;
+    let view = browser.tabs().first().and_then(|t| app.get_webview(&t.id)).ok_or_else(|| AppError::NotFound("no browser tab is open".into()))?;
+    #[cfg(windows)]
+    native::cancel_download(&view, url.to_string());
+    Ok(())
+}
+
 pub fn tab_for_host(app: &AppHandle, host: &str) -> Option<Tab> {
     app.try_state::<Browser>()?.tabs().into_iter().find(|t| t.host == host)
 }
@@ -840,6 +1033,13 @@ mod tests {
     fn local_hosts_are_not_upgraded() {
         assert!(is_local_host("localhost") && is_local_host("10.0.0.2") && is_local_host("printer.local"));
         assert!(!is_local_host("example.com") && !is_local_host("8.8.8.8"));
+    }
+
+    #[test]
+    fn autoplay_guard_carries_its_sites_as_data() {
+        let script = autoplay_guard(&["a.com".into(), "x\";alert(1);//".into()]);
+        assert!(script.contains(r#"["a.com","x\";alert(1);//"].some"#), "{script}");
+        assert!(!script.contains("SITES.some"));
     }
 
     #[test]

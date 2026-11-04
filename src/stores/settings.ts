@@ -5,9 +5,17 @@ import { DEFAULT_THEME, sanitizeTheme, type ThemeColors } from "@/styles/theme";
 import { applyAppearance, DEFAULT_BACKGROUND, FONTS, sanitizeBackground, type BackgroundSpec, type UiFont } from "@/styles/appearance";
 
 /** Open BROWSER tabs, saved so they come back after a restart (never private tabs). */
+export interface BrowserTabGroup {
+  id: string;
+  name: string;
+  color: string;
+  collapsed: boolean;
+}
+
 export interface BrowserSession {
-  tabs: { url: string; title: string }[];
+  tabs: { url: string; title: string; group?: string }[];
   active: number;
+  groups?: BrowserTabGroup[];
 }
 
 function sanitizeSession(raw: unknown): BrowserSession {
@@ -112,6 +120,14 @@ export interface SettingsSchema {
   "browser.restore_tabs": boolean;
   "browser.session": BrowserSession;
   /** Dark mode for pages: only sites that have a dark theme, or all (from the next start). */
+  /** Removes ads on YouTube: from the next tab opened. */
+  "browser.youtube_ads": boolean;
+  /** Sites where JavaScript is turned off. */
+  "browser.no_script": string[];
+  /** Sites that may not start media by themselves: from the next tab opened. */
+  "browser.no_autoplay": string[];
+  /** Saved logins in Windows Credential Manager, filled on click. Off by default. */
+  "browser.passwords": boolean;
   "browser.page_dark": "off" | "prefer" | "force";
   /** The theme's accent colour and scrollbars on pages. */
   "browser.page_accent": boolean;
@@ -178,6 +194,10 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "browser.home": "",
   "browser.restore_tabs": true,
   "browser.session": { tabs: [], active: 0 },
+  "browser.youtube_ads": true,
+  "browser.no_script": [],
+  "browser.no_autoplay": [],
+  "browser.passwords": false,
   "browser.page_dark": "off",
   "browser.page_accent": false,
   "browser.page_accent_off": [],

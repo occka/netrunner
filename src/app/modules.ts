@@ -124,7 +124,7 @@ export const MODULES: ModuleDef[] = [
     phase: 3,
     group: "main",
     description: "Integrated development environment built on Monaco.",
-    planned: ["Node.js debugging", "Semantic highlighting from language servers", "Extensions"],
+    planned: ["Extensions"],
     component: lazy(() => import("@/modules/developer/DeveloperModule")),
   },
   {
@@ -146,7 +146,7 @@ export const MODULES: ModuleDef[] = [
     phase: 4,
     group: "main",
     description: "Gemini assistant. It only sees what you attach.",
-    planned: ["Conversation history saved locally (opt-in)", "AI-assisted semantic search", "Image attachments"],
+    planned: ["AI-assisted semantic search"],
     component: lazy(() => import("@/modules/neural/NeuralModule")),
   },
   {
@@ -157,7 +157,7 @@ export const MODULES: ModuleDef[] = [
     phase: 5,
     group: "main",
     description: "Hardened WebView2 browser: ad and tracker blocking, HTTPS-only, isolated profile, private tabs.",
-    planned: ["Scriptlet filters (uBlock resources) for in-video ads", "Per-site JavaScript toggle", "Reader mode"],
+    planned: [],
     component: lazy(() => import("@/modules/browser/BrowserModule")),
   },
   {

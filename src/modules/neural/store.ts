@@ -1,9 +1,11 @@
 import { Channel } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { create } from "zustand";
 import { api } from "@/services/api";
 import { refreshActivity } from "@/stores/activity";
-import type { Attachment, ContextItem, ModelInfo, NeuralStatus, StreamEvent } from "@/types/neural";
+import type { Attachment, ContextItem, ModelInfo, NeuralAction, NeuralMode, NeuralStatus, StreamEvent } from "@/types/neural";
+import { encodePhoto } from "./images";
 
 export interface ChatMessage {
   id: number;
@@ -18,6 +20,12 @@ export interface ChatMessage {
   status?: string;
   error?: string;
   tokens?: { prompt: number | null; output: number | null };
+  /** Photos sent with this message (names in the chat's folder). */
+  images?: string[];
+  /** What the agent did while answering. */
+  actions?: NeuralAction[];
+  /** How many older messages were left out of this request. */
+  dropped?: number;
 }
 
 interface NeuralStore {
@@ -26,7 +34,10 @@ interface NeuralStore {
   messages: ChatMessage[];
   /** Attachments for the next message only (explicitly chosen by the user). */
   pending: Attachment[];
+  /** Attachments that go with every message of this chat. */
+  kept: Attachment[];
   preview: ContextItem[];
+  mode: NeuralMode;
   draft: string;
   busy: number | null;
   /** Persisted chats (local SQLite); chatId is the open one. */
@@ -42,7 +53,14 @@ interface NeuralStore {
   attach: (a: Attachment) => void;
   detach: (index: number) => void;
   setDraft: (text: string) => void;
-  send: () => Promise<void>;
+  /** `agent`: the NEURAL tab, with the chat's mode and folder. Off in DEVELOPER's panel. */
+  send: (agent?: boolean) => Promise<void>;
+  setMode: (mode: NeuralMode) => Promise<void>;
+  keep: (index: number) => Promise<void>;
+  unkeep: (index: number) => Promise<void>;
+  /** Re-encodes a photo (dropping its metadata), stores it and attaches it. */
+  attachPhoto: (blob: Blob) => Promise<void>;
+  undo: (messageId: number, change: number) => Promise<void>;
   cancel: () => void;
   clear: () => void;
 }
@@ -54,6 +72,14 @@ export interface ChatSummary {
   messageCount: number;
 }
 
+/** Tells other windows showing this chat (main / overlay) to reload it. */
+export interface NeuralChanged {
+  chatId: number | null;
+  source: string;
+}
+export const neuralWindow = () => getCurrentWindow().label;
+const announce = (chatId: number | null) => emit("neural://changed", { chatId, source: neuralWindow() } satisfies NeuralChanged);
+
 let nextId = 1;
 let nextRequest = Date.now();
 
@@ -61,13 +87,14 @@ function sameAttachment(a: Attachment, b: Attachment) {
   if (a.kind !== b.kind) return false;
   if (a.kind === "file" && b.kind === "file") return a.path.toLowerCase() === b.path.toLowerCase();
   if (a.kind === "tree" && b.kind === "tree") return a.root === b.root;
+  if (a.kind === "image" && b.kind === "image") return a.name === b.name;
   return false;
 }
 
 export const useNeural = create<NeuralStore>((set, get) => {
   const refreshPreview = async () => {
-    const pending = get().pending;
-    set({ preview: pending.length ? await api.neural.preview(pending).catch(() => []) : [] });
+    const all = [...get().pending, ...get().kept];
+    set({ preview: all.length ? await api.neural.preview(all).catch(() => []) : [] });
   };
 
   return {
@@ -75,7 +102,9 @@ export const useNeural = create<NeuralStore>((set, get) => {
     models: [],
     messages: [],
     pending: [],
+    kept: [],
     preview: [],
+    mode: "work",
     draft: "",
     busy: null,
     chatId: null,
@@ -87,19 +116,24 @@ export const useNeural = create<NeuralStore>((set, get) => {
       set({
         chatId: st.activeId,
         chats: st.chats,
-        messages: st.messages.map((m) => ({ id: nextId++, role: m.role, text: m.text, model: m.model ?? undefined, sent: m.sent })),
+        mode: st.mode,
+        kept: st.kept,
+        // A photo belongs to the folder of the chat it was added in.
+        pending: st.activeId === get().chatId ? get().pending : get().pending.filter((a) => a.kind !== "image"),
+        messages: st.messages.map((m) => ({ id: nextId++, role: m.role, text: m.text, model: m.model ?? undefined, sent: m.sent, images: m.images, actions: m.actions })),
       });
+      void refreshPreview();
     },
     newChat: async () => {
       if (get().busy) return;
       const st = await api.neural.chatNew();
-      set({ chatId: st.activeId, chats: st.chats, messages: [], draft: "", pending: [], preview: [] });
+      set({ chatId: st.activeId, chats: st.chats, messages: [], draft: "", pending: [], kept: [], preview: [], mode: st.mode });
     },
     deleteChat: async (id) => {
       await api.neural.chatDelete(id);
       if (get().chatId === id) await get().openChat();
       else set({ chats: (await api.neural.chatOpen(get().chatId ?? undefined)).chats });
-      void emit("neural://changed", null);
+      void announce(null);
     },
 
     loadStatus: async () => set({ status: await api.neural.status() }),
@@ -128,22 +162,69 @@ export const useNeural = create<NeuralStore>((set, get) => {
     },
     setDraft: (draft) => set({ draft }),
 
-    send: async () => {
-      const { draft, pending, messages, busy } = get();
-      const text = draft.trim();
+    setMode: async (mode) => {
+      const chatId = get().chatId;
+      if (chatId == null || get().busy) return;
+      await api.neural.chatSetMode(chatId, mode);
+      set({ mode });
+    },
+
+    keep: async (index) => {
+      const { pending, kept, chatId } = get();
+      const item = pending[index];
+      if (!item || chatId == null) return;
+      const next = kept.some((k) => sameAttachment(k, item)) ? kept : [...kept, item];
+      await api.neural.chatSetKept(chatId, next);
+      set({ kept: next, pending: pending.filter((_, i) => i !== index) });
+      void refreshPreview();
+    },
+    unkeep: async (index) => {
+      const { kept, chatId } = get();
+      if (chatId == null) return;
+      const next = kept.filter((_, i) => i !== index);
+      await api.neural.chatSetKept(chatId, next);
+      set({ kept: next });
+      void refreshPreview();
+    },
+
+    attachPhoto: async (blob) => {
+      const { data, bytes } = await encodePhoto(blob);
+      const chatId = get().chatId ?? (await api.neural.chatNew()).activeId;
+      if (get().chatId !== chatId) set({ chatId });
+      const name = await api.neural.imageSave(chatId, data);
+      get().attach({ kind: "image", name, bytes });
+    },
+
+    undo: async (messageId, change) => {
+      const chatId = get().chatId;
+      if (chatId == null) return;
+      await api.neural.undo(chatId, change);
+      set((s) => ({
+        messages: s.messages.map((m) =>
+          m.id === messageId ? { ...m, actions: m.actions?.map((a) => (a.change === change ? { ...a, change: null, error: "Undone" } : a)) } : m,
+        ),
+      }));
+    },
+
+    send: async (agent = true) => {
+      const { draft, pending, kept, messages, busy } = get();
+      const images = pending.flatMap((a) => (a.kind === "image" ? [a.name] : []));
+      const text = draft.trim() || (images.length ? "[photo]" : "");
       if (!text || busy) return;
-      const preview = pending.length ? await api.neural.preview(pending).catch(() => []) : [];
-      const user: ChatMessage = { id: nextId++, role: "user", text, sent: preview.filter((p) => !p.error).map((p) => p.label) };
+      const attachments = [...pending.filter((a) => a.kind !== "image"), ...kept];
+      const preview = attachments.length ? await api.neural.preview(attachments).catch(() => []) : [];
+      const user: ChatMessage = { id: nextId++, role: "user", text, images, sent: preview.filter((p) => !p.error && p.label !== "Photo").map((p) => p.label) };
       const reply: ChatMessage = { id: nextId++, role: "model", text: "", streaming: true };
       const requestId = nextRequest++;
       // History excludes failed replies so a retry does not re-send error text.
       const history = [...messages, user]
-        .filter((m) => !m.error && m.text)
-        .map((m) => ({ role: m.role, text: m.text }));
-      set({ messages: [...messages, user, reply], draft: "", pending: [], preview: [], busy: requestId });
+        .filter((m) => !m.error && (m.text || m.actions?.length))
+        .map((m) => ({ role: m.role, text: withActions(m), images: m.images ?? [] }));
+      set({ messages: [...messages, user, reply], draft: "", pending: [], busy: requestId });
+      void refreshPreview();
       const chatId = get().chatId ?? (await api.neural.chatNew()).activeId;
       if (get().chatId !== chatId) set({ chatId });
-      await api.neural.chatAppend(chatId, { role: "user", text, model: null, sent: user.sent ?? [] }).catch(() => undefined);
+      await api.neural.chatAppend(chatId, { role: "user", text, model: null, sent: user.sent ?? [], images }).catch(() => undefined);
 
       const update = (patch: Partial<ChatMessage> | ((m: ChatMessage) => Partial<ChatMessage>)) =>
         set((s) => ({
@@ -155,6 +236,8 @@ export const useNeural = create<NeuralStore>((set, get) => {
         if (e.type === "status") update({ status: e.text });
         else if (e.type === "model") update({ model: e.model, fallback: e.fallback, status: undefined });
         else if (e.type === "delta") update((m) => ({ text: m.text + e.text }));
+        else if (e.type === "action") update((m) => ({ actions: [...(m.actions ?? []), e.action] }));
+        else if (e.type === "context") update({ dropped: e.dropped });
         else
           update({
             streaming: false,
@@ -164,7 +247,7 @@ export const useNeural = create<NeuralStore>((set, get) => {
           });
       };
       try {
-        await api.neural.chat(history, pending, requestId, channel);
+        await api.neural.chat(chatId, agent, history, attachments, requestId, channel);
       } catch (err) {
         update({ streaming: false, error: err instanceof Error ? err.message : String(err) });
       } finally {
@@ -172,13 +255,13 @@ export const useNeural = create<NeuralStore>((set, get) => {
         set({ busy: null });
         refreshActivity();
         const done = get().messages.find((m) => m.id === reply.id);
-        if (done?.text && !done.error) {
-          await api.neural.chatAppend(chatId, { role: "model", text: done.text, model: done.model ?? null, sent: [] }).catch(() => undefined);
+        // Files may have changed even if the reply then failed, so actions are kept too.
+        if (done && (done.text || done.actions?.length) && (!done.error || done.actions?.length)) {
+          await api.neural.chatAppend(chatId, { role: "model", text: done.text, model: done.model ?? null, sent: [], actions: done.actions ?? [] }).catch(() => undefined);
         }
         const st = await api.neural.chatOpen(chatId).catch(() => null);
         if (st) set({ chats: st.chats });
-        // Other windows (main / overlay) showing this chat reload it.
-        void emit("neural://changed", chatId);
+        void announce(chatId);
       }
     },
 
@@ -189,6 +272,17 @@ export const useNeural = create<NeuralStore>((set, get) => {
     clear: () => void get().newChat(),
   };
 });
+
+/**
+ * The model's next requests carry only text, so its own actions are written into
+ * the reply: otherwise it would forget a dice result it did not repeat.
+ */
+function withActions(m: ChatMessage) {
+  const done = (m.actions ?? []).filter((a) => a.kind !== "python" && a.error !== "Undone");
+  if (!done.length) return m.text;
+  const list = done.map((a) => (a.kind === "dice" ? `rolled ${a.label}` : `${a.kind} ${a.label}${a.error ? " (failed)" : ""}`)).join("; ");
+  return `${m.text}\n[Tool actions: ${list}]`.trim();
+}
 
 /** Pre-fills the composer (e.g. from FILES "Analyze with AI"); never sends by itself. */
 export function prefillNeural(text: string, attachments: Attachment[] = []) {

@@ -15,7 +15,7 @@ Not done in Phase 2 (moved later):
 ## Phase 3: Developer and GitHub (done)
 Monaco editor, project explorer, ConPTY terminals, Run file, toolchain detection with path overrides, Git (status, stage, discard, commit, branches, pull, push, history, diff), GitHub (token auth, repos, PRs, issues, clone).
 
-Language servers and the debugger arrived in 0.8. Not done:
+Language servers and the debugger arrived in 0.8, semantic colours and Node.js in 0.9. Not done:
 - OAuth device-flow sign-in: needs a registered GitHub OAuth app; PAT is used today.
 
 ## Phase 4: Neural and Files (done, partial)
@@ -25,7 +25,7 @@ Not done in Phase 4:
 - Archive browsing, duplicate detection, opt-in index for instant search.
 - Persistent chat history (in-memory only today, by design for privacy).
 - AI-assisted semantic search in the command palette.
-- AI coding assistant with tools (it intentionally has none; context is explicit).
+- AI coding assistant with tools in DEVELOPER (it intentionally has none there; context is explicit). NEURAL's own agent works only in its chat's folder.
 
 ## Phase 5: Overlay, Browser, Extensions (in progress)
 Done:
@@ -71,14 +71,16 @@ Done so far: GITHUB code browsing, Widget Studio, per-profile overlay sets, clic
 - ✅ **Repair of damaged databases at startup** (0.8.2): an integrity check before migrations rebuilds a damaged database and keeps a copy of the original in `backups`.
 - ✅ **Resizable panels** (0.8.2): DEVELOPER, FILES, GITHUB, NEURAL, Widget Studio and the pinned navigation; sizes are remembered.
 - ✅ **Browser page appearance** (0.8.2): dark pages, theme accent and scrollbars, per-site transparency with a tint.
-- Moved on: Node.js debugging and semantic highlighting from language servers (below); the CodeLLDB adapter is located, not downloaded by NETRUNNER.
+- ✅ **NEURAL agent** (0.9): photos, a Work / Play switch per chat, a folder per chat with tools to list, read, write, append and edit, Undo on every change, attachments kept in context, role-playing games with real dice, a context indicator.
+- The CodeLLDB adapter is located, not downloaded by NETRUNNER. Node.js debugging and semantic highlighting arrived in 0.9.
 
 ### 0.9: Browser, part 2
-- **DEVELOPER leftovers**: Node.js debugging (js-debug), semantic highlighting from language servers.
-- **uBlock scriptlet resources** so in-video ads on sites like YouTube are blocked too.
-- Per-site JavaScript / autoplay / zoom memory, reader mode, tab groups, tab search, recently closed tabs (Ctrl+Shift+T).
-- Download manager panel with progress and "open folder"; per-site cookie viewer.
-- Password autofill through Windows Credential Manager (opt-in).
+- ✅ **Ads on YouTube** removed by our own script instead of uBlock scriptlets (no downloaded code runs in pages).
+- ✅ Per-site JavaScript switch and zoom memory, reader mode, tab search, recently closed tabs (Ctrl+Shift+T; private tab moved to Ctrl+Shift+N).
+- ✅ Download progress and cancel; per-site cookie viewer.
+- ✅ Tab groups, per-site autoplay blocking (from the next tab opened).
+- ✅ Saved logins in Windows Credential Manager (opt-in, filled on click).
+- ✅ **DEVELOPER**: Node.js debugging (js-debug, installed from the Tools panel), semantic highlighting from language servers.
 
 ### 1.0: Platform
 - **Plugin architecture**: signed plugins with a declared permission set (commands, widgets, automation triggers), loaded in an isolated webview; no access beyond what they declare.
@@ -101,9 +103,13 @@ Done so far: GITHUB code browsing, Widget Studio, per-profile overlay sets, clic
 - Overlays cannot draw over exclusive-fullscreen games (no injection by design).
 - Browser tabs are native webviews: NETRUNNER's toasts cannot appear on top of a page, and app shortcuts (Ctrl+K) work only while focus is in NETRUNNER's own UI. Dialogs and the palette hide the page while open.
 - Web overlay opacity applies to the frame only; page content is opaque.
+- Saved logins fill the top frame only, so forms in an iframe and sites that ask for the password on a later step need a click there first.
+- YouTube's ad removal can break when YouTube changes, and ads stitched into the video stream can only be played through quickly, not removed. Recently closed tabs last until NETRUNNER closes.
 - Browser transparency shows the background only where a site leaves its own page background: elements the site paints stay opaque, and some sites stay fully opaque. Forced dark pages are recoloured by Chromium and can look wrong on some sites; the choice applies to the whole browser and takes effect after a restart.
 - BROWSER's side panels are not resizable yet.
 - The Music Player shows only apps that publish Windows media sessions.
 - Automation process triggers have up to ~3 s latency (polling, only while such rules exist).
 - Monaco is ~3.6 MB, loaded only when DEVELOPER opens.
-- Free Gemini keys hit overloaded models (HTTP 503) at peak times; NEURAL falls back to other flash models automatically and shows which one answered.
+- Free Gemini keys hit overloaded models (HTTP 503) at peak times; NEURAL falls back to other flash models automatically and shows which one answered. Free Flash models allow only 20 requests a day and 5 a minute, and an agent can use several requests for one message; Play therefore defaults to Flash Lite (500 a day, 15 a minute).
+- The NEURAL agent can make mistakes in its files (for example, count an item twice) or forget to update them. Every change can be undone, but nothing checks that the model is right. A new chat does not see the files of an older one.
+- HEIC photos are not expected to open in the webview (not tested); convert them first if NEURAL refuses one.

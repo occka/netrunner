@@ -22,6 +22,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (12, include_str!("../../migrations/0012_automation_chains.sql")),
     (13, include_str!("../../migrations/0013_quick_access_profiles.sql")),
     (14, include_str!("../../migrations/0014_quick_access_hotkey.sql")),
+    (15, include_str!("../../migrations/0015_neural_agent.sql")),
 ];
 
 pub const LATEST_VERSION: i64 = MIGRATIONS[MIGRATIONS.len() - 1].0;

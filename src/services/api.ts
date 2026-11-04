@@ -38,7 +38,7 @@ import type {
 } from "@/types/dev";
 import type {
   Bookmark,
-  BrowserDownload,
+  BrowserCookie, BrowserDownload, BrowserLogin,
   BrowserStatus,
   BrowserTab,
   HistoryEntry,
@@ -46,7 +46,7 @@ import type {
   SitePermission,
   TabMedia,
 } from "@/types/browser";
-import type { Attachment, ChatState, ContextItem, FileEntry, FilePreview, ModelInfo, NeuralStatus, Places, StreamEvent } from "@/types/neural";
+import type { Attachment, ChatState, ContextItem, FileEntry, FilePreview, ModelInfo, NeuralAction, NeuralMode, NeuralStatus, Places, StreamEvent } from "@/types/neural";
 import type { NoteItem, NotesBoard } from "@/types/notes";
 import type { CustomWidget, FeedResult, StudioKind } from "@/types/studio";
 import type { Alarm, AlarmInput, AlarmsState, Sound, Timer, TimerInput } from "@/types/alarms";
@@ -339,15 +339,24 @@ export const api = {
     disconnect: () => call<void>("neural_disconnect"),
     models: () => call<ModelInfo[]>("neural_models"),
     preview: (attachments: Attachment[]) => call<ContextItem[]>("neural_preview", { attachments }),
-    chat: (history: { role: "user" | "model"; text: string }[], attachments: Attachment[], requestId: number, onEvent: Channel<StreamEvent>) =>
-      call<string>("neural_chat", { history, attachments, requestId, onEvent }),
+    chat: (chatId: number, agent: boolean, history: { role: "user" | "model"; text: string; images: string[] }[], attachments: Attachment[], requestId: number, onEvent: Channel<StreamEvent>) =>
+      call<string>("neural_chat", { chatId, agent, history, attachments, requestId, onEvent }),
     cancel: (requestId: number) => call<void>("neural_cancel", { requestId }),
     chatOpen: (id?: number) => call<ChatState>("neural_chat_open", { id: id ?? null }),
     chatNew: () => call<ChatState>("neural_chat_new"),
     chatDelete: (id: number) => call<void>("neural_chat_delete", { id }),
     chatRename: (id: number, title: string) => call<void>("neural_chat_rename", { id, title }),
-    chatAppend: (chatId: number, message: { role: "user" | "model"; text: string; model: string | null; sent: string[] }) =>
+    chatAppend: (chatId: number, message: { role: "user" | "model"; text: string; model: string | null; sent: string[]; images?: string[]; actions?: NeuralAction[] }) =>
       call<number>("neural_chat_append", { chatId, message }),
+    chatSetMode: (id: number, mode: NeuralMode) => call<void>("neural_chat_set_mode", { id, mode }),
+    chatSetKept: (id: number, kept: Attachment[]) => call<void>("neural_chat_set_kept", { id, kept }),
+    files: (chatId: number) => call<{ path: string; size: number }[]>("neural_files", { chatId }),
+    fileRead: (chatId: number, path: string) => call<string>("neural_file_read", { chatId, path }),
+    undo: (chatId: number, change: number) => call<string>("neural_undo", { chatId, change }),
+    openFolder: (chatId: number) => call<void>("neural_open_folder", { chatId }),
+    imageSave: (chatId: number, data: string) => call<string>("neural_image_save", { chatId, data }),
+    imageRead: (chatId: number, name: string) => call<string>("neural_image_read", { chatId, name }),
+    imageFromPath: (path: string) => call<string>("neural_image_from_path", { path }),
   },
 
   files: {
@@ -432,6 +441,14 @@ export const api = {
     allowHttp: (id: string, url: string) => call<void>("browser_allow_http", { id, url }),
     clearData: () => call<void>("browser_clear_data"),
     downloads: () => call<BrowserDownload[]>("browser_downloads"),
+    cancelDownload: (url: string) => call<void>("browser_download_cancel", { url }),
+    reader: (id: string) => call<void>("browser_reader", { id }),
+    logins: () => call<BrowserLogin[]>("browser_logins"),
+    loginSave: (host: string, username: string, password: string) => call<void>("browser_login_save", { host, username, password }),
+    loginDelete: (host: string, username: string) => call<void>("browser_login_delete", { host, username }),
+    loginFill: (id: string, username: string) => call<void>("browser_login_fill", { id, username }),
+    cookies: (id: string) => call<BrowserCookie[]>("browser_cookies", { id }),
+    deleteCookie: (id: string, c: Pick<BrowserCookie, "name" | "domain" | "path">) => call<void>("browser_cookie_delete", { id, name: c.name, domain: c.domain, path: c.path }),
     bookmarks: () => call<Bookmark[]>("browser_bookmarks"),
     addBookmark: (url: string, title: string) => call<Bookmark>("browser_bookmark_add", { url, title }),
     renameBookmark: (id: number, title: string) => call<void>("browser_bookmark_rename", { id, title }),

@@ -35,3 +35,14 @@ describe("debug configurations", () => {
     expect(shiftedBreakpoints([{ line: 2, condition: "x" }, { line: 9 }], [3, 10])).toEqual([{ line: 3, condition: "x" }, { line: 10 }]);
   });
 });
+
+describe("Node.js debugging", () => {
+  it("offers js-debug for JavaScript and keeps output in the debug console", () => {
+    const c = autoDebugConfig("D:\p\src\app.mjs", "D:\p")!;
+    expect(c.adapter).toBe("js-debug");
+    expect(c.config).toMatchObject({ type: "pwa-node", console: "internalConsole", program: "D:\p\src\app.mjs", cwd: "D:\p" });
+    expect(autoDebugConfig("D:\p\a.txt", "D:\p")).toBeNull();
+    const [fromFile] = debugConfigsFromLaunch({ configurations: [{ name: "Server", debug: { adapter: "js-debug", program: "server.js" } }] }, "D:\p");
+    expect(fromFile.config).toMatchObject({ type: "pwa-node", program: "server.js", request: "launch" });
+  });
+});

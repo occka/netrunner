@@ -1,6 +1,6 @@
 [package]
 name = "netrunner"
-version = "0.8.2"
+version = "0.9.0"
 description = "NETRUNNER — industrial control environment for Windows"
 edition = "2021"
 rust-version = "1.80"
@@ -46,6 +46,8 @@ adblock = { version = "0.13", default-features = false, features = ["embedded-do
 # DEVELOPER project search: .gitignore-aware walking and regex matching.
 ignore = "0.4"
 regex = "1"
+# Dice in NEURAL's Play mode come from the operating system's random source.
+getrandom = "0.3"
 
 # NETRUNNER targets Windows only; these back the native integrations.
 [target.'cfg(windows)'.dependencies]

@@ -5,15 +5,21 @@ use base64::Engine as _;
 use tauri::{AppHandle, Emitter, Manager};
 use webview2_com::Microsoft::Web::WebView2::Win32::*;
 use webview2_com::{
-    take_pwstr, AcceleratorKeyPressedEventHandler, ClearBrowsingDataCompletedHandler, ContainsFullScreenElementChangedEventHandler, FaviconChangedEventHandler,
-    GetFaviconCompletedHandler, HistoryChangedEventHandler, IsDocumentPlayingAudioChangedEventHandler, IsMutedChangedEventHandler,
-    LaunchingExternalUriSchemeEventHandler, SourceChangedEventHandler, WebResourceRequestedEventHandler,
+    take_pwstr, AcceleratorKeyPressedEventHandler, BytesReceivedChangedEventHandler, ClearBrowsingDataCompletedHandler, ContainsFullScreenElementChangedEventHandler,
+    DownloadStartingEventHandler, FaviconChangedEventHandler, GetCookiesCompletedHandler, GetFaviconCompletedHandler, HistoryChangedEventHandler,
+    IsDocumentPlayingAudioChangedEventHandler, IsMutedChangedEventHandler, LaunchingExternalUriSchemeEventHandler, SourceChangedEventHandler,
+    WebResourceRequestedEventHandler, ZoomFactorChangedEventHandler,
 };
 use windows::core::{Interface, BOOL, HSTRING, PWSTR};
 use windows::Win32::System::Com::IStream;
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyState, VK_CONTROL, VK_F5, VK_MENU, VK_SHIFT, VK_TAB};
 
-use super::{emit_tab, notice, on_source_changed, Browser};
+use super::{emit_tab, notice, on_source_changed, on_zoom_changed, Browser, Cookie};
+
+thread_local! {
+    /// Running downloads by address, so one can be cancelled. COM objects stay on the UI thread.
+    static DOWNLOADS: std::cell::RefCell<std::collections::HashMap<String, ICoreWebView2DownloadOperation>> = Default::default();
+}
 
 /// adblock request type for a WebView2 resource context.
 fn request_kind(ctx: COREWEBVIEW2_WEB_RESOURCE_CONTEXT, is_top_document: bool) -> &'static str {
@@ -60,7 +66,7 @@ unsafe fn setup(
     let browser = app.state::<Browser>();
 
     // Keys pressed inside a page never reach NETRUNNER's UI; forward the
-    // browser shortcuts (Ctrl+T/W/L/K/R/Tab, F5) so they work everywhere.
+    // browser shortcuts (Ctrl+T/W/L/K/R/Tab, F5 and others) so they work everywhere.
     {
         let (app, label) = (app.clone(), label.to_string());
         let mut token = 0i64;
@@ -80,7 +86,9 @@ unsafe fn setup(
                     return Ok(());
                 }
                 let key = match (ctrl, vk) {
-                    (true, v) if v == u32::from(b'T') => if shift { "new-private" } else { "new" },
+                    (true, v) if v == u32::from(b'T') => if shift { "reopen" } else { "new" },
+                    (true, v) if v == u32::from(b'N') && shift => "new-private",
+                    (true, v) if v == u32::from(b'A') && shift => "tabs",
                     (true, v) if v == u32::from(b'W') => "close",
                     (true, v) if v == u32::from(b'L') => "address",
                     (true, v) if v == u32::from(b'K') => "palette",
@@ -169,6 +177,53 @@ unsafe fn setup(
                     let _ = headers.SetHeader(&HSTRING::from("Sec-GPC"), &HSTRING::from("1"));
                     let _ = headers.SetHeader(&HSTRING::from("DNT"), &HSTRING::from("1"));
                 }
+                Ok(())
+            })),
+            &mut token,
+        )?;
+    }
+
+    {
+        let (app, label) = (app.clone(), label.to_string());
+        controller.add_ZoomFactorChanged(
+            &ZoomFactorChangedEventHandler::create(Box::new(move |sender, _| {
+                let Some(sender) = sender else { return Ok(()) };
+                let mut factor = 1.0f64;
+                sender.ZoomFactor(&mut factor)?;
+                on_zoom_changed(&app, &label, factor);
+                Ok(())
+            })),
+            &mut token,
+        )?;
+    }
+
+    if let Ok(core4) = core.cast::<ICoreWebView2_4>() {
+        let app = app.clone();
+        core4.add_DownloadStarting(
+            &DownloadStartingEventHandler::create(Box::new(move |_, args| {
+                let Some(args) = args else { return Ok(()) };
+                let operation = args.DownloadOperation()?;
+                let url = pwstr(|p| operation.Uri(p));
+                DOWNLOADS.with(|d| {
+                    let mut d = d.borrow_mut();
+                    if d.len() >= 50 {
+                        d.clear();
+                    }
+                    d.insert(url.clone(), operation.clone());
+                });
+                let app = app.clone();
+                let mut token = 0i64;
+                operation.add_BytesReceivedChanged(
+                    &BytesReceivedChangedEventHandler::create(Box::new(move |sender, _| {
+                        let Some(sender) = sender else { return Ok(()) };
+                        let (mut received, mut total) = (0i64, 0i64);
+                        sender.BytesReceived(&mut received)?;
+                        let _ = sender.TotalBytesToReceive(&mut total);
+                        app.state::<Browser>().download_progress(&url, received.max(0) as u64, (total > 0).then_some(total as u64));
+                        Ok(())
+                    })),
+                    &mut token,
+                )?;
                 Ok(())
             })),
             &mut token,
@@ -317,6 +372,76 @@ pub fn set_page_appearance(webview: &tauri::Webview, dark: bool, transparent: bo
             let (r, g, b) = background;
             let color = COREWEBVIEW2_COLOR { A: if transparent { 0 } else { 255 }, R: r, G: g, B: b };
             let _ = c2.SetDefaultBackgroundColor(color);
+        }
+    });
+}
+
+pub fn set_scripts(webview: &tauri::Webview, enabled: bool) {
+    let _ = webview.with_webview(move |pw| unsafe {
+        if let Ok(settings) = pw.controller().CoreWebView2().and_then(|c| c.Settings()) {
+            let _ = settings.SetIsScriptEnabled(enabled);
+        }
+    });
+}
+
+pub fn cancel_download(webview: &tauri::Webview, url: String) {
+    let _ = webview.with_webview(move |_| unsafe {
+        if let Some(operation) = DOWNLOADS.with(|d| d.borrow_mut().remove(&url)) {
+            let _ = operation.Cancel();
+        }
+    });
+}
+
+unsafe fn cookie_of(cookie: &ICoreWebView2Cookie) -> Cookie {
+    let (mut session, mut secure, mut http_only, mut expires) = (BOOL(0), BOOL(0), BOOL(0), 0f64);
+    let _ = cookie.IsSession(&mut session);
+    let _ = cookie.IsSecure(&mut secure);
+    let _ = cookie.IsHttpOnly(&mut http_only);
+    let _ = cookie.Expires(&mut expires);
+    Cookie {
+        name: pwstr(|p| cookie.Name(p)),
+        domain: pwstr(|p| cookie.Domain(p)),
+        path: pwstr(|p| cookie.Path(p)),
+        expires: (!session.as_bool()).then_some(expires),
+        secure: secure.as_bool(),
+        http_only: http_only.as_bool(),
+    }
+}
+
+/// The cookies the current page's address would send.
+pub fn cookies(webview: &tauri::Webview, url: String, tx: std::sync::mpsc::Sender<Vec<Cookie>>) {
+    let _ = webview.with_webview(move |pw| unsafe {
+        let manager = pw.controller().CoreWebView2().and_then(|c| c.cast::<ICoreWebView2_2>()).and_then(|c| c.CookieManager());
+        let Ok(manager) = manager else {
+            let _ = tx.send(Vec::new());
+            return;
+        };
+        let reply = tx.clone();
+        let result = manager.GetCookies(
+            &HSTRING::from(url.as_str()),
+            &GetCookiesCompletedHandler::create(Box::new(move |_, list| {
+                let mut out = Vec::new();
+                if let Some(list) = list {
+                    let mut count = 0u32;
+                    list.Count(&mut count)?;
+                    for i in 0..count.min(500) {
+                        out.push(cookie_of(&list.GetValueAtIndex(i)?));
+                    }
+                }
+                let _ = reply.send(out);
+                Ok(())
+            })),
+        );
+        if result.is_err() {
+            let _ = tx.send(Vec::new());
+        }
+    });
+}
+
+pub fn delete_cookie(webview: &tauri::Webview, name: String, domain: String, path: String) {
+    let _ = webview.with_webview(move |pw| unsafe {
+        if let Ok(manager) = pw.controller().CoreWebView2().and_then(|c| c.cast::<ICoreWebView2_2>()).and_then(|c| c.CookieManager()) {
+            let _ = manager.DeleteCookiesWithDomainAndPath(&HSTRING::from(name), &HSTRING::from(domain), &HSTRING::from(path));
         }
     });
 }

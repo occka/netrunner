@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { sessionOf, stripTabs } from "../src/modules/browser/store";
+import { sessionOf, stripItems, stripTabs, type StripTab } from "../src/modules/browser/store";
 import type { BrowserTab } from "../src/types/browser";
 
 const live = (id: string, url: string, extra: Partial<BrowserTab> = {}): BrowserTab => ({
   id,
   host: "main",
+  zoom: 1,
   url,
   title: id,
   loading: false,
@@ -49,5 +50,31 @@ describe("browser session", () => {
       ],
       active: 1,
     });
+  });
+});
+
+describe("tab groups", () => {
+  const tab = (id: string) => live(id, `https://${id}.example/`) as StripTab;
+  const group = (id: string, collapsed = false) => ({ id, name: id, color: "#fff", collapsed });
+  const tabs = [tab("a"), tab("b"), tab("c"), tab("d")];
+
+  it("keeps a group's tabs together after its label", () => {
+    const items = stripItems(tabs, [group("g")], { b: "g", d: "g" }, "a");
+    expect(items.map((i) => (i.kind === "group" ? `[${i.group.id}:${i.count}]` : i.tab.id))).toEqual(["a", "[g:2]", "b", "d", "c"]);
+  });
+
+  it("a collapsed group shows only its active tab", () => {
+    const shown = (active: string) => stripItems(tabs, [group("g", true)], { b: "g", d: "g" }, active).map((i) => (i.kind === "group" ? "[g]" : i.tab.id));
+    expect(shown("a")).toEqual(["a", "[g]", "c"]);
+    expect(shown("d")).toEqual(["a", "[g]", "d", "c"]);
+  });
+
+  it("ignores a membership whose group is gone", () => {
+    expect(stripItems([tab("a")], [], { a: "gone" }, null)).toEqual([{ kind: "tab", tab: tab("a"), group: null }]);
+  });
+
+  it("saves groups only while they have a saved tab", () => {
+    const s = { tabs: [tab("a"), { ...tab("p"), private: true }], sleeping: [], order: ["a", "p"], activeId: "a", groups: [group("g"), group("h")], members: { a: "g", p: "h" } };
+    expect(sessionOf(s)).toEqual({ tabs: [{ url: "https://a.example/", title: "a", group: "g" }], active: 0, groups: [group("g")] });
   });
 });

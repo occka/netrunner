@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "@/services/api";
 import { reportError } from "@/stores/notifications";
-import { useSettings, type BrowserSession } from "@/stores/settings";
+import { useSettings, type BrowserSession, type BrowserTabGroup } from "@/stores/settings";
 import type { BrowserNotice, BrowserTab } from "@/types/browser";
 
 /**
@@ -20,6 +20,11 @@ export interface SleepingTab {
   title: string;
 }
 
+export interface ClosedTab {
+  url: string;
+  title: string;
+}
+
 /** A tab as the strip shows it. */
 export type StripTab = BrowserTab & { sleeping?: boolean };
 
@@ -30,6 +35,11 @@ interface BrowserStore {
   activeId: string | null;
   /** Private mode for the next tab opened from the start page. */
   nextPrivate: boolean;
+  /** Recently closed tabs of this run, newest first. Private tabs are never kept. */
+  closed: ClosedTab[];
+  groups: BrowserTabGroup[];
+  /** Tab id to group id. */
+  members: Record<string, string>;
   notices: (BrowserNotice & { key: number })[];
   ready: boolean;
   init: () => Promise<void>;
@@ -39,6 +49,15 @@ interface BrowserStore {
   open: (input: string) => Promise<void>;
   go: (input: string) => Promise<void>;
   close: (id: string) => Promise<void>;
+  /** Opens the most recently closed tab again, or the given one. */
+  reopen: (index?: number) => Promise<void>;
+  /** A new group, with this tab in it. */
+  addGroup: (name: string, tabId: string) => void;
+  setGroup: (tabId: string, groupId: string | null) => void;
+  renameGroup: (groupId: string, name: string) => void;
+  toggleGroup: (groupId: string) => void;
+  /** Ends the group; its tabs stay open. */
+  removeGroup: (groupId: string) => void;
   dismiss: (key: number) => void;
 }
 
@@ -72,6 +91,7 @@ function sleeper(s: SleepingTab): StripTab {
     audible: false,
     fullscreen: false,
     favicon: null,
+    zoom: 1,
     sleeping: true,
   };
 }
@@ -98,12 +118,47 @@ function upsert(list: BrowserTab[], tab: BrowserTab): BrowserTab[] {
   return next;
 }
 
+const GROUP_COLORS = ["#4f9cf9", "#3ecf8e", "#f5a623", "#e5484d", "#b07cf0", "#27c5d6"];
+
+/** A group with no tabs left does not stay. */
+function pruneGroups<T extends Pick<BrowserStore, "groups" | "members">>(s: T): BrowserTabGroup[] {
+  const used = new Set(Object.values(s.members));
+  return s.groups.filter((g) => used.has(g.id));
+}
+
+export type StripItem = { kind: "group"; group: BrowserTabGroup; count: number } | { kind: "tab"; tab: StripTab; group: BrowserTabGroup | null };
+
+/**
+ * What the strip draws: a group's tabs together, at the place of its first tab,
+ * after its label. A collapsed group shows only its active tab.
+ */
+export function stripItems(tabs: StripTab[], groups: BrowserTabGroup[], members: Record<string, string>, activeId: string | null): StripItem[] {
+  const out: StripItem[] = [];
+  const done = new Set<string>();
+  const groupOf = (t: StripTab) => groups.find((g) => g.id === members[t.id]) ?? null;
+  for (const tab of tabs) {
+    const group = groupOf(tab);
+    if (!group) {
+      out.push({ kind: "tab", tab, group: null });
+    } else if (!done.has(group.id)) {
+      done.add(group.id);
+      const inGroup = tabs.filter((t) => members[t.id] === group.id);
+      out.push({ kind: "group", group, count: inGroup.length });
+      for (const t of inGroup) if (!group.collapsed || t.id === activeId) out.push({ kind: "tab", tab: t, group });
+    }
+  }
+  return out;
+}
+
 /** What is written to `browser.session`: http(s) pages of non-private tabs, in strip order. */
-export function sessionOf(s: Pick<BrowserStore, "tabs" | "sleeping" | "order" | "activeId">): BrowserSession {
+export function sessionOf(s: Pick<BrowserStore, "tabs" | "sleeping" | "order" | "activeId"> & Partial<Pick<BrowserStore, "groups" | "members">>): BrowserSession {
   const saved = stripTabs(s).filter((t) => !t.private && /^https?:\/\//.test(t.url));
+  const members = s.members ?? {};
+  const groups = (s.groups ?? []).filter((g) => saved.some((t) => members[t.id] === g.id));
   return {
-    tabs: saved.map((t) => ({ url: t.url, title: t.title })),
+    tabs: saved.map((t) => ({ url: t.url, title: t.title, ...(members[t.id] ? { group: members[t.id] } : {}) })),
     active: Math.max(0, saved.findIndex((t) => t.id === s.activeId)),
+    ...(groups.length ? { groups } : {}),
   };
 }
 
@@ -135,6 +190,8 @@ export const useBrowser = create<BrowserStore>((set, get) => {
         // The tab event may already have appended the new id; keep it only in the sleeper's place.
         order: s.order.filter((x) => x !== tab.id).map((x) => (x === id ? tab.id : x)),
         activeId: s.activeId === id ? tab.id : s.activeId,
+        // The live tab has another id: it keeps its group.
+        members: s.members[id] ? { ...Object.fromEntries(Object.entries(s.members).filter(([k]) => k !== id)), [tab.id]: s.members[id] } : s.members,
       }));
     } catch (err) {
       reportError("Could not reopen the tab", err);
@@ -149,6 +206,9 @@ export const useBrowser = create<BrowserStore>((set, get) => {
     order: [],
     activeId: null,
     nextPrivate: false,
+    closed: [],
+    groups: [],
+    members: {},
     notices: [],
     ready: false,
     init: async () => {
@@ -194,7 +254,8 @@ export const useBrowser = create<BrowserStore>((set, get) => {
       if (settings["browser.restore_tabs"] && mainTabs(get().tabs).length === 0 && session.tabs.length > 0) {
         const sleeping = session.tabs.map((t, i) => ({ id: `sleeping-${i}`, url: t.url, title: t.title }));
         const active = sleeping[Math.min(session.active, sleeping.length - 1)].id;
-        set((s) => ({ sleeping, order: syncOrder(s.order, s.tabs, sleeping), activeId: active }));
+        const members = Object.fromEntries(session.tabs.flatMap((t, i) => (t.group ? [[sleeping[i].id, t.group]] : [])));
+        set((s) => ({ sleeping, order: syncOrder(s.order, s.tabs, sleeping), activeId: active, groups: session.groups ?? [], members }));
         void wake(active);
       }
       lastSaved = JSON.stringify(settings["browser.session"]);
@@ -240,11 +301,18 @@ export const useBrowser = create<BrowserStore>((set, get) => {
     },
     close: async (id) => {
       const isSleeping = get().sleeping.some((t) => t.id === id);
+      const gone = stripTabs(get()).find((t) => t.id === id);
+      if (gone && !gone.private && /^https?:\/\//.test(gone.url)) {
+        set((s) => ({ closed: [{ url: gone.url, title: gone.title }, ...s.closed].slice(0, 25) }));
+      }
       set((s) => {
         const i = s.order.indexOf(id);
         const order = s.order.filter((x) => x !== id);
         const next = order[i] ?? order[i - 1];
+        const members = Object.fromEntries(Object.entries(s.members).filter(([k]) => k !== id));
         return {
+          members,
+          groups: pruneGroups({ groups: s.groups, members }),
           tabs: s.tabs.filter((t) => t.id !== id),
           sleeping: s.sleeping.filter((t) => t.id !== id),
           order,
@@ -260,6 +328,32 @@ export const useBrowser = create<BrowserStore>((set, get) => {
         reportError("Could not close the tab", err);
       }
     },
+    reopen: async (index = 0) => {
+      const entry = get().closed[index];
+      if (!entry) return;
+      set((s) => ({ closed: s.closed.filter((_, i) => i !== index), nextPrivate: false }));
+      await get().open(entry.url);
+    },
+    addGroup: (name, tabId) =>
+      set((s) => {
+        const color = GROUP_COLORS[s.groups.length % GROUP_COLORS.length];
+        const id = `group-${Date.now()}`;
+        const members = { ...s.members, [tabId]: id };
+        return { members, groups: pruneGroups({ groups: [...s.groups, { id, name: name.trim() || "Group", color, collapsed: false }], members }) };
+      }),
+    setGroup: (tabId, groupId) =>
+      set((s) => {
+        const members = Object.fromEntries(Object.entries(s.members).filter(([k]) => k !== tabId));
+        if (groupId) members[tabId] = groupId;
+        return { members, groups: pruneGroups({ groups: s.groups, members }) };
+      }),
+    renameGroup: (groupId, name) => set((s) => ({ groups: s.groups.map((g) => (g.id === groupId ? { ...g, name } : g)) })),
+    toggleGroup: (groupId) => set((s) => ({ groups: s.groups.map((g) => (g.id === groupId ? { ...g, collapsed: !g.collapsed } : g)) })),
+    removeGroup: (groupId) =>
+      set((s) => ({
+        groups: s.groups.filter((g) => g.id !== groupId),
+        members: Object.fromEntries(Object.entries(s.members).filter(([, g]) => g !== groupId)),
+      })),
     dismiss: (key) => set((s) => ({ notices: s.notices.filter((n) => n.key !== key) })),
   };
 });

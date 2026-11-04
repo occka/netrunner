@@ -151,3 +151,27 @@ export function locations(result: unknown): { uri: string; range: LspRange }[] {
     )
     .filter((l) => typeof l.uri === "string" && !!l.range);
 }
+
+/** Token types and modifiers NETRUNNER announces to servers (see `initialize` in the backend), plus one for anything else. */
+export const SEMANTIC_TYPES = ["namespace", "type", "class", "enum", "interface", "struct", "typeParameter", "parameter", "variable", "property", "enumMember", "event", "function", "method", "macro", "keyword", "modifier", "comment", "string", "number", "regexp", "operator", "decorator", "unknown"];
+export const SEMANTIC_MODIFIERS = ["declaration", "definition", "readonly", "static", "deprecated", "abstract", "async", "modification", "documentation", "defaultLibrary"];
+
+/** Servers number tokens by their own legend; Monaco has one legend for all of them. */
+export function remapSemanticTokens(data: number[], legend: { tokenTypes: string[]; tokenModifiers: string[] }): Uint32Array {
+  const types = legend.tokenTypes.map((t) => {
+    const i = SEMANTIC_TYPES.indexOf(t);
+    return i < 0 ? SEMANTIC_TYPES.indexOf("unknown") : i;
+  });
+  const mods = legend.tokenModifiers.map((m) => SEMANTIC_MODIFIERS.indexOf(m));
+  const out = Uint32Array.from(data);
+  for (let i = 0; i + 4 < out.length; i += 5) {
+    out[i + 3] = types[data[i + 3]] ?? SEMANTIC_TYPES.indexOf("unknown");
+    let mask = 0;
+    mods.forEach((m, bit) => {
+      if (m >= 0 && data[i + 4] & (1 << bit)) mask |= 1 << m;
+    });
+    out[i + 4] = mask;
+  }
+  return out;
+}
+

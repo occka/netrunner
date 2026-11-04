@@ -289,6 +289,8 @@ function EditorGroup({ group, onRun }: { group: 0 | 1; onRun: (path: string) => 
             onMount={onMount}
             onChange={(value) => setContent(tab.key, value ?? "")}
             options={{
+              // Language servers know what a name is; the highlighter only guesses.
+              "semanticHighlighting.enabled": true,
               readOnly: tab.readOnly,
               glyphMargin: true,
               fontFamily: prefs.fontFamily,

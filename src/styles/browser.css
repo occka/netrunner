@@ -425,3 +425,35 @@ label.check.browser__opt {
 .browser__notice {
   color: var(--c-warning);
 }
+
+.browser__progress {
+  width: 80px;
+  height: 8px;
+  flex-shrink: 0;
+  accent-color: var(--c-primary);
+}
+
+.browser__group {
+  flex-shrink: 0;
+  height: 20px;
+  margin: 0 2px 0 6px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 3px;
+  color: #0b0d10;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+.browser__group-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.browser__group-pick {
+  width: 90px;
+  height: 22px;
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
+}

@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { FolderOpen, RefreshCw, Trash2 } from "lucide-react";
+import { Cookie as CookieIcon, FolderOpen, Globe, RefreshCw, RotateCcw, Trash2, VenetianMask, X } from "lucide-react";
 import { api } from "@/services/api";
 import { usePolled } from "@/hooks/usePolled";
 import { useSetting, useSettings, type SettingKey, type SettingsSchema } from "@/stores/settings";
 import { confirmAction } from "@/stores/confirm";
 import { notify, reportError } from "@/stores/notifications";
 import { formatBytes, formatRelative, parseDbTime } from "@/utils/format";
-import { useBrowser } from "./store";
+import { stripTabs, useBrowser } from "./store";
 
 function hostOf(url: string) {
   try {
@@ -21,6 +21,95 @@ const save = <K extends SettingKey>(key: K, value: SettingsSchema[K]) =>
     .getState()
     .set(key, value)
     .catch((err) => reportError("Could not save the setting", err));
+
+/** Finds an open tab by title or address, and brings closed ones back. */
+export function TabsPanel() {
+  const { tabs, sleeping, order, closed, groups, members, activeId, activate, close, reopen, addGroup, setGroup, renameGroup, removeGroup } = useBrowser();
+  const [query, setQuery] = useState("");
+  const [groupName, setGroupName] = useState("");
+  const q = query.trim().toLowerCase();
+  const matches = (t: { title: string; url: string }) => !q || t.title.toLowerCase().includes(q) || t.url.toLowerCase().includes(q);
+  const open = stripTabs({ tabs, sleeping, order }).filter(matches);
+  const shownClosed = closed.map((t, i) => ({ ...t, i })).filter(matches);
+
+  return (
+    <div className="browser__panel-stack">
+      <input
+        className="input"
+        autoFocus
+        placeholder="Search tabs"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && open[0]) activate(open[0].id);
+        }}
+      />
+      <h3 className="label">Open ({open.length})</h3>
+      <ul className="browser__list">
+        {open.map((t) => (
+          <li key={t.id}>
+            {t.private ? <VenetianMask size={12} /> : t.favicon ? <img src={t.favicon} alt="" width={12} height={12} /> : <Globe size={12} />}
+            <button className="link-btn truncate" title={t.url} onClick={() => activate(t.id)}>
+              {t.title || t.url}
+            </button>
+            {groups.length > 0 && (
+              <select className="select browser__group-pick" title="Group of this tab" value={members[t.id] ?? ""} onChange={(e) => setGroup(t.id, e.target.value || null)}>
+                <option value="">No group</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button className="icon-btn icon-btn--sm" title="Close tab" onClick={() => void close(t.id)}>
+              <X size={12} />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <h3 className="label">Groups</h3>
+      {groups.map((g) => (
+        <div key={g.id} className="browser__site">
+          <span className="browser__group-dot" style={{ background: g.color }} />
+          <input className="input" aria-label="Group name" value={g.name} onChange={(e) => renameGroup(g.id, e.target.value)} />
+          <button className="icon-btn icon-btn--sm" title="End the group: its tabs stay open" onClick={() => removeGroup(g.id)}>
+            <X size={12} />
+          </button>
+        </div>
+      ))}
+      <form
+        className="browser__site"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!activeId) return;
+          addGroup(groupName, activeId);
+          setGroupName("");
+        }}
+      >
+        <input className="input" placeholder="New group name" value={groupName} onChange={(e) => setGroupName(e.target.value)} />
+        <button className="btn btn--sm" type="submit" disabled={!activeId} title="Creates a group with the current tab in it">
+          Group this tab
+        </button>
+      </form>
+      {closed.length > 0 && (
+        <>
+          <h3 className="label">Recently closed</h3>
+          <ul className="browser__list">
+            {shownClosed.map((t) => (
+              <li key={`${t.i}-${t.url}`}>
+                <RotateCcw size={12} className="muted" />
+                <button className="link-btn truncate" title={`${t.url}\nCtrl+Shift+T opens the latest`} onClick={() => void reopen(t.i)}>
+                  {t.title || t.url}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
 
 export function BookmarksPanel() {
   const open = useBrowser((s) => s.open);
@@ -104,7 +193,17 @@ export function DownloadsPanel() {
           <span className="truncate" title={d.url}>
             {d.path?.split(/[\\/]/).pop() || hostOf(d.url)}
           </span>
+          {d.state === "running" && d.total != null && d.total > 0 ? (
+            <progress className="browser__progress" value={d.received} max={d.total} title={`${formatBytes(d.received)} of ${formatBytes(d.total)}`} />
+          ) : (
+            d.state === "running" && d.received > 0 && <span className="muted mono">{formatBytes(d.received)}</span>
+          )}
           <span className={`tag ${d.state === "done" ? "tag--ok" : d.state === "failed" ? "tag--crit" : "tag--info"}`}>{d.state}</span>
+          {d.state === "running" && (
+            <button className="icon-btn icon-btn--sm" title="Cancel download" onClick={() => void api.browser.cancelDownload(d.url).catch((err) => reportError("Could not cancel", err))}>
+              <X size={12} />
+            </button>
+          )}
           {d.path && d.state === "done" && (
             <button className="icon-btn icon-btn--sm" title="Show in folder" onClick={() => void api.files.reveal(d.path!).catch((err) => reportError("Could not open folder", err))}>
               <FolderOpen size={12} />
@@ -199,13 +298,114 @@ export function AppearancePanel({ site }: { site: string }) {
   );
 }
 
-export function PrivacyPanel({ site }: { site: string }) {
+/**
+ * Logins for this site, kept in Windows Credential Manager. The password box is
+ * NETRUNNER's own: pages cannot see it, and they can never trigger a fill.
+ */
+function SiteLogins({ site, tabId }: { site: string; tabId: string }) {
+  const { data, reload } = usePolled(() => api.browser.logins(), 0);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const mine = (data ?? []).filter((l) => l.host === site);
+  return (
+    <>
+      <h3 className="label">Logins for {site}</h3>
+      <ul className="browser__list">
+        {mine.map((l) => (
+          <li key={l.username}>
+            <span className="mono truncate">{l.username || "(no user name)"}</span>
+            <button className="btn btn--sm" title="Fill the login form on this page" onClick={() => void api.browser.loginFill(tabId, l.username).catch((err) => reportError("Could not fill the login", err))}>
+              Fill
+            </button>
+            <button
+              className="icon-btn icon-btn--sm"
+              title="Delete this login"
+              onClick={async () => {
+                if (await confirmAction({ title: "Delete login", message: `Delete the saved login "${l.username}" for ${site}?`, confirmLabel: "Delete", danger: true }))
+                  await api.browser.loginDelete(site, l.username).then(reload, (err) => reportError("Could not delete the login", err));
+              }}
+            >
+              <Trash2 size={12} />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <form
+        className="browser__panel-stack"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void api.browser.loginSave(site, username.trim(), password).then(
+            () => {
+              setUsername("");
+              setPassword("");
+              return reload();
+            },
+            (err) => reportError("Could not save the login", err),
+          );
+        }}
+      >
+        <input className="input" placeholder="User name" autoComplete="off" spellCheck={false} value={username} onChange={(e) => setUsername(e.target.value)} />
+        <input className="input" type="password" placeholder="Password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <button className="btn btn--sm" type="submit" disabled={!password}>
+          Save login for {site}
+        </button>
+      </form>
+    </>
+  );
+}
+
+/** What the current site has stored. Values are not shown: they are often login tokens. */
+function SiteCookies({ tabId }: { tabId: string }) {
+  const { data, reload } = usePolled(() => api.browser.cookies(tabId), 0);
+  const remove = async (list: NonNullable<typeof data>) => {
+    try {
+      await Promise.all(list.map((c) => api.browser.deleteCookie(tabId, c)));
+      window.setTimeout(() => void reload(), 200);
+    } catch (err) {
+      reportError("Could not delete the cookie", err);
+    }
+  };
+  return (
+    <>
+      <h3 className="label">
+        <CookieIcon size={11} /> Cookies on this page ({data?.length ?? 0})
+      </h3>
+      {data && data.length > 0 ? (
+        <>
+          <ul className="browser__list">
+            {data.map((c) => (
+              <li key={`${c.domain}${c.path}${c.name}`} title={`${c.domain}${c.path}${c.secure ? " · secure" : ""}${c.httpOnly ? " · hidden from scripts" : ""}`}>
+                <span className="mono truncate">{c.name}</span>
+                <span className="muted truncate">{c.domain}</span>
+                <span className="muted">{c.expires == null ? "session" : new Date(c.expires * 1000).toLocaleDateString()}</span>
+                <button className="icon-btn icon-btn--sm" title="Delete this cookie" onClick={() => void remove([c])}>
+                  <Trash2 size={12} />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button className="btn btn--sm btn--ghost" onClick={() => void remove(data)}>
+            <Trash2 size={12} /> Delete all of these
+          </button>
+        </>
+      ) : (
+        <p className="muted browser__hint">None.</p>
+      )}
+    </>
+  );
+}
+
+export function PrivacyPanel({ site, tabId }: { site: string; tabId: string | null }) {
   const { data: status, reload } = usePolled(() => api.browser.status(), 3000);
   const { data: perms, reload: reloadPerms } = usePolled(() => api.browser.permissions());
   const [updating, setUpdating] = useState(false);
   const v = {
     adblock: useSetting("browser.adblock"),
     cosmetic: useSetting("browser.cosmetic"),
+    youtube: useSetting("browser.youtube_ads"),
+    noScript: useSetting("browser.no_script"),
+    noAutoplay: useSetting("browser.no_autoplay"),
+    passwords: useSetting("browser.passwords"),
     https: useSetting("browser.https_only"),
     gpc: useSetting("browser.gpc"),
     tracking: useSetting("browser.tracking"),
@@ -265,10 +465,44 @@ export function PrivacyPanel({ site }: { site: string }) {
           </button>
         </div>
       )}
+      {site && tabId && (
+        <label className="check browser__opt">
+          <input
+            type="checkbox"
+            checked={v.noScript.includes(site)}
+            onChange={(e) =>
+              void save("browser.no_script", e.target.checked ? [...v.noScript, site] : v.noScript.filter((s) => s !== site)).then(() =>
+                api.browser.action(tabId, "reload").catch(() => undefined),
+              )
+            }
+          />
+          <span>
+            Turn JavaScript off on <span className="mono">{site}</span>
+            <span className="muted browser__hint">Safer and quieter, but many sites stop working. The page reloads.</span>
+          </span>
+        </label>
+      )}
+      {site && (
+        <label className="check browser__opt">
+          <input
+            type="checkbox"
+            checked={v.noAutoplay.includes(site)}
+            onChange={(e) => void save("browser.no_autoplay", e.target.checked ? [...v.noAutoplay, site] : v.noAutoplay.filter((s) => s !== site))}
+          />
+          <span>
+            Stop sound and video starting by themselves on <span className="mono">{site}</span>
+            <span className="muted browser__hint">Until you click on the page. Applies to the next tab you open.</span>
+          </span>
+        </label>
+      )}
+      {tabId && <SiteCookies key={`${tabId}${site}`} tabId={tabId} />}
+      {toggle("browser.passwords", "Saved logins", v.passwords, "Kept in Windows Credential Manager. Filled only when you click Fill, only on the exact site they were saved for, only over HTTPS.")}
+      {v.passwords && site && tabId && <SiteLogins key={site} site={site} tabId={tabId} />}
 
       <h3 className="label">Blocking</h3>
       {toggle("browser.adblock", "Block ads, trackers and malware sites", v.adblock)}
       {toggle("browser.cosmetic", "Hide empty ad frames on pages", v.cosmetic, "Cosmetic filters")}
+      {toggle("browser.youtube_ads", "Remove ads on YouTube", v.youtube, "Applies to the next tab you open. Turn it off if YouTube misbehaves. YouTube changes often, so an ad can still slip through.")}
       {status && (
         <div className="muted browser__hint">
           {status.blocker.building ? "Building filters… " : ""}

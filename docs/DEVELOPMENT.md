@@ -45,6 +45,12 @@ Add a `Spec` to `SPECS` in `dev/lsp/registry.rs`: executable names, arguments, t
 
 Add it to `adapters` and `Dap::start` in `dev/dap.rs` (stdio with `spawn_stdio`, a local port with `spawn_tcp`), then to `autoDebugConfig` in `modules/developer/debug/configs.ts` with the launch settings it expects. `cargo test dap` runs the session state machine against a fake adapter.
 
+## Adding a NEURAL tool
+
+Declare it in `neural/tools.rs` (`declarations`) and handle it in `execute`, returning a JSON result and, if the user should see it, an `Action` card. A tool must not reach outside `ChatFolder`. Anything that does belongs in the user's own hands, not in a tool. Add the behaviour to `prompts.rs` only if the model needs telling.
+
+To debug js-debug itself, point `NETRUNNER_DEV_JS_DEBUG` at its `dapDebugServer.js` (debug builds only) and run `cargo test js_debug -- --ignored`, the one test that uses the real adapter and Node. js-debug differs from other adapters: the first session asks for another one per program (`startDebugging`), and that session is where the program stops, so it becomes `Dap.current` while `Dap.root` owns the process.
+
 ## Making a panel resizable
 
 Put `<ResizeHandle pane="name" of="prev" />` next to the panel (`next` when it is on the other side), add a `0` column for it if the parent is a grid, and use `var(--pane-name, <default>)` for the panel's size in the stylesheet.

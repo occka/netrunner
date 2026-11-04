@@ -1,11 +1,12 @@
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
-use crate::browser::{self, blocker, data, Browser, Download, Prefs, Tab};
+use crate::browser::{self, blocker, data, logins, Browser, Cookie, Download, Prefs, Tab};
 use crate::error::{AppError, AppResult};
 use crate::overlay;
 use crate::services::activity::{self, Level};
 use crate::services::overlays::{self, Overlay};
+use crate::services::settings;
 use crate::state::AppState;
 
 #[derive(Serialize)]
@@ -84,7 +85,7 @@ pub async fn browser_set_bounds(app: AppHandle, id: String, x: f64, y: f64, widt
 
 #[tauri::command]
 pub async fn browser_set_zoom(app: AppHandle, id: String, factor: f64) -> AppResult<()> {
-    browser::webview(&app, &id)?.set_zoom(factor.clamp(0.25, 5.0)).map_err(|e| AppError::Internal(e.to_string()))
+    browser::set_tab_zoom(&app, &id, factor.clamp(0.25, 5.0))
 }
 
 /// The user chose to load this site over plain HTTP for the rest of the session.
@@ -109,6 +110,70 @@ pub async fn browser_clear_data(app: AppHandle, state: State<'_, AppState>) -> A
 #[tauri::command]
 pub async fn browser_downloads(browser: State<'_, Browser>) -> AppResult<Vec<Download>> {
     Ok(browser.downloads())
+}
+
+fn logins_enabled(state: &AppState) -> AppResult<()> {
+    let on = settings::get(&*state.db.conn()?, "browser.passwords")?.and_then(|v| v.as_bool()).unwrap_or(false);
+    if on {
+        Ok(())
+    } else {
+        Err(AppError::Invalid("saved logins are turned off".into()))
+    }
+}
+
+/// Which accounts are saved. Passwords stay in Windows Credential Manager.
+#[tauri::command]
+pub async fn browser_logins(state: State<'_, AppState>) -> AppResult<Vec<logins::Login>> {
+    logins::list(&*state.db.conn()?)
+}
+
+#[tauri::command]
+pub async fn browser_login_save(state: State<'_, AppState>, host: String, username: String, password: String) -> AppResult<()> {
+    logins_enabled(&state)?;
+    logins::save(&*state.db.conn()?, &host, &username, &password)?;
+    activity::record(&*state.db.conn()?, Level::Info, "browser", &format!("Saved a login for {host}"));
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn browser_login_delete(state: State<'_, AppState>, host: String, username: String) -> AppResult<()> {
+    logins::delete(&*state.db.conn()?, &host, &username)?;
+    activity::record(&*state.db.conn()?, Level::Info, "browser", &format!("Deleted a login for {host}"));
+    Ok(())
+}
+
+/// The user clicked Fill. The backend finds the password and checks the page itself.
+#[tauri::command]
+pub async fn browser_login_fill(app: AppHandle, state: State<'_, AppState>, id: String, username: String) -> AppResult<()> {
+    logins_enabled(&state)?;
+    browser::fill_login(&app, &id, &username)?;
+    activity::record(&*state.db.conn()?, Level::Info, "browser", "Filled a saved login");
+    Ok(())
+}
+
+/// Cancels a running download, found by its address.
+#[tauri::command]
+pub async fn browser_download_cancel(app: AppHandle, url: String) -> AppResult<()> {
+    browser::cancel_download(&app, &url)
+}
+
+#[tauri::command]
+pub async fn browser_reader(app: AppHandle, id: String) -> AppResult<()> {
+    browser::reader(&app, &id)
+}
+
+/// Cookies of the tab's current page: names and details, never values.
+#[tauri::command]
+pub async fn browser_cookies(app: AppHandle, id: String) -> AppResult<Vec<Cookie>> {
+    let rx = browser::cookies(&app, &id)?;
+    tauri::async_runtime::spawn_blocking(move || rx.recv_timeout(std::time::Duration::from_secs(5)).unwrap_or_default())
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))
+}
+
+#[tauri::command]
+pub async fn browser_cookie_delete(app: AppHandle, id: String, name: String, domain: String, path: String) -> AppResult<()> {
+    browser::delete_cookie(&app, &id, &name, &domain, &path)
 }
 
 #[tauri::command]

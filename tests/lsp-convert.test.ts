@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   applyTextEdits,
+  remapSemanticTokens,
+  SEMANTIC_MODIFIERS,
+  SEMANTIC_TYPES,
   completionKind,
   locations,
   markerSeverity,
@@ -85,5 +88,19 @@ describe("LSP conversions", () => {
     expect(locations({ uri: "file:///a", range })).toEqual([{ uri: "file:///a", range }]);
     expect(locations([{ targetUri: "file:///b", targetRange: range, targetSelectionRange: range }])).toEqual([{ uri: "file:///b", range }]);
     expect(locations(null)).toEqual([]);
+  });
+});
+
+describe("semantic tokens", () => {
+  it("renumbers a server's legend to the one Monaco knows", () => {
+    const legend = { tokenTypes: ["function", "class", "somethingOdd"], tokenModifiers: ["readonly", "weird", "async"] };
+    const out = [...remapSemanticTokens([0, 2, 4, 0, 0b001, 1, 0, 3, 1, 0b100, 0, 5, 1, 2, 0b010], legend)];
+    expect(out.slice(0, 3)).toEqual([0, 2, 4]);
+    expect(SEMANTIC_TYPES[out[3]]).toBe("function");
+    expect(out[4]).toBe(1 << SEMANTIC_MODIFIERS.indexOf("readonly"));
+    expect(SEMANTIC_TYPES[out[8]]).toBe("class");
+    expect(out[9]).toBe(1 << SEMANTIC_MODIFIERS.indexOf("async"));
+    expect(SEMANTIC_TYPES[out[13]]).toBe("unknown");
+    expect(out[14]).toBe(0);
   });
 });
