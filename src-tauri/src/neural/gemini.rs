@@ -218,11 +218,8 @@ pub fn trim_history(history: &[ChatMessage], budget: usize) -> (&[ChatMessage], 
     (&history[start..], start, start == 0 && used * 5 >= budget * 4)
 }
 
-/// Flash and newer can call functions and run code in one request; Gemma cannot.
-fn supports_tools(model: &str) -> bool {
-    !model.starts_with("gemma")
-}
-
+/// Gemini 3 and newer can call functions and run code in one request. Gemma 4 and
+/// older Gemini models can only call functions.
 fn supports_code_execution(model: &str) -> bool {
     ["gemini-3", "gemini-4", "gemini-flash"].iter().any(|p| model.starts_with(p))
 }
@@ -244,15 +241,13 @@ fn request_body(agent: &Agent, model: &str, contents: &[Value]) -> Value {
         "generationConfig": { "temperature": agent.temperature }
     });
     if let Some(play) = agent.tools {
-        if supports_tools(model) {
-            // Not in Play: Flash Lite took to running code just to think, and then
-            // often stopped without a reply. Dice and files cover what a game needs.
-            let code = !play && supports_code_execution(model);
-            body["tools"] = tools::declarations(play, code);
-            if code {
-                // Gemini refuses hosted code execution next to functions without this.
-                body["toolConfig"] = json!({ "includeServerSideToolInvocations": true });
-            }
+        // Not in Play: Flash Lite took to running code just to think, and then
+        // often stopped without a reply. Dice and files cover what a game needs.
+        let code = !play && supports_code_execution(model);
+        body["tools"] = tools::declarations(play, code);
+        if code {
+            // Gemini refuses hosted code execution next to functions without this.
+            body["toolConfig"] = json!({ "includeServerSideToolInvocations": true });
         }
     }
     body
@@ -426,7 +421,9 @@ async fn stream_step(
                 last_error = Some(api_error(status, &text));
                 continue 'models;
             }
-            if !first_step && status == reqwest::StatusCode::SERVICE_UNAVAILABLE && busy_retries < BUSY_RETRIES {
+            // Gemma answers an overload with 500 as often as with 503.
+            let busy = status == reqwest::StatusCode::SERVICE_UNAVAILABLE || status == reqwest::StatusCode::INTERNAL_SERVER_ERROR;
+            if !first_step && busy && busy_retries < BUSY_RETRIES {
                 busy_retries += 1;
                 let _ = channel.send(StreamEvent::Status { text: format!("{candidate} is busy, retrying…") });
                 let pause = Duration::from_secs(u64::from(busy_retries) * 4);
@@ -436,7 +433,7 @@ async fn stream_step(
                 continue;
             }
             // Overloaded or retired model: try the next one. Anything else is final.
-            if status == reqwest::StatusCode::SERVICE_UNAVAILABLE || status == reqwest::StatusCode::NOT_FOUND {
+            if busy || status == reqwest::StatusCode::NOT_FOUND {
                 log::warn!("Gemini model {candidate} unavailable ({status}); trying fallback");
                 last_error = Some(api_error(status, &text));
                 continue 'models;
@@ -629,7 +626,8 @@ mod tests {
         let old = request_body(&work, "gemini-2.5-flash", &[]);
         assert!(old["tools"].to_string().contains("write_file") && !old["tools"].to_string().contains("codeExecution"));
         assert!(old.get("toolConfig").is_none());
-        assert!(request_body(&work, "gemma-4-26b", &[]).get("tools").is_none());
+        let gemma = request_body(&work, "gemma-4-26b-a4b-it", &[]);
+        assert!(gemma["tools"].to_string().contains("write_file") && !gemma["tools"].to_string().contains("codeExecution"));
     }
 
     #[test]
