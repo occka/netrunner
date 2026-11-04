@@ -112,6 +112,8 @@ export interface SettingsSchema {
   "browser.restore_tabs": boolean;
   "browser.session": BrowserSession;
   /** Dark mode for pages: only sites that have a dark theme, or all (from the next start). */
+  /** Removes ads on YouTube: from the next tab opened. */
+  "browser.youtube_ads": boolean;
   "browser.page_dark": "off" | "prefer" | "force";
   /** The theme's accent colour and scrollbars on pages. */
   "browser.page_accent": boolean;
@@ -178,6 +180,7 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "browser.home": "",
   "browser.restore_tabs": true,
   "browser.session": { tabs: [], active: 0 },
+  "browser.youtube_ads": true,
   "browser.page_dark": "off",
   "browser.page_accent": false,
   "browser.page_accent_off": [],

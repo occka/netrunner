@@ -44,6 +44,8 @@ pub const LABEL_PREFIX: &str = "web-";
 pub struct Prefs {
     pub adblock: bool,
     pub cosmetic: bool,
+    /// Removes ads on YouTube (`youtube_guard.js`). From the next tab opened.
+    pub youtube_ads: bool,
     pub https_only: bool,
     pub gpc: bool,
     pub tracking: String,
@@ -71,6 +73,7 @@ impl Default for Prefs {
         Self {
             adblock: true,
             cosmetic: true,
+            youtube_ads: true,
             https_only: true,
             gpc: true,
             tracking: "strict".into(),
@@ -103,6 +106,7 @@ impl Prefs {
         };
         p.adblock = flag("adblock", p.adblock);
         p.cosmetic = flag("cosmetic", p.cosmetic);
+        p.youtube_ads = flag("youtube_ads", p.youtube_ads);
         p.https_only = flag("https_only", p.https_only);
         p.gpc = flag("gpc", p.gpc);
         p.tracking = text("tracking", &p.tracking);
@@ -554,6 +558,8 @@ fn inject_cosmetics(app: AppHandle, label: String, url: String) {
 /// Sends `navigator.globalPrivacyControl = true` to scripts as GPC requires.
 const GPC_SCRIPT: &str = "try{Object.defineProperty(Navigator.prototype,'globalPrivacyControl',{get:()=>true,configurable:true})}catch(e){}";
 
+const YOUTUBE_GUARD: &str = include_str!("youtube_guard.js");
+
 fn browser_args(prefs: &Prefs) -> String {
     // Unlike NETRUNNER's own webview, SmartScreen stays on here.
     // HardwareMediaKeyHandling publishes playing pages to Windows media
@@ -595,6 +601,10 @@ macro_rules! configure {
         }
         if prefs.gpc {
             b = b.initialization_script_for_all_frames(GPC_SCRIPT);
+        }
+        // All frames: YouTube players are often embedded in other sites.
+        if prefs.adblock && prefs.youtube_ads && !$browser.is_exception("https://www.youtube.com/") {
+            b = b.initialization_script_for_all_frames(YOUTUBE_GUARD);
         }
         b = b.initialization_script(media::HOOK);
         let (a1, l1) = ($app.clone(), $label.clone());

@@ -206,6 +206,7 @@ export function PrivacyPanel({ site }: { site: string }) {
   const v = {
     adblock: useSetting("browser.adblock"),
     cosmetic: useSetting("browser.cosmetic"),
+    youtube: useSetting("browser.youtube_ads"),
     https: useSetting("browser.https_only"),
     gpc: useSetting("browser.gpc"),
     tracking: useSetting("browser.tracking"),
@@ -269,6 +270,7 @@ export function PrivacyPanel({ site }: { site: string }) {
       <h3 className="label">Blocking</h3>
       {toggle("browser.adblock", "Block ads, trackers and malware sites", v.adblock)}
       {toggle("browser.cosmetic", "Hide empty ad frames on pages", v.cosmetic, "Cosmetic filters")}
+      {toggle("browser.youtube_ads", "Remove ads on YouTube", v.youtube, "Applies to the next tab you open. Turn it off if YouTube misbehaves. YouTube changes often, so an ad can still slip through.")}
       {status && (
         <div className="muted browser__hint">
           {status.blocker.building ? "Building filters… " : ""}
