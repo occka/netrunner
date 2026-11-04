@@ -3,7 +3,8 @@
 export type Attachment =
   | { kind: "file"; path: string }
   | { kind: "selection"; label: string; text: string }
-  | { kind: "tree"; root: string };
+  | { kind: "tree"; root: string }
+  | { kind: "image"; name: string; bytes: number };
 
 export interface ContextItem {
   label: string;
@@ -20,12 +21,28 @@ export interface ModelInfo {
 export interface NeuralStatus {
   configured: boolean;
   model: string;
+  playModel: string;
+}
+
+export type NeuralMode = "work" | "play";
+
+/** Something the agent did, shown as a card under its reply. */
+export interface NeuralAction {
+  kind: "write" | "append" | "edit" | "dice" | "python";
+  label: string;
+  detail: string | null;
+  error: string | null;
+  added: number;
+  removed: number;
+  change: number | null;
 }
 
 export type StreamEvent =
   | { type: "status"; text: string }
   | { type: "model"; model: string; fallback: boolean }
   | { type: "delta"; text: string }
+  | { type: "action"; action: NeuralAction }
+  | { type: "context"; dropped: number }
   | { type: "done"; promptTokens: number | null; outputTokens: number | null; finishReason: string | null };
 
 export interface FileEntry {
@@ -50,5 +67,7 @@ export type FilePreview =
 export interface ChatState {
   activeId: number;
   chats: { id: number; title: string; updatedAt: string; messageCount: number }[];
-  messages: { id: number; role: "user" | "model"; text: string; model: string | null; sent: string[] }[];
+  messages: { id: number; role: "user" | "model"; text: string; model: string | null; sent: string[]; images: string[]; actions: NeuralAction[] }[];
+  mode: NeuralMode;
+  kept: Attachment[];
 }

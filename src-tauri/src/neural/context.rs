@@ -1,8 +1,8 @@
 //! Builds the context sent to the AI from attachments the user selected.
 //!
-//! The model never gets file-system access or tools: the backend reads only
-//! the files listed in the request, enforces size limits and refuses files
-//! that look like secrets. The UI previews exactly what will be sent.
+//! For attachments the backend reads only the files listed in the request,
+//! enforces size limits and refuses files that look like secrets. The UI previews
+//! exactly what will be sent. The agent's own folder is handled by `folder.rs`.
 
 use std::path::{Path, PathBuf};
 
@@ -19,7 +19,7 @@ const MAX_TREE_ENTRIES: usize = 600;
 const SECRET_NAMES: &[&str] = &[".env", ".npmrc", ".pypirc", ".netrc", ".git-credentials", "id_rsa", "id_ed25519", "id_ecdsa", "credentials", "secrets.json"];
 const SECRET_EXTS: &[&str] = &["pem", "key", "pfx", "p12", "keystore", "jks", "kdbx", "ppk"];
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Attachment {
     /// A whole text file the user attached.
@@ -28,6 +28,8 @@ pub enum Attachment {
     Selection { label: String, text: String },
     /// File names (no contents) under a project root.
     Tree { root: String },
+    /// A photo in the chat's folder. Goes to the model as an image, not as text.
+    Image { name: String, bytes: usize },
 }
 
 #[derive(Debug, Serialize)]
@@ -106,6 +108,10 @@ pub fn build(roots: &[PathBuf], attachments: &[Attachment]) -> (String, Vec<Cont
     let mut out = String::new();
     let mut items = Vec::new();
     for a in attachments {
+        if let Attachment::Image { bytes, .. } = a {
+            items.push(ContextItem { label: "Photo".into(), bytes: *bytes, error: None });
+            continue;
+        }
         let rendered: AppResult<(String, String)> = match a {
             Attachment::File { path } => read_text(path).map(|(p, text)| {
                 (format!("File {p}"), format!("### File: {p}\n```{}\n{text}\n```\n", fence_lang(&p)))
@@ -118,6 +124,7 @@ pub fn build(roots: &[PathBuf], attachments: &[Attachment]) -> (String, Vec<Cont
                 }
             }
             Attachment::Tree { root } => tree(roots, root).map(|(r, t)| (format!("File list of {r}"), format!("### Project file list: {r}\n```\n{t}\n```\n"))),
+            Attachment::Image { .. } => continue,
         };
         match rendered {
             Ok((label, block)) if out.len() + block.len() <= MAX_TOTAL => {
@@ -131,6 +138,7 @@ pub fn build(roots: &[PathBuf], attachments: &[Attachment]) -> (String, Vec<Cont
                     Attachment::File { path } => format!("File {path}"),
                     Attachment::Selection { label, .. } => format!("Selection: {label}"),
                     Attachment::Tree { root } => format!("File list of {root}"),
+                    Attachment::Image { .. } => "Photo".into(),
                 },
                 bytes: 0,
                 error: Some(e.to_string()),

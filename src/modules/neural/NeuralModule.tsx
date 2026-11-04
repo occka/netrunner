@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { FileUp, KeyRound, LogOut, ShieldCheck } from "lucide-react";
+import { FileUp, FolderOpen, KeyRound, LogOut, PanelRight, Save, ShieldCheck } from "lucide-react";
 import { ModuleHeader } from "@/components/ModuleHeader";
 import { ResizeHandle } from "@/components/ResizeHandle";
 import { api } from "@/services/api";
@@ -8,12 +8,15 @@ import { confirmAction } from "@/stores/confirm";
 import { notify, reportError } from "@/stores/notifications";
 import { ChatPanel } from "./ChatPanel";
 import { useNeural } from "./store";
+import { ChatFiles } from "./ChatFiles";
 import { ChatList } from "./ChatList";
 import { useNeuralSession } from "./useNeuralSession";
 
 export default function NeuralModule() {
-  const { status, models, loadStatus, loadModels, disconnect, attach } = useNeural();
+  const { status, models, mode, chatId, busy, loadStatus, loadModels, disconnect, attach, setMode, setDraft, send } = useNeural();
   const [projects, setProjects] = useState<string[]>([]);
+  const [showFiles, setShowFiles] = useState(false);
+  const selected = mode === "play" ? status?.playModel : status?.model;
   useNeuralSession();
 
   useEffect(() => {
@@ -27,7 +30,7 @@ export default function NeuralModule() {
 
   const setModel = async (model: string) => {
     try {
-      await api.settings.set("neural.model", model);
+      await api.settings.set(mode === "play" ? "neural.model_play" : "neural.model", model);
       await loadStatus();
     } catch (err) {
       reportError("Could not change model", err);
@@ -42,11 +45,32 @@ export default function NeuralModule() {
 
   return (
     <div className="module">
-      <ModuleHeader id="neural" subtitle={status?.configured ? "Gemini via Google AI Studio · context is only what you attach" : undefined}>
+      <ModuleHeader id="neural" subtitle={status?.configured ? "Gemini via Google AI Studio · sees what you attach and this chat's folder" : undefined}>
         {status?.configured && (
           <>
-            <select className="select neural-model" value={status.model} onChange={(e) => void setModel(e.target.value)} title="Model">
-              {!models.some((m) => m.id === status.model) && <option value={status.model}>{status.model}</option>}
+            <div className="segmented" role="group" aria-label="Mode of this chat">
+              <button
+                aria-pressed={mode === "work"}
+                disabled={!!busy}
+                title="Precise and concise, for code and tasks"
+                onClick={() => void setMode("work").catch((e) => reportError("Could not change mode", e))}
+              >
+                Work
+              </button>
+              <button
+                aria-pressed={mode === "play"}
+                disabled={!!busy}
+                title="Creative: conversation and role-playing games with real dice. Uses its own model, with a larger free quota"
+                onClick={() => void setMode("play").catch((e) => reportError("Could not change mode", e))}
+              >
+                Play
+              </button>
+            </div>
+            <button className="btn btn--ghost" aria-pressed={showFiles} onClick={() => setShowFiles((v) => !v)} title="Files in this chat's folder">
+              <PanelRight size={14} /> Files
+            </button>
+            <select className="select neural-model" value={selected} onChange={(e) => void setModel(e.target.value)} title={`Model for ${mode === "play" ? "Play" : "Work"}`}>
+              {selected && !models.some((m) => m.id === selected) && <option value={selected}>{selected}</option>}
               {models.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.id}
@@ -79,6 +103,19 @@ export default function NeuralModule() {
                 <button className="btn btn--sm btn--ghost" onClick={() => void attachFile()} title="Attach text files (max 256 KB each)">
                   <FileUp size={12} /> Attach file
                 </button>
+                {mode === "play" && (
+                  <button
+                    className="btn btn--sm btn--ghost"
+                    disabled={!!busy}
+                    title="Ask NEURAL to save the current state to its files"
+                    onClick={() => {
+                      setDraft("Save the current state to your files now: everything that changed, then a one-line confirmation. Keep replying in the language we have been using.");
+                      void send(true);
+                    }}
+                  >
+                    <Save size={12} /> Update files
+                  </button>
+                )}
                 {projects.length > 0 && (
                   <select
                     className="select neural-tree"
@@ -97,6 +134,12 @@ export default function NeuralModule() {
               </>
             }
           />
+          {showFiles && chatId != null && (
+            <>
+              <ResizeHandle pane="neural-files" of="next" min={180} max={700} rest={360} />
+              <ChatFiles chatId={chatId} onOpen={() => void api.neural.openFolder(chatId).catch((e) => reportError("Could not open the folder", e))} icon={<FolderOpen size={12} />} />
+            </>
+          )}
         </div>
       )}
     </div>
@@ -138,8 +181,9 @@ function Connect() {
           <li>The key is checked against Google, then stored only in Windows Credential Manager. It is not shown again.</li>
           <li>Requests send the key in a header, never in a URL.</li>
           <li>
-            <ShieldCheck size={11} /> The AI never reads your disk. It only sees files, selections or project file lists
-            you attach, and every send is recorded in the activity log.
+            <ShieldCheck size={11} /> The AI sees only what you attach and its own folder for each chat, and every send
+            is recorded in the activity log. On the free tier Google may use what you send to improve its products, and
+            human reviewers may read it: do not send anything sensitive.
           </li>
         </ul>
         <label className="field">

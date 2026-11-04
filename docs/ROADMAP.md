@@ -25,7 +25,7 @@ Not done in Phase 4:
 - Archive browsing, duplicate detection, opt-in index for instant search.
 - Persistent chat history (in-memory only today, by design for privacy).
 - AI-assisted semantic search in the command palette.
-- AI coding assistant with tools (it intentionally has none; context is explicit).
+- AI coding assistant with tools in DEVELOPER (it intentionally has none there; context is explicit). NEURAL's own agent works only in its chat's folder.
 
 ## Phase 5: Overlay, Browser, Extensions (in progress)
 Done:
@@ -71,6 +71,7 @@ Done so far: GITHUB code browsing, Widget Studio, per-profile overlay sets, clic
 - ✅ **Repair of damaged databases at startup** (0.8.2): an integrity check before migrations rebuilds a damaged database and keeps a copy of the original in `backups`.
 - ✅ **Resizable panels** (0.8.2): DEVELOPER, FILES, GITHUB, NEURAL, Widget Studio and the pinned navigation; sizes are remembered.
 - ✅ **Browser page appearance** (0.8.2): dark pages, theme accent and scrollbars, per-site transparency with a tint.
+- ✅ **NEURAL agent** (0.8.3): photos, a Work / Play switch per chat, a folder per chat with tools to list, read, write, append and edit, Undo on every change, attachments kept in context, role-playing games with real dice, a context indicator.
 - Moved on: Node.js debugging and semantic highlighting from language servers (below); the CodeLLDB adapter is located, not downloaded by NETRUNNER.
 
 ### 0.9: Browser, part 2
@@ -106,4 +107,6 @@ Done so far: GITHUB code browsing, Widget Studio, per-profile overlay sets, clic
 - The Music Player shows only apps that publish Windows media sessions.
 - Automation process triggers have up to ~3 s latency (polling, only while such rules exist).
 - Monaco is ~3.6 MB, loaded only when DEVELOPER opens.
-- Free Gemini keys hit overloaded models (HTTP 503) at peak times; NEURAL falls back to other flash models automatically and shows which one answered.
+- Free Gemini keys hit overloaded models (HTTP 503) at peak times; NEURAL falls back to other flash models automatically and shows which one answered. Free Flash models allow only 20 requests a day and 5 a minute, and an agent can use several requests for one message; Play therefore defaults to Flash Lite (500 a day, 15 a minute).
+- The NEURAL agent can make mistakes in its files (for example, count an item twice) or forget to update them. Every change can be undone, but nothing checks that the model is right. A new chat does not see the files of an older one.
+- HEIC photos are not expected to open in the webview (not tested); convert them first if NEURAL refuses one.

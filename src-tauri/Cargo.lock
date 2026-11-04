@@ -2774,6 +2774,7 @@ dependencies = [
  "chrono",
  "feed-rs",
  "futures-util",
+ "getrandom 0.3.4",
  "ignore",
  "keyring",
  "log",
