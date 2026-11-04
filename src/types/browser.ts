@@ -18,7 +18,7 @@ export interface BrowserTab {
   zoom: number;
 }
 
-export type BrowserNoticeKind = "https-upgrade" | "permission" | "external-app" | "blocked-scheme" | "download" | "reader";
+export type BrowserNoticeKind = "https-upgrade" | "permission" | "external-app" | "blocked-scheme" | "download" | "reader" | "login-form";
 
 export interface BrowserNotice {
   tab: string;
@@ -89,6 +89,12 @@ export interface BrowserDownload {
   state: "running" | "done" | "failed";
   received: number;
   total: number | null;
+}
+
+/** Which accounts are saved; passwords never reach the UI. */
+export interface BrowserLogin {
+  host: string;
+  username: string;
 }
 
 /** Names and details only: the backend never passes a cookie's value. */

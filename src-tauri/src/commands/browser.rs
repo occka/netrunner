@@ -1,11 +1,12 @@
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
-use crate::browser::{self, blocker, data, Browser, Cookie, Download, Prefs, Tab};
+use crate::browser::{self, blocker, data, logins, Browser, Cookie, Download, Prefs, Tab};
 use crate::error::{AppError, AppResult};
 use crate::overlay;
 use crate::services::activity::{self, Level};
 use crate::services::overlays::{self, Overlay};
+use crate::services::settings;
 use crate::state::AppState;
 
 #[derive(Serialize)]
@@ -109,6 +110,45 @@ pub async fn browser_clear_data(app: AppHandle, state: State<'_, AppState>) -> A
 #[tauri::command]
 pub async fn browser_downloads(browser: State<'_, Browser>) -> AppResult<Vec<Download>> {
     Ok(browser.downloads())
+}
+
+fn logins_enabled(state: &AppState) -> AppResult<()> {
+    let on = settings::get(&*state.db.conn()?, "browser.passwords")?.and_then(|v| v.as_bool()).unwrap_or(false);
+    if on {
+        Ok(())
+    } else {
+        Err(AppError::Invalid("saved logins are turned off".into()))
+    }
+}
+
+/// Which accounts are saved. Passwords stay in Windows Credential Manager.
+#[tauri::command]
+pub async fn browser_logins(state: State<'_, AppState>) -> AppResult<Vec<logins::Login>> {
+    logins::list(&*state.db.conn()?)
+}
+
+#[tauri::command]
+pub async fn browser_login_save(state: State<'_, AppState>, host: String, username: String, password: String) -> AppResult<()> {
+    logins_enabled(&state)?;
+    logins::save(&*state.db.conn()?, &host, &username, &password)?;
+    activity::record(&*state.db.conn()?, Level::Info, "browser", &format!("Saved a login for {host}"));
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn browser_login_delete(state: State<'_, AppState>, host: String, username: String) -> AppResult<()> {
+    logins::delete(&*state.db.conn()?, &host, &username)?;
+    activity::record(&*state.db.conn()?, Level::Info, "browser", &format!("Deleted a login for {host}"));
+    Ok(())
+}
+
+/// The user clicked Fill. The backend finds the password and checks the page itself.
+#[tauri::command]
+pub async fn browser_login_fill(app: AppHandle, state: State<'_, AppState>, id: String, username: String) -> AppResult<()> {
+    logins_enabled(&state)?;
+    browser::fill_login(&app, &id, &username)?;
+    activity::record(&*state.db.conn()?, Level::Info, "browser", "Filled a saved login");
+    Ok(())
 }
 
 /// Cancels a running download, found by its address.

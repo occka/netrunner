@@ -25,6 +25,9 @@ import {
   markerSeverity,
   markupToMarkdown,
   pathKey,
+  remapSemanticTokens,
+  SEMANTIC_MODIFIERS,
+  SEMANTIC_TYPES,
   symbolKind,
   toLspPosition,
   toLspRange,
@@ -70,6 +73,8 @@ const capabilities = new Map<string, Caps>();
 const MARKER_OWNER = "lsp";
 const TASK_OWNER = "task";
 const CHANGE_DEBOUNCE_MS = 150;
+/** Monaco asks again for semantic tokens when this fires: a file's server has just become ready. */
+const semanticReady = new monaco.Emitter<void>();
 
 const setDoc = (path: string, patch: Partial<DocState>) =>
   useLsp.setState((s) => {
@@ -168,6 +173,7 @@ async function openDoc(tab: EditorTab) {
     if (!stillOpen) return closeDoc(tab.path);
     applyMarkers(tab.path);
     void flush(tab.path);
+    semanticReady.fire();
   } else if (res.state === "unsupported") {
     setDoc(tab.path, { state: "unsupported" });
   } else {
@@ -771,6 +777,19 @@ function registerProviders() {
         dispose() {},
       };
     },
+  });
+
+  monaco.languages.registerDocumentSemanticTokensProvider(all, {
+    onDidChange: semanticReady.event,
+    getLegend: () => ({ tokenTypes: SEMANTIC_TYPES, tokenModifiers: SEMANTIC_MODIFIERS }),
+    async provideDocumentSemanticTokens(model) {
+      const d = readyDoc(model);
+      const provider = d && caps(d).semanticTokensProvider;
+      if (!d || !provider?.full || !provider.legend) return null;
+      const res = await request<{ data: number[]; resultId?: string }>(d, "textDocument/semanticTokens/full", { textDocument: { uri: d.uri } });
+      return res?.data ? { data: remapSemanticTokens(res.data, provider.legend), resultId: res.resultId } : null;
+    },
+    releaseDocumentSemanticTokens() {},
   });
 
   monaco.editor.registerEditorOpener({

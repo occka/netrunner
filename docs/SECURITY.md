@@ -48,7 +48,9 @@ The command policy is a safety net, not a sandbox: a confirmed command runs with
 | Navigation | Only http(s), `about:`, `blob:`/`data:` pages. `file:` and custom schemes are refused; pages cannot launch external apps (`steam:`, `ms-settings:`…) |
 | Popups | `window.open` without a size opens a normal tab; sized popups (sign-in flows) open a hardened popup window |
 | Permissions | Camera, microphone, location, notifications, clipboard read, screen capture, MIDI, sensors, fonts, window management, multiple downloads and file-system access are denied unless the user allowed that site (stored in `browser_site_permissions`, revocable) |
-| Data entry | Password saving and form autofill are off by default |
+| Data entry | WebView2's password saving and form autofill are off by default |
+| Saved logins | Off by default. Passwords are stored only in Windows Credential Manager; the database holds which accounts exist. The user types them in NETRUNNER's own panel, so nothing is captured from pages. A page cannot ask for a login: the backend fills one only when the user clicks Fill, in the top frame, on exactly the host it was saved for (not a subdomain), and over HTTPS unless the address is local. Once filled, the page's own scripts can read the field, as they can read anything typed into it |
+| Autoplay | Per site, `autoplay_guard.js` refuses `play()` and pauses media until the user clicks or presses a key on the page. Hosts reach the script as JSON |
 | Downloads | Default Downloads folder; SmartScreen reputation checks stay on (NETRUNNER's own webview disables SmartScreen, the browser profile does not) |
 | WebRTC | `--force-webrtc-ip-handling-policy=default_public_interface_only` hides local IP addresses (applies after restart) |
 | Private tabs | InPrivate WebView2 sessions; nothing is written to history |

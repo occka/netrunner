@@ -15,6 +15,7 @@
 
 pub mod blocker;
 pub mod data;
+pub mod logins;
 pub mod media;
 #[cfg(windows)]
 mod native;
@@ -70,6 +71,8 @@ pub struct Prefs {
     pub site_zoom: HashMap<String, f64>,
     /// Sites where the user turned JavaScript off.
     pub no_script: Vec<String>,
+    /// Sites that may not start media by themselves. From the next tab opened.
+    pub no_autoplay: Vec<String>,
 }
 
 impl Default for Prefs {
@@ -97,6 +100,7 @@ impl Default for Prefs {
             page_background: "#0b0d10".into(),
             site_zoom: HashMap::new(),
             no_script: Vec::new(),
+            no_autoplay: Vec::new(),
         }
     }
 }
@@ -128,6 +132,7 @@ impl Prefs {
         p.page_accent_off = list("page_accent_off").unwrap_or_default();
         p.page_transparent = list("page_transparent").unwrap_or_default();
         p.no_script = list("no_script").unwrap_or_default();
+        p.no_autoplay = list("no_autoplay").unwrap_or_default();
         p.site_zoom = get("site_zoom")
             .and_then(|v| v.as_object().map(|m| m.iter().filter_map(|(k, v)| Some((k.clone(), v.as_f64()?))).collect()))
             .unwrap_or_default();
@@ -670,6 +675,12 @@ const GPC_SCRIPT: &str = "try{Object.defineProperty(Navigator.prototype,'globalP
 
 const YOUTUBE_GUARD: &str = include_str!("youtube_guard.js");
 
+/// Hosts go in as JSON, so a value can never become code.
+fn autoplay_guard(sites: &[String]) -> String {
+    let list = serde_json::to_string(sites).unwrap_or_else(|_| "[]".into());
+    include_str!("autoplay_guard.js").replacen("SITES.some", &format!("{list}.some"), 1)
+}
+
 fn browser_args(prefs: &Prefs) -> String {
     // Unlike NETRUNNER's own webview, SmartScreen stays on here.
     // HardwareMediaKeyHandling publishes playing pages to Windows media
@@ -715,6 +726,9 @@ macro_rules! configure {
         // All frames: YouTube players are often embedded in other sites.
         if prefs.adblock && prefs.youtube_ads && !$browser.is_exception("https://www.youtube.com/") {
             b = b.initialization_script_for_all_frames(YOUTUBE_GUARD);
+        }
+        if !prefs.no_autoplay.is_empty() {
+            b = b.initialization_script_for_all_frames(autoplay_guard(&prefs.no_autoplay));
         }
         b = b.initialization_script(media::HOOK);
         let (a1, l1) = ($app.clone(), $label.clone());
@@ -924,6 +938,25 @@ pub fn reader(app: &AppHandle, id: &str) -> AppResult<()> {
     .map_err(|e| AppError::Internal(e.to_string()))
 }
 
+/// Fills a saved login into the page, on the user's click. Refuses any page but
+/// the exact site it was saved for.
+pub fn fill_login(app: &AppHandle, id: &str, username: &str) -> AppResult<()> {
+    let view = webview(app, id)?;
+    let tab = app.try_state::<Browser>().and_then(|b| b.tab(id)).ok_or_else(|| AppError::NotFound("tab is closed".into()))?;
+    let host = host_of(&tab.url);
+    if !logins::may_fill(&tab.url, &host) {
+        return Err(AppError::Invalid("logins are filled only over HTTPS".into()));
+    }
+    let script = logins::fill_script(username, &logins::password(&host, username)?)?;
+    let (app, label) = (app.clone(), id.to_string());
+    view.eval_with_callback(script, move |result| {
+        if result.trim() != "true" {
+            notice(&app, &label, "login-form", &host, "");
+        }
+    })
+    .map_err(|e| AppError::Internal(e.to_string()))
+}
+
 pub fn cookies(app: &AppHandle, id: &str) -> AppResult<std::sync::mpsc::Receiver<Vec<Cookie>>> {
     let view = webview(app, id)?;
     let url = app.try_state::<Browser>().and_then(|b| b.tab(id)).map(|t| t.url).unwrap_or_default();
@@ -1000,6 +1033,13 @@ mod tests {
     fn local_hosts_are_not_upgraded() {
         assert!(is_local_host("localhost") && is_local_host("10.0.0.2") && is_local_host("printer.local"));
         assert!(!is_local_host("example.com") && !is_local_host("8.8.8.8"));
+    }
+
+    #[test]
+    fn autoplay_guard_carries_its_sites_as_data() {
+        let script = autoplay_guard(&["a.com".into(), "x\";alert(1);//".into()]);
+        assert!(script.contains(r#"["a.com","x\";alert(1);//"].some"#), "{script}");
+        assert!(!script.contains("SITES.some"));
     }
 
     #[test]

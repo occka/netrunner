@@ -291,7 +291,7 @@ export type DapEvent =
   | { type: "closed" };
 
 export interface DebugAdapterStatus {
-  id: "debugpy" | "delve" | "codelldb";
+  id: "debugpy" | "delve" | "codelldb" | "js-debug";
   name: string;
   languages: string;
   found: boolean;

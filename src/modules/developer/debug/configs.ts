@@ -4,13 +4,13 @@
  */
 export interface DebugConfig {
   name: string;
-  adapter: "debugpy" | "delve" | "codelldb";
+  adapter: "debugpy" | "delve" | "codelldb" | "js-debug";
   request: "launch" | "attach";
   config: Record<string, unknown>;
 }
 
 const dirOf = (path: string) => path.replace(/[\\/][^\\/]*$/, "");
-const ADAPTERS = ["debugpy", "delve", "codelldb"];
+const ADAPTERS = ["debugpy", "delve", "codelldb", "js-debug"];
 
 /** A debug configuration for the file, or null when its language needs a built program or has no adapter. */
 export function autoDebugConfig(path: string, root: string): DebugConfig | null {
@@ -27,8 +27,14 @@ export function autoDebugConfig(path: string, root: string): DebugConfig | null 
   if (ext === "go") {
     return { name: `Go: ${name}`, adapter: "delve", request: "launch", config: { name, type: "go", request: "launch", mode: "debug", program: dirOf(path), cwd: root } };
   }
+  if (ext === "js" || ext === "mjs" || ext === "cjs") {
+    return { name: `Node: ${name}`, adapter: "js-debug", request: "launch", config: nodeConfig({ name, request: "launch", program: path, cwd: root }) };
+  }
   return null;
 }
+
+/** Output goes to the debug console, not to a terminal the session cannot reach. */
+const nodeConfig = (c: Record<string, unknown>) => ({ type: "pwa-node", console: "internalConsole", ...c });
 
 /** A built program for Rust, C and C++ (the user names it). */
 export function nativeDebugConfig(program: string, root: string): DebugConfig {
@@ -55,7 +61,7 @@ export function debugConfigsFromLaunch(raw: { configurations?: { name?: string; 
       config.type = "python";
       config.console = "internalConsole";
     }
-    out.push({ name: c.name, adapter: adapter as DebugConfig["adapter"], request: req, config });
+    out.push({ name: c.name, adapter: adapter as DebugConfig["adapter"], request: req, config: adapter === "js-debug" ? nodeConfig(config) : config });
   }
   return out;
 }

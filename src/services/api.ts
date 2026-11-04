@@ -38,7 +38,7 @@ import type {
 } from "@/types/dev";
 import type {
   Bookmark,
-  BrowserCookie, BrowserDownload,
+  BrowserCookie, BrowserDownload, BrowserLogin,
   BrowserStatus,
   BrowserTab,
   HistoryEntry,
@@ -443,6 +443,10 @@ export const api = {
     downloads: () => call<BrowserDownload[]>("browser_downloads"),
     cancelDownload: (url: string) => call<void>("browser_download_cancel", { url }),
     reader: (id: string) => call<void>("browser_reader", { id }),
+    logins: () => call<BrowserLogin[]>("browser_logins"),
+    loginSave: (host: string, username: string, password: string) => call<void>("browser_login_save", { host, username, password }),
+    loginDelete: (host: string, username: string) => call<void>("browser_login_delete", { host, username }),
+    loginFill: (id: string, username: string) => call<void>("browser_login_fill", { id, username }),
     cookies: (id: string) => call<BrowserCookie[]>("browser_cookies", { id }),
     deleteCookie: (id: string, c: Pick<BrowserCookie, "name" | "domain" | "path">) => call<void>("browser_cookie_delete", { id, name: c.name, domain: c.domain, path: c.path }),
     bookmarks: () => call<Bookmark[]>("browser_bookmarks"),

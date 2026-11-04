@@ -35,7 +35,7 @@ import { useSetting, useSettings } from "@/stores/settings";
 import { notify, reportError } from "@/stores/notifications";
 import { BrowserSurface } from "./BrowserSurface";
 import { AppearancePanel, BookmarksPanel, DownloadsPanel, HistoryPanel, PrivacyPanel, TabsPanel } from "./BrowserPanels";
-import { hostOf, mainTabs, stripTabs, useBrowser, type StripTab } from "./store";
+import { hostOf, mainTabs, stripItems, stripTabs, useBrowser, type StripTab } from "./store";
 import type { BrowserNotice, BrowserTab } from "@/types/browser";
 
 type Panel = "tabs" | "bookmarks" | "history" | "downloads" | "privacy" | "appearance" | null;
@@ -57,7 +57,7 @@ const PERMISSION_LABEL: Record<string, string> = {
 };
 
 export default function BrowserModule() {
-  const { tabs, sleeping, order, activeId, ready, init, activate, newTab, close, nextPrivate } = useBrowser();
+  const { tabs, sleeping, order, activeId, ready, init, activate, newTab, close, nextPrivate, groups, members, toggleGroup } = useBrowser();
   const [panel, setPanel] = useState<Panel>(null);
   const clearSites = useSetting("browser.page_transparent");
   const shown = stripTabs({ tabs, sleeping, order });
@@ -155,9 +155,23 @@ export default function BrowserModule() {
         }
       />
       <div className="browser__tabs" role="tablist">
-        {shown.map((t) => (
-          <TabButton key={t.id} tab={t} active={t.id === activeId} onSelect={() => activate(t.id)} onClose={() => void close(t.id)} />
-        ))}
+        {stripItems(shown, groups, members, activeId).map((item) =>
+          item.kind === "group" ? (
+            <button
+              key={item.group.id}
+              className="browser__group"
+              style={{ background: item.group.color }}
+              aria-expanded={!item.group.collapsed}
+              title={`${item.group.collapsed ? "Show" : "Hide"} this group (${item.count} tabs)`}
+              onClick={() => toggleGroup(item.group.id)}
+            >
+              {item.group.name}
+              {item.group.collapsed && <span className="mono"> {item.count}</span>}
+            </button>
+          ) : (
+            <TabButton key={item.tab.id} tab={item.tab} color={item.group?.color} active={item.tab.id === activeId} onSelect={() => activate(item.tab.id)} onClose={() => void close(item.tab.id)} />
+          ),
+        )}
         {activeId === null && (
           <div className="browser__tab" role="tab" aria-selected>
             {nextPrivate ? <VenetianMask size={13} /> : <Globe size={13} />}
@@ -206,10 +220,11 @@ export default function BrowserModule() {
   );
 }
 
-function TabButton({ tab, active, onSelect, onClose }: { tab: StripTab; active: boolean; onSelect: () => void; onClose: () => void }) {
+function TabButton({ tab, active, color, onSelect, onClose }: { tab: StripTab; active: boolean; color?: string; onSelect: () => void; onClose: () => void }) {
   return (
     <div
       className={`browser__tab${tab.sleeping ? " browser__tab--sleeping" : ""}`}
+      style={color ? { boxShadow: `inset 0 -2px 0 ${color}` } : undefined}
       role="tab"
       aria-selected={active}
       title={tab.url}
@@ -405,6 +420,8 @@ function noticeText(n: BrowserNotice): string {
       return `Downloading from ${n.host}. Windows SmartScreen checks the file.`;
     case "reader":
       return "Reader mode found no article on this page.";
+    case "login-form":
+      return "No password field was found in this page's main frame. Open the login form first.";
   }
 }
 

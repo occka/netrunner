@@ -24,8 +24,9 @@ const save = <K extends SettingKey>(key: K, value: SettingsSchema[K]) =>
 
 /** Finds an open tab by title or address, and brings closed ones back. */
 export function TabsPanel() {
-  const { tabs, sleeping, order, closed, activate, close, reopen } = useBrowser();
+  const { tabs, sleeping, order, closed, groups, members, activeId, activate, close, reopen, addGroup, setGroup, renameGroup, removeGroup } = useBrowser();
   const [query, setQuery] = useState("");
+  const [groupName, setGroupName] = useState("");
   const q = query.trim().toLowerCase();
   const matches = (t: { title: string; url: string }) => !q || t.title.toLowerCase().includes(q) || t.url.toLowerCase().includes(q);
   const open = stripTabs({ tabs, sleeping, order }).filter(matches);
@@ -51,12 +52,46 @@ export function TabsPanel() {
             <button className="link-btn truncate" title={t.url} onClick={() => activate(t.id)}>
               {t.title || t.url}
             </button>
+            {groups.length > 0 && (
+              <select className="select browser__group-pick" title="Group of this tab" value={members[t.id] ?? ""} onChange={(e) => setGroup(t.id, e.target.value || null)}>
+                <option value="">No group</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <button className="icon-btn icon-btn--sm" title="Close tab" onClick={() => void close(t.id)}>
               <X size={12} />
             </button>
           </li>
         ))}
       </ul>
+      <h3 className="label">Groups</h3>
+      {groups.map((g) => (
+        <div key={g.id} className="browser__site">
+          <span className="browser__group-dot" style={{ background: g.color }} />
+          <input className="input" aria-label="Group name" value={g.name} onChange={(e) => renameGroup(g.id, e.target.value)} />
+          <button className="icon-btn icon-btn--sm" title="End the group: its tabs stay open" onClick={() => removeGroup(g.id)}>
+            <X size={12} />
+          </button>
+        </div>
+      ))}
+      <form
+        className="browser__site"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!activeId) return;
+          addGroup(groupName, activeId);
+          setGroupName("");
+        }}
+      >
+        <input className="input" placeholder="New group name" value={groupName} onChange={(e) => setGroupName(e.target.value)} />
+        <button className="btn btn--sm" type="submit" disabled={!activeId} title="Creates a group with the current tab in it">
+          Group this tab
+        </button>
+      </form>
       {closed.length > 0 && (
         <>
           <h3 className="label">Recently closed</h3>
@@ -263,6 +298,62 @@ export function AppearancePanel({ site }: { site: string }) {
   );
 }
 
+/**
+ * Logins for this site, kept in Windows Credential Manager. The password box is
+ * NETRUNNER's own: pages cannot see it, and they can never trigger a fill.
+ */
+function SiteLogins({ site, tabId }: { site: string; tabId: string }) {
+  const { data, reload } = usePolled(() => api.browser.logins(), 0);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const mine = (data ?? []).filter((l) => l.host === site);
+  return (
+    <>
+      <h3 className="label">Logins for {site}</h3>
+      <ul className="browser__list">
+        {mine.map((l) => (
+          <li key={l.username}>
+            <span className="mono truncate">{l.username || "(no user name)"}</span>
+            <button className="btn btn--sm" title="Fill the login form on this page" onClick={() => void api.browser.loginFill(tabId, l.username).catch((err) => reportError("Could not fill the login", err))}>
+              Fill
+            </button>
+            <button
+              className="icon-btn icon-btn--sm"
+              title="Delete this login"
+              onClick={async () => {
+                if (await confirmAction({ title: "Delete login", message: `Delete the saved login "${l.username}" for ${site}?`, confirmLabel: "Delete", danger: true }))
+                  await api.browser.loginDelete(site, l.username).then(reload, (err) => reportError("Could not delete the login", err));
+              }}
+            >
+              <Trash2 size={12} />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <form
+        className="browser__panel-stack"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void api.browser.loginSave(site, username.trim(), password).then(
+            () => {
+              setUsername("");
+              setPassword("");
+              return reload();
+            },
+            (err) => reportError("Could not save the login", err),
+          );
+        }}
+      >
+        <input className="input" placeholder="User name" autoComplete="off" spellCheck={false} value={username} onChange={(e) => setUsername(e.target.value)} />
+        <input className="input" type="password" placeholder="Password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <button className="btn btn--sm" type="submit" disabled={!password}>
+          Save login for {site}
+        </button>
+      </form>
+    </>
+  );
+}
+
 /** What the current site has stored. Values are not shown: they are often login tokens. */
 function SiteCookies({ tabId }: { tabId: string }) {
   const { data, reload } = usePolled(() => api.browser.cookies(tabId), 0);
@@ -313,6 +404,8 @@ export function PrivacyPanel({ site, tabId }: { site: string; tabId: string | nu
     cosmetic: useSetting("browser.cosmetic"),
     youtube: useSetting("browser.youtube_ads"),
     noScript: useSetting("browser.no_script"),
+    noAutoplay: useSetting("browser.no_autoplay"),
+    passwords: useSetting("browser.passwords"),
     https: useSetting("browser.https_only"),
     gpc: useSetting("browser.gpc"),
     tracking: useSetting("browser.tracking"),
@@ -389,7 +482,22 @@ export function PrivacyPanel({ site, tabId }: { site: string; tabId: string | nu
           </span>
         </label>
       )}
+      {site && (
+        <label className="check browser__opt">
+          <input
+            type="checkbox"
+            checked={v.noAutoplay.includes(site)}
+            onChange={(e) => void save("browser.no_autoplay", e.target.checked ? [...v.noAutoplay, site] : v.noAutoplay.filter((s) => s !== site))}
+          />
+          <span>
+            Stop sound and video starting by themselves on <span className="mono">{site}</span>
+            <span className="muted browser__hint">Until you click on the page. Applies to the next tab you open.</span>
+          </span>
+        </label>
+      )}
       {tabId && <SiteCookies key={`${tabId}${site}`} tabId={tabId} />}
+      {toggle("browser.passwords", "Saved logins", v.passwords, "Kept in Windows Credential Manager. Filled only when you click Fill, only on the exact site they were saved for, only over HTTPS.")}
+      {v.passwords && site && tabId && <SiteLogins key={site} site={site} tabId={tabId} />}
 
       <h3 className="label">Blocking</h3>
       {toggle("browser.adblock", "Block ads, trackers and malware sites", v.adblock)}

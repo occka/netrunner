@@ -23,6 +23,10 @@ use crate::services::launcher::expand_env;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 const INITIALIZED_TIMEOUT: Duration = Duration::from_secs(30);
+// What js-debug is called in the protocol.
+const JS_DEBUG_ID: &str = "pwa-node";
+const JS_DEBUG_SERVER: &str = r"%LOCALAPPDATA%\js-debug\js-debug\src\dapDebugServer.js";
+const JS_DEBUG_INSTALL: &str = r#"$d="$env:LOCALAPPDATA\js-debug"; New-Item -ItemType Directory -Force $d | Out-Null; $t=(Invoke-RestMethod https://api.github.com/repos/microsoft/vscode-js-debug/releases/latest).tag_name; Invoke-WebRequest "https://github.com/microsoft/vscode-js-debug/releases/download/$t/js-debug-dap-$t.tar.gz" -OutFile "$d\js-debug.tar.gz"; tar -xzf "$d\js-debug.tar.gz" -C $d; Remove-Item "$d\js-debug.tar.gz""#;
 
 /// Requests the UI may send. Lifecycle (initialize, launch, configurationDone) stays here.
 const COMMANDS: &[&str] = &[
@@ -81,6 +85,38 @@ pub struct Session {
     child: Mutex<Option<Child>>,
     pub capabilities: Mutex<Value>,
     initialized: Mutex<Option<Sender<()>>>,
+    /// Set for js-debug: each program it debugs is a further session on its port.
+    children: Mutex<Option<Arc<Children>>>,
+}
+
+/// js-debug asks for a new session per program (`startDebugging`). Stops and
+/// variables then come from that session, so it becomes the current one.
+struct Children {
+    port: u16,
+    breakpoints: Vec<SourceBreakpoints>,
+    current: Arc<Mutex<Option<Arc<Session>>>>,
+    sink: Sink,
+}
+
+fn start_child(children: Arc<Children>, arguments: &Value) -> AppResult<()> {
+    let stream = TcpStream::connect(("127.0.0.1", children.port))?;
+    let read = stream.try_clone()?;
+    // The first session stays connected until the end and reports when it is gone.
+    let outer = Arc::clone(&children.sink);
+    let sink: Sink = Arc::new(move |e| {
+        if !matches!(e, DapEvent::Closed) {
+            outer(e);
+        }
+    });
+    let (session, init) = Session::connect(Box::new(read), Box::new(stream), None, Arc::clone(&sink))?;
+    if let Ok(mut c) = session.children.lock() {
+        *c = Some(Arc::clone(&children));
+    }
+    if let Ok(mut current) = children.current.lock() {
+        *current = Some(Arc::clone(&session));
+    }
+    let request = arguments["request"].as_str().unwrap_or("launch");
+    start_session(&session, init, JS_DEBUG_ID, request, arguments["configuration"].clone(), &children.breakpoints, sink)
 }
 
 impl Session {
@@ -95,6 +131,7 @@ impl Session {
             child: Mutex::new(child),
             capabilities: Mutex::new(json!({})),
             initialized: Mutex::new(Some(init_tx)),
+            children: Mutex::new(None),
         });
         let me = Arc::clone(&session);
         let mut reader = reader;
@@ -153,17 +190,28 @@ impl Session {
                 }
                 sink(DapEvent::Event { event, body: msg.get("body").cloned().unwrap_or(Value::Null) });
             }
-            // Reverse requests (runInTerminal, startDebugging): sessions run in the internal console.
+            // Reverse requests. Programs run in the internal console, so runInTerminal is refused.
             Some("request") => {
+                let children = if msg["command"] == "startDebugging" { self.children.lock().ok().and_then(|c| c.clone()) } else { None };
                 let reply = json!({
                     "seq": self.seq.fetch_add(1, Ordering::Relaxed),
                     "type": "response",
                     "request_seq": msg["seq"],
                     "command": msg["command"],
-                    "success": false,
-                    "message": "not supported by NETRUNNER",
+                    "success": children.is_some(),
+                    "message": if children.is_some() { Value::Null } else { json!("not supported by NETRUNNER") },
                 });
                 let _ = self.write(&reply);
+                if let Some(children) = children {
+                    let arguments = msg["arguments"].clone();
+                    // On its own thread: this one has to keep reading.
+                    std::thread::spawn(move || {
+                        let sink = Arc::clone(&children.sink);
+                        if let Err(e) = start_child(children, &arguments) {
+                            sink(DapEvent::Failed { message: e.to_string() });
+                        }
+                    });
+                }
             }
             _ => {}
         }
@@ -240,6 +288,7 @@ pub fn start_session(session: &Arc<Session>, initialized: Receiver<()>, adapter_
             "pathFormat": "path",
             "supportsVariableType": true,
             "supportsRunInTerminalRequest": false,
+            "supportsStartDebuggingRequest": adapter_id == JS_DEBUG_ID,
         }),
         INITIALIZED_TIMEOUT,
     )?;
@@ -326,6 +375,17 @@ fn codelldb(custom: Option<&str>) -> Option<String> {
     })
 }
 
+/// js-debug's server script, from where the Install command puts it.
+fn js_debug() -> Option<String> {
+    if cfg!(debug_assertions) {
+        if let Some(p) = std::env::var("NETRUNNER_DEV_JS_DEBUG").ok().filter(|p| Path::new(p).is_file()) {
+            return Some(p);
+        }
+    }
+    let p = PathBuf::from(expand_env(JS_DEBUG_SERVER));
+    p.is_file().then(|| p.display().to_string())
+}
+
 pub fn adapters(project: &Path, python: Option<&str>, codelldb_path: Option<&str>) -> Vec<AdapterStatus> {
     let py = python_for(project, python);
     let check = process::run(&py, &["-c", "import debugpy; print(debugpy.__version__)"], Some(project), Duration::from_secs(8));
@@ -336,6 +396,8 @@ pub fn adapters(project: &Path, python: Option<&str>, codelldb_path: Option<&str
     };
     let dlv = delve();
     let lldb = codelldb(codelldb_path);
+    let js = js_debug();
+    let node = on_path("node");
     vec![
         AdapterStatus { id: "debugpy", name: "debugpy", languages: "Python", found, path: found.then_some(py.clone()), note, install: Some(if py == "python" { "python -m pip install debugpy".to_string() } else { format!("& '{py}' -m pip install debugpy") }), docs: "https://github.com/microsoft/debugpy" },
         AdapterStatus { id: "delve", name: "Delve", languages: "Go", found: dlv.is_some(), path: dlv, note: None, install: Some("go install github.com/go-delve/delve/cmd/dlv@latest".to_string()), docs: "https://github.com/go-delve/delve" },
@@ -348,6 +410,16 @@ pub fn adapters(project: &Path, python: Option<&str>, codelldb_path: Option<&str
             note: Some("Comes with the VS Code extension vadimcn.vscode-lldb, or download a release and pick codelldb.exe".into()),
             install: None,
             docs: "https://github.com/vadimcn/codelldb/releases",
+        },
+        AdapterStatus {
+            id: "js-debug",
+            name: "js-debug",
+            languages: "JavaScript (Node.js)",
+            found: js.is_some() && node.is_some(),
+            note: if node.is_none() { Some("Node.js is not installed".into()) } else { None },
+            path: js,
+            install: Some(JS_DEBUG_INSTALL.to_string()),
+            docs: "https://github.com/microsoft/vscode-js-debug",
         },
     ]
 }
@@ -418,7 +490,10 @@ fn spawn_tcp(exe: &str, args: &[String], cwd: &Path, port: u16) -> AppResult<Spa
 
 #[derive(Default)]
 pub struct Dap {
-    current: Mutex<Option<Arc<Session>>>,
+    /// The session the UI talks to. For js-debug, the program's own session.
+    current: Arc<Mutex<Option<Arc<Session>>>>,
+    /// The one that owns the adapter process.
+    root: Mutex<Option<Arc<Session>>>,
 }
 
 pub struct StartOptions<'a> {
@@ -437,6 +512,7 @@ impl Dap {
         if !matches!(o.request, "launch" | "attach") {
             return Err(AppError::Invalid("a debug session either launches or attaches".into()));
         }
+        let mut js_debug_port = None;
         let spawned = match o.adapter {
             "debugpy" => spawn_stdio(&python_for(o.project, o.python), &["-m", "debugpy.adapter"], o.project)?,
             "delve" => {
@@ -449,14 +525,28 @@ impl Dap {
                 let port = free_port()?;
                 spawn_tcp(&exe, &["--port".into(), port.to_string()], o.project, port)?
             }
+            "js-debug" => {
+                let script = js_debug().ok_or_else(|| AppError::NotFound("js-debug is not installed".into()))?;
+                let node = on_path("node").ok_or_else(|| AppError::NotFound("Node.js is not installed".into()))?;
+                let port = free_port()?;
+                js_debug_port = Some(port);
+                spawn_tcp(&node, &[script, port.to_string(), "127.0.0.1".into()], o.project, port)?
+            }
             other => return Err(AppError::Invalid(format!("unknown debug adapter '{other}'"))),
         };
         let (session, init) = Session::connect(spawned.reader, spawned.writer, Some(spawned.child), Arc::clone(&sink))?;
-        if let Err(e) = start_session(&session, init, o.adapter, o.request, o.config, o.breakpoints, sink) {
-            session.stop();
+        if let Some(port) = js_debug_port {
+            let children = Children { port, breakpoints: o.breakpoints.to_vec(), current: Arc::clone(&self.current), sink: Arc::clone(&sink) };
+            *session.children.lock().map_err(|_| AppError::Internal("debug lock poisoned".into()))? = Some(Arc::new(children));
+        }
+        // Current before it starts: a program's own session may replace it during the start.
+        *self.current.lock().map_err(|_| AppError::Internal("debug lock poisoned".into()))? = Some(Arc::clone(&session));
+        *self.root.lock().map_err(|_| AppError::Internal("debug lock poisoned".into()))? = Some(Arc::clone(&session));
+        let adapter_id = if js_debug_port.is_some() { JS_DEBUG_ID } else { o.adapter };
+        if let Err(e) = start_session(&session, init, adapter_id, o.request, o.config, o.breakpoints, sink) {
+            self.stop();
             return Err(e);
         }
-        *self.current.lock().map_err(|_| AppError::Internal("debug lock poisoned".into()))? = Some(session);
         Ok(())
     }
 
@@ -469,8 +559,13 @@ impl Dap {
     }
 
     pub fn stop(&self) {
-        if let Some(s) = self.current.lock().ok().and_then(|mut c| c.take()) {
+        let current = self.current.lock().ok().and_then(|mut c| c.take());
+        let root = self.root.lock().ok().and_then(|mut c| c.take());
+        if let Some(s) = &current {
             s.stop();
+        }
+        if let Some(r) = root.filter(|r| !current.as_ref().is_some_and(|c| Arc::ptr_eq(c, r))) {
+            r.stop();
         }
     }
 }
@@ -623,6 +718,131 @@ mod tests {
         let DapEvent::Failed { message } = wait(&store, |e| matches!(e, DapEvent::Failed { .. })) else { unreachable!() };
         assert_eq!(message, "no such program");
         session.stop();
+    }
+
+    /// Speaks js-debug's protocol: the first session asks for a second one, which
+    /// is where the program runs and stops.
+    #[test]
+    fn a_program_session_takes_over_from_the_first_one() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let seen = Arc::new(Mutex::new(Vec::<String>::new()));
+        let log = Arc::clone(&seen);
+        std::thread::spawn(move || {
+            for (conn, stream) in listener.incoming().enumerate() {
+                let mut stream = stream.unwrap();
+                let log = Arc::clone(&log);
+                std::thread::spawn(move || {
+                    let mut framer = Framer::default();
+                    let mut buf = [0u8; 4096];
+                    let mut seq = 100;
+                    loop {
+                        let n = match stream.read(&mut buf) {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => n,
+                        };
+                        framer.push(&buf[..n]);
+                        while let Ok(Some(Frame::Message(m))) = framer.next() {
+                            let cmd = m["command"].as_str().unwrap_or_default().to_string();
+                            log.lock().unwrap().push(format!("{conn}:{}:{cmd}", m["type"].as_str().unwrap_or_default()));
+                            if m["type"] != "request" {
+                                continue;
+                            }
+                            seq += 1;
+                            let body = match cmd.as_str() {
+                                "initialize" => json!({"supportsConfigurationDoneRequest": true, "got": m["arguments"]["supportsStartDebuggingRequest"]}),
+                                "setBreakpoints" => json!({"breakpoints": [{"verified": true, "line": 2}]}),
+                                "threads" => json!({"threads": [{"id": conn, "name": "from session"}]}),
+                                _ => json!({}),
+                            };
+                            let reply = json!({"seq": seq, "type": "response", "request_seq": m["seq"], "command": cmd, "success": true, "body": body});
+                            stream.write_all(&encode(&reply)).unwrap();
+                            if cmd == "disconnect" {
+                                return;
+                            }
+                            let mut event = |name: &str, body: Value| stream.write_all(&encode(&json!({"seq": 0, "type": "event", "event": name, "body": body}))).unwrap();
+                            if cmd == "launch" {
+                                event("initialized", json!({}));
+                            }
+                            if cmd == "configurationDone" && conn == 1 {
+                                event("stopped", json!({"reason": "breakpoint", "threadId": 1}));
+                            }
+                            if cmd == "launch" && conn == 0 {
+                                let ask = json!({"seq": 50, "type": "request", "command": "startDebugging", "arguments": {"request": "launch", "configuration": {"__pendingTargetId": "abc"}}});
+                                stream.write_all(&encode(&ask)).unwrap();
+                            }
+                        }
+                    }
+                });
+            }
+        });
+
+        let stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        let (s, store) = sink();
+        let dap = Dap::default();
+        let bps = vec![SourceBreakpoints { path: "app.js".into(), breakpoints: vec![Breakpoint { line: 2, condition: None }] }];
+        let (root, init) = Session::connect(Box::new(stream.try_clone().unwrap()), Box::new(stream), None, Arc::clone(&s)).unwrap();
+        *root.children.lock().unwrap() = Some(Arc::new(Children { port, breakpoints: bps.clone(), current: Arc::clone(&dap.current), sink: Arc::clone(&s) }));
+        *dap.current.lock().unwrap() = Some(Arc::clone(&root));
+        *dap.root.lock().unwrap() = Some(Arc::clone(&root));
+        start_session(&root, init, JS_DEBUG_ID, "launch", json!({"program": "app.js"}), &bps, s).unwrap();
+
+        wait(&store, |e| matches!(e, DapEvent::Event { event, .. } if event == "stopped"));
+        // Requests now go to the program's session, which has the breakpoints.
+        assert_eq!(dap.request("threads", json!({})).unwrap()["threads"][0]["id"], 1);
+        let log = seen.lock().unwrap().clone();
+        assert!(log.contains(&"0:response:startDebugging".to_string()), "{log:?}");
+        for step in ["1:request:initialize", "1:request:launch", "1:request:setBreakpoints", "1:request:configurationDone"] {
+            assert!(log.iter().any(|l| l == step), "{step} in {log:?}");
+        }
+        dap.stop();
+        wait(&store, |e| matches!(e, DapEvent::Closed));
+        assert!(matches!(dap.request("threads", json!({})), Err(AppError::NotFound(_))));
+    }
+
+    /// The real thing: js-debug and node. `NETRUNNER_DEV_JS_DEBUG` points to dapDebugServer.js.
+    #[test]
+    #[ignore]
+    fn js_debug_stops_at_a_breakpoint() {
+        let dir = std::env::temp_dir().join(format!("nr-jsdbg-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("app.js");
+        std::fs::write(&file, "const answer = 40 + 2;
+console.log('hello from node', answer);
+console.log('done');
+").unwrap();
+        let path = file.display().to_string();
+        let (s, store) = sink();
+        let dap = Dap::default();
+        let bps = vec![SourceBreakpoints { path: path.clone(), breakpoints: vec![Breakpoint { line: 2, condition: None }] }];
+        let config = json!({"name": "app", "type": "pwa-node", "request": "launch", "console": "internalConsole", "program": path, "cwd": dir.display().to_string()});
+        dap.start(StartOptions { project: &dir, adapter: "js-debug", request: "launch", config, breakpoints: &bps, python: None, codelldb: None }, s).unwrap();
+
+        let until = |what: &str, f: &dyn Fn(&DapEvent) -> bool| {
+            for _ in 0..300 {
+                if let Some(e) = store.lock().unwrap().iter().find(|e| f(e)) {
+                    return e.clone();
+                }
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            panic!("no {what}: {:?}", store.lock().unwrap());
+        };
+        let DapEvent::Event { body, .. } = until("stop", &|e| matches!(e, DapEvent::Event { event, .. } if event == "stopped")) else { unreachable!() };
+        let thread = body["threadId"].as_i64().unwrap();
+        let stack = dap.request("stackTrace", json!({"threadId": thread})).unwrap();
+        let frame = &stack["stackFrames"][0];
+        assert_eq!(frame["line"], 2, "{stack}");
+        let scopes = dap.request("scopes", json!({"frameId": frame["id"]})).unwrap();
+        let local = scopes["scopes"][0]["variablesReference"].clone();
+        let vars = dap.request("variables", json!({"variablesReference": local})).unwrap();
+        assert!(vars["variables"].as_array().unwrap().iter().any(|v| v["name"] == "answer" && v["value"] == "42"), "{vars}");
+
+        dap.request("continue", json!({"threadId": thread})).unwrap();
+        until("output", &|e| matches!(e, DapEvent::Event { event, body } if event == "output" && body["output"].as_str().is_some_and(|o| o.contains("hello from node"))));
+        until("end", &|e| matches!(e, DapEvent::Event { event, .. } if event == "terminated"));
+        dap.stop();
+        until("close", &|e| matches!(e, DapEvent::Closed));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
