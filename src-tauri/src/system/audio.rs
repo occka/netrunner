@@ -389,6 +389,11 @@ mod tests {
             let same = after.outputs.iter().find(|x| x.id == d.id).unwrap();
             assert!(same.is_default && same.volume.abs_diff(d.volume) <= 1 && same.muted == d.muted);
         }
+        // CI machines have no sound device; per-app sessions need a default output.
+        if !all.outputs.iter().any(|d| d.is_default) {
+            eprintln!("no default playback device; skipping sessions");
+            return;
+        }
         let s = sessions(None).unwrap();
         eprintln!("audio: {} outputs, {} inputs, {} sessions: {:?}", all.outputs.len(), all.inputs.len(), s.len(), s.iter().map(|x| &x.name).collect::<Vec<_>>());
         for x in &s {
