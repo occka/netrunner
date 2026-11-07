@@ -52,9 +52,9 @@ mod smoke {
     #[test]
     fn game_scan_does_not_fail() {
         let scan = crate::services::games::scan();
-        assert_eq!(scan.sources.len(), 4);
-        for g in scan.games.iter().filter(|g| g.source == "prism") {
-            println!("prism instance: {} -> {} {}", g.name, g.launch_target, crate::services::games::launch_params(g));
+        assert_eq!(scan.sources.len(), 7);
+        for g in scan.games.iter().filter(|g| matches!(g.source, "prism" | "riot" | "hoyoplay" | "ubisoft")) {
+            println!("{} game: {} in {:?} -> {} {}", g.source, g.name, g.install_dir, g.launch_target, crate::services::games::launch_params(g));
         }
     }
 }

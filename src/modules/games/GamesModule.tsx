@@ -19,6 +19,9 @@ const SOURCE_LABEL: Record<Source, string> = {
   steam: "Steam",
   epic: "Epic Games",
   gog: "GOG Galaxy",
+  riot: "Riot Client",
+  hoyoplay: "HoYoPlay",
+  ubisoft: "Ubisoft Connect",
   prism: "Prism Launcher",
   custom: "Custom",
 };
@@ -186,7 +189,7 @@ export default function GamesModule() {
   const counts = (s: Source) => items.filter((i) => i.source === s).length;
   const tabs: { id: Filter; label: string; count?: number }[] = [
     { id: "all", label: "All", count: items.length },
-    ...(["custom", "steam", "epic", "gog", "prism"] as Source[])
+    ...(["custom", "steam", "epic", "gog", "riot", "hoyoplay", "ubisoft", "prism"] as Source[])
       .filter((s) => counts(s) > 0)
       .map((s) => ({ id: s as Filter, label: SOURCE_LABEL[s], count: counts(s) })),
   ];

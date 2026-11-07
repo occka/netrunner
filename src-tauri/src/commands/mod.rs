@@ -20,5 +20,6 @@ pub mod overlay;
 pub mod profiles;
 pub mod quick_access;
 pub mod settings;
+pub mod storage;
 pub mod studio;
 pub mod system;

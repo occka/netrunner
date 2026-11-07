@@ -82,14 +82,20 @@ Done so far: GITHUB code browsing, Widget Studio, per-profile overlay sets, clic
 - ✅ Saved logins in Windows Credential Manager (opt-in, filled on click).
 - ✅ **DEVELOPER**: Node.js debugging (js-debug, installed from the Tools panel), semantic highlighting from language servers.
 
+### 0.10: Data safety, FILES, more launchers
+- ✅ **Backups**: automatic (weekly by default) and manual, restore, export and import of all data (STORAGE).
+- ✅ **FILES**: ZIP archives (list, extract), duplicate finder.
+- ✅ **GAMES**: Riot Client, HoYoPlay, Ubisoft Connect.
+- ✅ csharp-ls installs with .NET 8 and 9 SDKs too (0.21+ needs .NET 10).
+
 ### 1.0: Platform
 - **Plugin architecture**: signed plugins with a declared permission set (commands, widgets, automation triggers), loaded in an isolated webview; no access beyond what they declare.
-- **FILES**: zip/7z browsing, duplicate finder, opt-in search index.
-- Export / import of settings, profiles and layouts; backup schedule in STORAGE.
+- **FILES**: 7z and RAR archives, opt-in search index.
+- **GAMES**: EA app, Battle.net, Xbox app.
 
 ### Engineering (alongside releases)
 - Upgrade `vitest` to 5.x (current 3.x has advisories in dev-only tooling, not shipped).
-- Run typecheck, tests and clippy on every pull request in CI, not only on release tags.
+- ✅ Typecheck, tests, build and clippy run on every pull request (`checks.yml`).
 - End-to-end smoke test of the built app (start, open each module, BROWSER tab, overlay).
 - Authenticode code-signing certificate so Windows SmartScreen trusts the installer (needs a purchased certificate).
 - Reduce the DEVELOPER chunk (Monaco) further; lazy-load language workers on demand.

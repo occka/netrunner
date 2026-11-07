@@ -43,6 +43,7 @@ pub struct Entry {
 pub enum Preview {
     Text { text: String, truncated: bool },
     Image { data_url: String },
+    Archive { listing: crate::archive::Listing },
     None { reason: String },
 }
 
@@ -172,6 +173,12 @@ pub fn preview(path: &str) -> AppResult<Preview> {
         "ico" => Some("image/x-icon"),
         _ => None,
     };
+    if crate::archive::is_zip(p) {
+        return Ok(match crate::archive::list(p) {
+            Ok(listing) => Preview::Archive { listing },
+            Err(e) => Preview::None { reason: e.to_string() },
+        });
+    }
     if let Some(mime) = mime {
         if meta.len() > PREVIEW_IMAGE {
             return Ok(Preview::None { reason: "image is too large to preview".into() });

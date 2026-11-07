@@ -52,7 +52,7 @@ import type { CustomWidget, FeedResult, StudioKind } from "@/types/studio";
 import type { Alarm, AlarmInput, AlarmsState, Sound, Timer, TimerInput } from "@/types/alarms";
 import type {
   ActivityEntry,
-  AppInfo,
+  AppInfo, DbBackup,
   CommandAssessment,
   DashboardLayout,
   ProcessList,
@@ -113,6 +113,17 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
 
 export const api = {
   appInfo: () => call<AppInfo>("app_info"),
+
+  storage: {
+    backups: () => call<DbBackup[]>("storage_backups"),
+    backupNow: () => call<void>("storage_backup_now"),
+    exportTo: (path: string) => call<void>("storage_export", { path }),
+    /** Checks the backup, then restarts NETRUNNER to swap it in. */
+    restore: (name: string) => call<void>("storage_restore", { name }),
+    importFrom: (path: string) => call<void>("storage_import", { path }),
+    remove: (name: string) => call<void>("storage_backup_delete", { name }),
+    openFolder: () => call<void>("storage_open_backups"),
+  },
 
   settings: {
     getAll: () => call<Record<string, unknown>>("settings_get_all"),
@@ -370,6 +381,8 @@ export const api = {
     open: (path: string) => call<void>("files_open", { path }),
     reveal: (path: string) => call<void>("files_reveal", { path }),
     search: (root: string, query: string) => call<{ entries: FileEntry[]; complete: boolean }>("files_search", { root, query }),
+    extract: (path: string) => call<{ folder: string; files: number; skipped: number }>("files_extract", { path }),
+    duplicates: (root: string, minSize: number) => call<{ groups: { size: number; paths: string[] }[]; scanned: number; complete: boolean }>("files_duplicates", { root, minSize }),
   },
 
   overlays: {

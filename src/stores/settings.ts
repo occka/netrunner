@@ -128,6 +128,10 @@ export interface SettingsSchema {
   "browser.no_autoplay": string[];
   /** Saved logins in Windows Credential Manager, filled on click. Off by default. */
   "browser.passwords": boolean;
+  /** Automatic database backups: every this many days, 0 = off. */
+  "storage.backup_every_days": number;
+  /** How many automatic backups are kept. */
+  "storage.backup_keep": number;
   "browser.page_dark": "off" | "prefer" | "force";
   /** The theme's accent colour and scrollbars on pages. */
   "browser.page_accent": boolean;
@@ -198,6 +202,8 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
   "browser.no_script": [],
   "browser.no_autoplay": [],
   "browser.passwords": false,
+  "storage.backup_every_days": 7,
+  "storage.backup_keep": 8,
   "browser.page_dark": "off",
   "browser.page_accent": false,
   "browser.page_accent_off": [],

@@ -65,7 +65,7 @@ export interface NetworkStatus {
 
 export interface Game {
   id: string;
-  source: "steam" | "epic" | "gog" | "prism";
+  source: "steam" | "epic" | "gog" | "riot" | "hoyoplay" | "ubisoft" | "prism";
   name: string;
   installDir: string | null;
   sizeBytes: number | null;

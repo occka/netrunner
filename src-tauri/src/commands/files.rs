@@ -101,3 +101,20 @@ pub async fn files_search(root: String, query: String) -> AppResult<SearchResult
     let (entries, complete) = blocking(move || files::search(&root, &query)).await?;
     Ok(SearchResult { entries, complete })
 }
+
+/// Extracts a ZIP into a new folder beside it.
+#[tauri::command]
+pub async fn files_extract(state: State<'_, AppState>, path: String) -> AppResult<crate::archive::Extracted> {
+    let archive = std::path::PathBuf::from(&path);
+    let parent = archive.parent().ok_or_else(|| crate::error::AppError::Invalid("archive has no folder".into()))?.to_path_buf();
+    files::ensure_modifiable(&parent)?;
+    let out = blocking(move || crate::archive::extract(&archive)).await?;
+    log(&state, &format!("Extracted {} file(s) from {path} to {}", out.files, out.folder));
+    Ok(out)
+}
+
+/// Identical files below a folder. Reads files, changes nothing.
+#[tauri::command]
+pub async fn files_duplicates(root: String, min_size: u64) -> AppResult<crate::duplicates::Report> {
+    blocking(move || crate::duplicates::find(std::path::Path::new(&root), min_size, std::time::Duration::from_secs(90))).await
+}

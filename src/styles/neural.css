@@ -595,3 +595,34 @@
   margin: auto 0 0;
   font-size: var(--fs-xs);
 }
+
+.files-archive {
+  list-style: none;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+}
+.files-archive li {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+.files-dups {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+.files-dups__group {
+  display: grid;
+  gap: 2px;
+  padding: 0 12px;
+}
+.files-dups__file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.files-dups__file .truncate {
+  flex: 1;
+}

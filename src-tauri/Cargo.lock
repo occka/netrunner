@@ -2773,6 +2773,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "feed-rs",
+ "flate2",
  "futures-util",
  "getrandom 0.3.4",
  "ignore",
@@ -2785,6 +2786,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
  "sysinfo",
  "tauri",
  "tauri-build",
@@ -2803,6 +2805,7 @@ dependencies = [
  "windows-core 0.62.2",
  "windows-sys 0.59.0",
  "winreg 0.55.0",
+ "zip",
 ]
 
 [[package]]
@@ -6713,6 +6716,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f5b58784007ff6e5f280ec82c8596686a3b9b5dd5836c63288d4479f84728b9"
 dependencies = [
  "crc32fast",
+ "flate2",
  "getrandom 0.4.3",
  "indexmap 2.14.2",
  "memchr",

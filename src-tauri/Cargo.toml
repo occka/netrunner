@@ -46,6 +46,10 @@ adblock = { version = "0.13", default-features = false, features = ["embedded-do
 # DEVELOPER project search: .gitignore-aware walking and regex matching.
 ignore = "0.4"
 regex = "1"
+# FILES: ZIP archives (already in the build through the updater) and duplicate detection.
+zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
+flate2 = "1"
+sha2 = "0.10"
 # Dice in NEURAL's Play mode come from the operating system's random source.
 getrandom = "0.3"
 

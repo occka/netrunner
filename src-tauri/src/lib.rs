@@ -12,6 +12,8 @@ mod dev;
 mod hotkeys;
 mod desktop;
 mod error;
+mod archive;
+mod duplicates;
 mod files;
 mod neural;
 mod alarm;
@@ -96,6 +98,8 @@ pub fn run() {
         )
         .setup(move |app| {
             let (data_dir, local_dir) = data_dirs(app.handle())?;
+            // A restore asked for before the restart: swapped in before anything opens the file.
+            let restored = storage::backups::apply_pending(&data_dir);
             let db = Database::open(&data_dir.join("netrunner.db"), &data_dir.join("backups"))?;
             {
                 let conn = db.conn()?;
@@ -106,6 +110,9 @@ pub fn run() {
             app.manage(browser::Browser::new(&data_dir, &local_dir, prefs));
             if let Some(report) = db.repair_report() {
                 activity::record(&*db.conn()?, Level::Warn, "core", report);
+            }
+            if let Some(report) = restored {
+                activity::record(&*db.conn()?, Level::Warn, "storage", &report);
             }
             let alarm_dir = data_dir.clone();
             app.manage(AppState::new(db, data_dir));
@@ -125,6 +132,17 @@ pub fn run() {
             overlay::restore_on_startup(&handle);
             alarm::start(&handle, alarm_dir);
             playtime::start(&handle);
+            {
+                // Automatic backups: shortly after start, then every few hours.
+                let handle = handle.clone();
+                std::thread::spawn(move || loop {
+                    std::thread::sleep(std::time::Duration::from_secs(90));
+                    if let Some(state) = handle.try_state::<AppState>() {
+                        commands::storage::scheduled(&state);
+                    }
+                    std::thread::sleep(std::time::Duration::from_secs(6 * 3600));
+                });
+            }
             browser::start_blocker(handle.clone(), false);
             automation::start_process_watcher(handle.clone());
             automation::start_event_watcher(handle.clone());
@@ -134,6 +152,13 @@ pub fn run() {
         .on_window_event(desktop::handle_window_event)
         .invoke_handler(guarded(tauri::generate_handler![
             commands::app::app_info,
+            commands::storage::storage_backups,
+            commands::storage::storage_backup_now,
+            commands::storage::storage_export,
+            commands::storage::storage_restore,
+            commands::storage::storage_import,
+            commands::storage::storage_backup_delete,
+            commands::storage::storage_open_backups,
             commands::app::app_autostart_get,
             commands::app::app_autostart_set,
             commands::app::app_quit,
@@ -351,6 +376,8 @@ pub fn run() {
             commands::files::files_open,
             commands::files::files_reveal,
             commands::files::files_search,
+            commands::files::files_extract,
+            commands::files::files_duplicates,
             commands::overlay::overlay_create_web,
             commands::overlay::overlay_set_profile,
             commands::browser::browser_status,
