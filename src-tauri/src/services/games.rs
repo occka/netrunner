@@ -1,6 +1,8 @@
 //! Installed game discovery from launcher data on disk: Steam app manifests,
-//! Epic Games Launcher manifests and GOG Galaxy registry entries. Read-only;
-//! launching goes through each launcher's documented URI or the game's exe.
+//! Epic Games Launcher manifests, GOG Galaxy, Ubisoft Connect and HoYoPlay
+//! registry entries, Riot Client product settings and Prism Launcher instances.
+//! Read-only; launching goes through each launcher's URI, its command line or
+//! the game's exe.
 
 use std::path::{Path, PathBuf};
 
@@ -43,13 +45,19 @@ pub fn scan() -> LibraryScan {
     let (epic_found, epic) = epic_games();
     let (gog_found, gog) = gog_games();
     let (prism_found, prism) = prism_instances();
+    let (riot_found, riot) = riot_games();
+    let (hoyo_found, hoyo) = hoyoplay_games();
+    let (ubisoft_found, ubisoft) = ubisoft_games();
     let sources = vec![
         SourceStatus { source: "steam", detected: steam_found, count: steam.len() },
         SourceStatus { source: "epic", detected: epic_found, count: epic.len() },
         SourceStatus { source: "gog", detected: gog_found, count: gog.len() },
+        SourceStatus { source: "riot", detected: riot_found, count: riot.len() },
+        SourceStatus { source: "hoyoplay", detected: hoyo_found, count: hoyo.len() },
+        SourceStatus { source: "ubisoft", detected: ubisoft_found, count: ubisoft.len() },
         SourceStatus { source: "prism", detected: prism_found, count: prism.len() },
     ];
-    let mut games: Vec<Game> = steam.into_iter().chain(epic).chain(gog).chain(prism).collect();
+    let mut games: Vec<Game> = steam.into_iter().chain(epic).chain(gog).chain(riot).chain(hoyo).chain(ubisoft).chain(prism).collect();
     games.sort_by_key(|g| g.name.to_lowercase());
     LibraryScan { games, sources }
 }
@@ -183,6 +191,156 @@ fn gog_games() -> (bool, Vec<Game>) {
     (true, games)
 }
 
+// ---------- Riot Client ----------
+
+/// Product ids in Riot's metadata folders and how players know them.
+const RIOT_PRODUCTS: &[(&str, &str)] = &[
+    ("valorant", "VALORANT"),
+    ("league_of_legends", "League of Legends"),
+    ("teamfighttactics", "Teamfight Tactics"),
+    ("bacon", "Legends of Runeterra"),
+    ("lion", "2XKO"),
+];
+
+/// A `key: "value"` line of Riot's flat YAML.
+fn yaml_value(text: &str, key: &str) -> Option<String> {
+    text.lines().find_map(|line| {
+        let rest = line.trim().strip_prefix(key)?.strip_prefix(':')?;
+        Some(rest.trim().trim_matches('"').to_string()).filter(|v| !v.is_empty())
+    })
+}
+
+/// `valorant.live` with its product settings → (product, patchline, install folder).
+/// Folders such as `league_of_legends.live.game_patch` are not products.
+fn riot_product(folder: &str, settings: &str) -> Option<(String, String, String)> {
+    let (product, patchline) = folder.split_once('.')?;
+    let plain = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+    if !plain(product) || !plain(patchline) {
+        return None;
+    }
+    let path = yaml_value(settings, "product_install_full_path")?.replace('/', "\\");
+    Some((product.to_string(), patchline.to_string(), path))
+}
+
+fn riot_client() -> Option<PathBuf> {
+    let program_data = std::env::var_os("ProgramData")?;
+    let text = std::fs::read_to_string(Path::new(&program_data).join(r"Riot Games\RiotClientInstalls.json")).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&text).ok()?;
+    ["rc_default", "rc_live"].iter().filter_map(|k| v[*k].as_str()).map(|p| PathBuf::from(p.replace('/', "\\"))).find(|p| p.is_file())
+}
+
+/// Games installed through the Riot Client. Its metadata keeps products that were
+/// uninstalled, so only those whose folder still exists count.
+fn riot_games() -> (bool, Vec<Game>) {
+    let (Some(program_data), Some(client)) = (std::env::var_os("ProgramData"), riot_client()) else { return (false, Vec::new()) };
+    let mut games = Vec::new();
+    for entry in std::fs::read_dir(Path::new(&program_data).join(r"Riot Games\Metadata")).into_iter().flatten().flatten() {
+        let folder = entry.file_name().to_string_lossy().into_owned();
+        let Ok(settings) = std::fs::read_to_string(entry.path().join(format!("{folder}.product_settings.yaml"))) else { continue };
+        let Some((product, patchline, path)) = riot_product(&folder, &settings) else { continue };
+        if !Path::new(&path).is_dir() {
+            continue;
+        }
+        let base = RIOT_PRODUCTS.iter().find(|(id, _)| *id == product).map_or(product.as_str(), |(_, name)| name);
+        games.push(Game {
+            id: format!("riot:{product}.{patchline}"),
+            source: "riot",
+            name: if patchline == "live" { base.to_string() } else { format!("{base} ({})", patchline.to_uppercase()) },
+            install_dir: Some(path),
+            size_bytes: None,
+            launch_target: client.display().to_string(),
+            launch_dir: client.parent().map(Path::to_path_buf),
+        });
+    }
+    (true, games)
+}
+
+// ---------- HoYoPlay ----------
+
+/// Game id prefixes ("hk4e_global" → "hk4e"), names and executables, global first.
+const HOYO_GAMES: &[(&str, &str, &[&str])] = &[
+    ("hk4e", "Genshin Impact", &["GenshinImpact.exe", "YuanShen.exe"]),
+    ("hkrpg", "Honkai: Star Rail", &["StarRail.exe"]),
+    ("nap", "Zenless Zone Zero", &["ZenlessZoneZero.exe"]),
+    ("bh3", "Honkai Impact 3rd", &["BH3.exe"]),
+];
+
+/// The game's name and executable in its install folder, for a known game id.
+fn hoyo_game(biz: &str, dir: &Path) -> Option<(String, PathBuf)> {
+    let prefix = biz.split('_').next()?;
+    let (_, name, exes) = HOYO_GAMES.iter().find(|(p, ..)| *p == prefix)?;
+    let exe = exes.iter().map(|e| dir.join(e)).find(|p| p.is_file())?;
+    let name = if biz.ends_with("_cn") { format!("{name} (China)") } else { name.to_string() };
+    Some((name, exe))
+}
+
+/// Games installed through HoYoPlay (global and Chinese versions), from the
+/// launcher's per-user registry keys. They start from their own executable.
+fn hoyoplay_games() -> (bool, Vec<Game>) {
+    use winreg::enums::HKEY_CURRENT_USER;
+    let mut found = false;
+    let mut games = Vec::new();
+    for root in [r"Software\Cognosphere\HYP", r"Software\miHoYo\HYP"] {
+        let Ok(root) = winreg::RegKey::predef(HKEY_CURRENT_USER).open_subkey(root) else { continue };
+        found = true;
+        for version in root.enum_keys().flatten() {
+            let Ok(version) = root.open_subkey(&version) else { continue };
+            for biz in version.enum_keys().flatten() {
+                let Ok(key) = version.open_subkey(&biz) else { continue };
+                let Ok(dir) = key.get_value::<String, _>("GameInstallPath") else { continue };
+                let dir = PathBuf::from(dir);
+                let Some((name, exe)) = hoyo_game(&biz, &dir) else { continue };
+                if games.iter().any(|g: &Game| g.id == format!("hoyoplay:{biz}")) {
+                    continue;
+                }
+                games.push(Game {
+                    id: format!("hoyoplay:{biz}"),
+                    source: "hoyoplay",
+                    name,
+                    install_dir: Some(dir.display().to_string()),
+                    size_bytes: None,
+                    launch_target: exe.display().to_string(),
+                    launch_dir: Some(dir),
+                });
+            }
+        }
+    }
+    (found, games)
+}
+
+// ---------- Ubisoft Connect ----------
+
+/// Games installed through Ubisoft Connect, launched with its `uplay://` link.
+fn ubisoft_games() -> (bool, Vec<Game>) {
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+    let Ok(root) = winreg::RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey(r"SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs") else {
+        return (false, Vec::new());
+    };
+    let mut games = Vec::new();
+    for id in root.enum_keys().flatten() {
+        if !id.chars().all(|c| c.is_ascii_digit()) {
+            continue;
+        }
+        let Ok(key) = root.open_subkey(&id) else { continue };
+        let Ok(dir) = key.get_value::<String, _>("InstallDir") else { continue };
+        let dir = PathBuf::from(dir.replace('/', "\\"));
+        if !dir.is_dir() {
+            continue;
+        }
+        let name = dir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| format!("Ubisoft game {id}"));
+        games.push(Game {
+            id: format!("ubisoft:{id}"),
+            source: "ubisoft",
+            name,
+            install_dir: Some(dir.display().to_string()),
+            size_bytes: None,
+            launch_target: format!("uplay://launch/{id}/0"),
+            launch_dir: None,
+        });
+    }
+    (true, games)
+}
+
 /// Locates Prism Launcher: the installer's uninstall entry, the default
 /// per-user install, Scoop, then a portable copy next to its data.
 fn prism_exe() -> Option<PathBuf> {
@@ -255,12 +413,16 @@ fn prism_instances() -> (bool, Vec<Game>) {
     (true, games)
 }
 
-/// Command-line parameters needed to launch a game (only Prism needs any).
+/// Command-line parameters needed to launch a game (Prism and the Riot Client).
 pub fn launch_params(game: &Game) -> String {
-    match game.id.strip_prefix("prism:") {
-        Some(instance) => format!("--launch \"{}\"", instance.replace('"', "")),
-        None => String::new(),
+    if let Some(instance) = game.id.strip_prefix("prism:") {
+        return format!("--launch \"{}\"", instance.replace('"', ""));
     }
+    if let Some((product, patchline)) = game.id.strip_prefix("riot:").and_then(|p| p.split_once('.')) {
+        // The id came from riot_product, which allows only [a-z0-9_].
+        return format!("--launch-product={product} --launch-patchline={patchline}");
+    }
+    String::new()
 }
 
 #[cfg(test)]
@@ -287,6 +449,31 @@ mod tests {
             launch_dir: None,
         };
         assert_eq!(launch_params(&g), "--launch \"My Pack\"");
+    }
+
+    #[test]
+    fn reads_riot_products() {
+        let settings = "patchline_patching_ask_policy: \"ask\"\nproduct_install_full_path: \"D:/Riot Games/VALORANT/live\"\nproduct_install_root: \"D:/Riot Games\"\n";
+        assert_eq!(riot_product("valorant.live", settings), Some(("valorant".into(), "live".into(), r"D:\Riot Games\VALORANT\live".into())));
+        assert_eq!(riot_product("league_of_legends.pbe", settings).map(|p| p.1), Some("pbe".into()));
+        assert_eq!(riot_product("league_of_legends.live.game_patch", settings), None, "not a product");
+        assert_eq!(riot_product("Riot Client", settings), None);
+        assert_eq!(riot_product("valorant.live", "shortcut_name: \"VALORANT.lnk\""), None, "no install folder");
+        let g = Game { id: "riot:valorant.live".into(), source: "riot", name: "x".into(), install_dir: None, size_bytes: None, launch_target: String::new(), launch_dir: None };
+        assert_eq!(launch_params(&g), "--launch-product=valorant --launch-patchline=live");
+    }
+
+    #[test]
+    fn finds_hoyoplay_executables() {
+        let dir = std::env::temp_dir().join(format!("nr-hoyo-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        assert!(hoyo_game("hk4e_global", &dir).is_none(), "no executable yet");
+        std::fs::write(dir.join("YuanShen.exe"), b"").unwrap();
+        assert_eq!(hoyo_game("hk4e_cn", &dir).map(|g| g.0), Some("Genshin Impact (China)".into()));
+        std::fs::write(dir.join("GenshinImpact.exe"), b"").unwrap();
+        assert!(hoyo_game("hk4e_global", &dir).unwrap().1.ends_with("GenshinImpact.exe"));
+        assert!(hoyo_game("unknown_global", &dir).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

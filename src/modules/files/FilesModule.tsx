@@ -8,6 +8,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Files,
   FolderOpen,
   FolderPlus,
   HardDrive,
@@ -41,21 +42,150 @@ import type { FileEntry, FilePreview } from "@/types/neural";
 
 type SortKey = "name" | "size" | "modified";
 
+type DuplicateReport = Awaited<ReturnType<typeof api.files.duplicates>>;
+
+/**
+ * Identical files below a folder. Nothing is selected for removal by itself, and
+ * at least one file of every group stays: removing all copies is refused.
+ */
+function Duplicates({
+  root,
+  report,
+  onClose,
+  onRemove,
+}: {
+  root: string;
+  report: DuplicateReport;
+  onClose: () => void;
+  onRemove: (paths: string[]) => Promise<void>;
+}) {
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const waste = report.groups.reduce(
+    (sum, g) => sum + g.size * (g.paths.length - 1),
+    0,
+  );
+  const allOfAGroup = report.groups.some((g) =>
+    g.paths.every((p) => picked.has(p)),
+  );
+  const toggle = (p: string) =>
+    setPicked((s) => {
+      const next = new Set(s);
+      if (next.has(p)) next.delete(p);
+      else next.add(p);
+      return next;
+    });
+  const keepFirst = () =>
+    setPicked(new Set(report.groups.flatMap((g) => g.paths.slice(1))));
+
+  return (
+    <div className="files-dups">
+      <div className="files-banner">
+        <span>
+          {report.groups.length} group(s) of identical files in {root}:{" "}
+          {formatBytes(waste)} could be freed. Scanned{" "}
+          {report.scanned.toLocaleString()} files
+          {!report.complete && " (stopped early: time or file limit)"}.
+        </span>
+        <button
+          className="btn btn--ghost btn--sm"
+          onClick={keepFirst}
+          disabled={!report.groups.length}
+          title="Select every copy except the first of each group"
+        >
+          Select copies
+        </button>
+        <button
+          className="btn btn--danger btn--sm"
+          disabled={!picked.size || allOfAGroup}
+          title={
+            allOfAGroup
+              ? "Keep at least one file of each group"
+              : "Move the selected files to the Recycle Bin"
+          }
+          onClick={() =>
+            void onRemove([...picked]).then(() => setPicked(new Set()))
+          }
+        >
+          <Trash2 size={12} /> Recycle {picked.size || ""}
+        </button>
+        <button className="btn btn--ghost btn--sm" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      {report.groups.length === 0 && (
+        <div className="empty">No identical files found.</div>
+      )}
+      {report.groups.map((g, i) => (
+        <div key={i} className="files-dups__group">
+          <div className="label">
+            {g.paths.length} × {formatBytes(g.size)}
+          </div>
+          {g.paths.map((p) => (
+            <label key={p} className="check files-dups__file">
+              <input
+                type="checkbox"
+                checked={picked.has(p)}
+                onChange={() => toggle(p)}
+              />
+              <span className="mono truncate" title={p}>
+                {p}
+              </span>
+              <button
+                className="icon-btn icon-btn--sm"
+                title="Show in Explorer"
+                onClick={(e) => (e.preventDefault(), void api.files.reveal(p))}
+              >
+                <FolderOpen size={12} />
+              </button>
+            </label>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function FilesModule() {
-  const { tabs, active, clipboard, navigate, goBack, goForward, openTab, closeTab, setActive, setClipboard } = useFiles();
+  const {
+    tabs,
+    active,
+    clipboard,
+    navigate,
+    goBack,
+    goForward,
+    openTab,
+    closeTab,
+    setActive,
+    setClipboard,
+  } = useFiles();
   const tab = tabs.find((t) => t.id === active)!;
   const places = usePolled(() => api.files.places());
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [anchor, setAnchor] = useState<string | null>(null);
-  const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "name", desc: false });
+  const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({
+    key: "name",
+    desc: false,
+  });
   const [filter, setFilter] = useState("");
   const [showHidden, setShowHidden] = useState(false);
   const [address, setAddress] = useState(tab.path);
-  const [search, setSearch] = useState<{ query: string; results: FileEntry[]; complete: boolean } | null>(null);
+  const [search, setSearch] = useState<{
+    query: string;
+    results: FileEntry[];
+    complete: boolean;
+  } | null>(null);
   const [searching, setSearching] = useState(false);
-  const [preview, setPreview] = useState<{ path: string; data: FilePreview } | null>(null);
+  const [preview, setPreview] = useState<{
+    path: string;
+    data: FilePreview;
+  } | null>(null);
+  const [dups, setDups] = useState<{
+    root: string;
+    report: DuplicateReport;
+  } | null>(null);
+  const [findingDups, setFindingDups] = useState(false);
   const openMenu = useContextMenu((s) => s.open);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -80,17 +210,22 @@ export default function FilesModule() {
     setSelected(new Set());
     setSearch(null);
     setPreview(null);
+    setDups(null);
     void load();
   }, [tab.path, load]);
 
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    const base = (search ? search.results : entries).filter((e) => (showHidden || !e.hidden) && (!q || e.name.toLowerCase().includes(q)));
+    const base = (search ? search.results : entries).filter(
+      (e) =>
+        (showHidden || !e.hidden) && (!q || e.name.toLowerCase().includes(q)),
+    );
     const dir = sort.desc ? -1 : 1;
     return [...base].sort((a, b) => {
       if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
       if (sort.key === "size") return ((a.size ?? 0) - (b.size ?? 0)) * dir;
-      if (sort.key === "modified") return ((a.modified ?? 0) - (b.modified ?? 0)) * dir;
+      if (sort.key === "modified")
+        return ((a.modified ?? 0) - (b.modified ?? 0)) * dir;
       return a.name.localeCompare(b.name, undefined, { numeric: true }) * dir;
     });
   }, [entries, search, filter, showHidden, sort]);
@@ -112,41 +247,117 @@ export default function FilesModule() {
     }
   };
 
-  const openEntry = (e: FileEntry) => (e.isDir ? navigate(e.path) : run("Could not open", () => api.files.open(e.path)));
+  const findDuplicates = async () => {
+    setFindingDups(true);
+    try {
+      setDups({
+        root: tab.path,
+        report: await api.files.duplicates(tab.path, 1),
+      });
+    } catch (err) {
+      reportError("Could not look for duplicates", err);
+    } finally {
+      setFindingDups(false);
+    }
+  };
+
+  const recycleDuplicates = async (paths: string[]) => {
+    const ok = await confirmAction({
+      title: "Move to Recycle Bin",
+      message: `Move ${paths.length} duplicate file(s) to the Recycle Bin?`,
+      detail: "Items can be restored from the Recycle Bin.",
+      confirmLabel: "Move to Recycle Bin",
+      danger: true,
+    });
+    if (!ok || !dups) return;
+    await run("Could not delete", async () =>
+      notify.success(
+        `Moved ${await api.files.remove(paths)} file(s) to the Recycle Bin`,
+      ),
+    );
+    const gone = new Set(paths);
+    setDups({
+      ...dups,
+      report: {
+        ...dups.report,
+        groups: dups.report.groups
+          .map((g) => ({ ...g, paths: g.paths.filter((p) => !gone.has(p)) }))
+          .filter((g) => g.paths.length > 1),
+      },
+    });
+  };
+
+  const openEntry = (e: FileEntry) =>
+    e.isDir
+      ? navigate(e.path)
+      : run("Could not open", () => api.files.open(e.path));
 
   const remove = async (items: FileEntry[]) => {
     if (!items.length) return;
     const ok = await confirmAction({
       title: "Move to Recycle Bin",
-      message: items.length === 1 ? `Move "${items[0].name}" to the Recycle Bin?` : `Move ${items.length} items to the Recycle Bin?`,
+      message:
+        items.length === 1
+          ? `Move "${items[0].name}" to the Recycle Bin?`
+          : `Move ${items.length} items to the Recycle Bin?`,
       detail: "Items can be restored from the Recycle Bin.",
       confirmLabel: "Move to Recycle Bin",
       danger: true,
     });
-    if (ok) await run("Could not delete", async () => notify.success(`Moved ${await api.files.remove(items.map((i) => i.path))} item(s) to the Recycle Bin`));
+    if (ok)
+      await run("Could not delete", async () =>
+        notify.success(
+          `Moved ${await api.files.remove(items.map((i) => i.path))} item(s) to the Recycle Bin`,
+        ),
+      );
   };
 
   const rename = async (e: FileEntry) => {
-    const name = await promptText({ title: "Rename", label: "New name", initial: e.name, selectStem: !e.isDir, confirmLabel: "Rename" });
-    if (name && name !== e.name) await run("Could not rename", () => api.files.rename(e.path, name));
+    const name = await promptText({
+      title: "Rename",
+      label: "New name",
+      initial: e.name,
+      selectStem: !e.isDir,
+      confirmLabel: "Rename",
+    });
+    if (name && name !== e.name)
+      await run("Could not rename", () => api.files.rename(e.path, name));
   };
 
   const newFolder = async () => {
-    const name = await promptText({ title: "New folder", label: "Name", initial: "New folder", confirmLabel: "Create" });
-    if (name) await run("Could not create folder", () => api.files.createDir(tab.path, name));
+    const name = await promptText({
+      title: "New folder",
+      label: "Name",
+      initial: "New folder",
+      confirmLabel: "Create",
+    });
+    if (name)
+      await run("Could not create folder", () =>
+        api.files.createDir(tab.path, name),
+      );
   };
 
   const paste = async () => {
     if (!clipboard) return;
-    await run(clipboard.move ? "Could not move" : "Could not copy", async () => {
-      const n = await api.files.transfer(clipboard.paths, tab.path, clipboard.move);
-      notify.success(`${clipboard.move ? "Moved" : "Copied"} ${n} item(s)`);
-      if (clipboard.move) setClipboard(null);
-    });
+    await run(
+      clipboard.move ? "Could not move" : "Could not copy",
+      async () => {
+        const n = await api.files.transfer(
+          clipboard.paths,
+          tab.path,
+          clipboard.move,
+        );
+        notify.success(`${clipboard.move ? "Moved" : "Copied"} ${n} item(s)`);
+        if (clipboard.move) setClipboard(null);
+      },
+    );
   };
 
   const analyze = (e: FileEntry) => {
-    prefillNeural(`Analyze this file: what is it, what does it do, and is anything wrong or risky in it?`, [{ kind: "file", path: e.path }]);
+    prefillNeural(
+      `Analyze this file: what is it, what does it do, and is anything wrong or risky in it?`,
+      [{ kind: "file", path: e.path }],
+    );
     useShell.getState().navigate("neural");
   };
 
@@ -162,15 +373,67 @@ export default function FilesModule() {
   const actionsFor = (e: FileEntry): ObjectAction[] => {
     const items = selected.has(e.path) ? selection : [e];
     return [
-      { id: "open", label: e.isDir ? "Open" : "Open with default app", icon: FolderOpen, run: () => openEntry(e) },
-      ...(e.isDir ? [{ id: "tab", label: "Open in new tab", icon: Plus, run: () => openTab(e.path) }] : []),
-      { id: "copy", label: "Copy", icon: Copy, run: () => setClipboard({ paths: items.map((i) => i.path), move: false }) },
-      { id: "cut", label: "Cut", icon: Scissors, run: () => setClipboard({ paths: items.map((i) => i.path), move: true }) },
+      {
+        id: "open",
+        label: e.isDir ? "Open" : "Open with default app",
+        icon: FolderOpen,
+        run: () => openEntry(e),
+      },
+      ...(e.isDir
+        ? [
+            {
+              id: "tab",
+              label: "Open in new tab",
+              icon: Plus,
+              run: () => openTab(e.path),
+            },
+          ]
+        : []),
+      {
+        id: "copy",
+        label: "Copy",
+        icon: Copy,
+        run: () =>
+          setClipboard({ paths: items.map((i) => i.path), move: false }),
+      },
+      {
+        id: "cut",
+        label: "Cut",
+        icon: Scissors,
+        run: () =>
+          setClipboard({ paths: items.map((i) => i.path), move: true }),
+      },
       { id: "rename", label: "Rename…", icon: Pencil, run: () => rename(e) },
-      { id: "reveal", label: "Show in Explorer", icon: FolderOpen, run: () => run("Could not open Explorer", () => api.files.reveal(e.path)) },
-      { id: "qa", label: "Add to Quick Access", icon: Rocket, run: () => addToQuickAccess(e) },
-      ...(!e.isDir ? [{ id: "ai", label: "Analyze with AI…", icon: BrainCircuit, run: () => analyze(e) }] : []),
-      { id: "delete", label: items.length > 1 ? `Delete ${items.length} items` : "Delete", icon: Trash2, danger: true, run: () => remove(items) },
+      {
+        id: "reveal",
+        label: "Show in Explorer",
+        icon: FolderOpen,
+        run: () =>
+          run("Could not open Explorer", () => api.files.reveal(e.path)),
+      },
+      {
+        id: "qa",
+        label: "Add to Quick Access",
+        icon: Rocket,
+        run: () => addToQuickAccess(e),
+      },
+      ...(!e.isDir
+        ? [
+            {
+              id: "ai",
+              label: "Analyze with AI…",
+              icon: BrainCircuit,
+              run: () => analyze(e),
+            },
+          ]
+        : []),
+      {
+        id: "delete",
+        label: items.length > 1 ? `Delete ${items.length} items` : "Delete",
+        icon: Trash2,
+        danger: true,
+        run: () => remove(items),
+      },
     ];
   };
 
@@ -179,7 +442,9 @@ export default function FilesModule() {
     if (ev.shiftKey && anchor) {
       const a = shown.findIndex((x) => x.path === anchor);
       const b = shown.findIndex((x) => x.path === e.path);
-      shown.slice(Math.min(a, b), Math.max(a, b) + 1).forEach((x) => next.add(x.path));
+      shown
+        .slice(Math.min(a, b), Math.max(a, b) + 1)
+        .forEach((x) => next.add(x.path));
     } else if (ev.ctrlKey && selected.has(e.path)) {
       next.delete(e.path);
     } else {
@@ -188,7 +453,10 @@ export default function FilesModule() {
     }
     setSelected(next);
     if (!e.isDir && next.size === 1) {
-      api.files.preview(e.path).then((data) => setPreview({ path: e.path, data }), () => setPreview(null));
+      api.files.preview(e.path).then(
+        (data) => setPreview({ path: e.path, data }),
+        () => setPreview(null),
+      );
     } else {
       setPreview(null);
     }
@@ -205,8 +473,10 @@ export default function FilesModule() {
     } else if (ev.ctrlKey && ev.key.toLowerCase() === "a") {
       ev.preventDefault();
       setSelected(new Set(shown.map((x) => x.path)));
-    } else if (ev.ctrlKey && ev.key.toLowerCase() === "c" && selection.length) setClipboard({ paths: selection.map((x) => x.path), move: false });
-    else if (ev.ctrlKey && ev.key.toLowerCase() === "x" && selection.length) setClipboard({ paths: selection.map((x) => x.path), move: true });
+    } else if (ev.ctrlKey && ev.key.toLowerCase() === "c" && selection.length)
+      setClipboard({ paths: selection.map((x) => x.path), move: false });
+    else if (ev.ctrlKey && ev.key.toLowerCase() === "x" && selection.length)
+      setClipboard({ paths: selection.map((x) => x.path), move: true });
     else if (ev.ctrlKey && ev.key.toLowerCase() === "v") void paste();
   };
 
@@ -223,7 +493,8 @@ export default function FilesModule() {
     }
   };
 
-  const sortBy = (key: SortKey) => setSort((s) => ({ key, desc: s.key === key ? !s.desc : false }));
+  const sortBy = (key: SortKey) =>
+    setSort((s) => ({ key, desc: s.key === key ? !s.desc : false }));
   const crumbs = tab.path.split("\\").filter(Boolean);
 
   return (
@@ -237,35 +508,70 @@ export default function FilesModule() {
           }}
         >
           <Search size={13} className="muted" />
-          <input name="q" className="input" placeholder={`Search in ${crumbs.at(-1) ?? "folder"}…`} />
+          <input
+            name="q"
+            className="input"
+            placeholder={`Search in ${crumbs.at(-1) ?? "folder"}…`}
+          />
           {searching && <RefreshCw size={12} className="spin muted" />}
         </form>
       </ModuleHeader>
 
       <div className="files-tabs">
         {tabs.map((t) => (
-          <div key={t.id} className="files-tab" aria-selected={t.id === active} onClick={() => setActive(t.id)} title={t.path}>
-            <span className="truncate">{t.path.split("\\").filter(Boolean).at(-1) ?? "…"}</span>
+          <div
+            key={t.id}
+            className="files-tab"
+            aria-selected={t.id === active}
+            onClick={() => setActive(t.id)}
+            title={t.path}
+          >
+            <span className="truncate">
+              {t.path.split("\\").filter(Boolean).at(-1) ?? "…"}
+            </span>
             {tabs.length > 1 && (
-              <button className="editor-tab__close" aria-label="Close tab" onClick={(e) => (e.stopPropagation(), closeTab(t.id))}>
+              <button
+                className="editor-tab__close"
+                aria-label="Close tab"
+                onClick={(e) => (e.stopPropagation(), closeTab(t.id))}
+              >
                 <X size={10} />
               </button>
             )}
           </div>
         ))}
-        <button className="icon-btn icon-btn--sm" title="New tab" onClick={() => openTab(tab.path)}>
+        <button
+          className="icon-btn icon-btn--sm"
+          title="New tab"
+          onClick={() => openTab(tab.path)}
+        >
           <Plus size={13} />
         </button>
       </div>
 
       <div className="files-bar">
-        <button className="icon-btn" title="Back" disabled={!tab.back.length} onClick={goBack}>
+        <button
+          className="icon-btn"
+          title="Back"
+          disabled={!tab.back.length}
+          onClick={goBack}
+        >
           <ArrowLeft size={15} />
         </button>
-        <button className="icon-btn" title="Forward" disabled={!tab.forward.length} onClick={goForward}>
+        <button
+          className="icon-btn"
+          title="Forward"
+          disabled={!tab.forward.length}
+          onClick={goForward}
+        >
           <ArrowRight size={15} />
         </button>
-        <button className="icon-btn" title="Up (Backspace)" disabled={!parentOf(tab.path)} onClick={() => navigate(parentOf(tab.path)!)}>
+        <button
+          className="icon-btn"
+          title="Up (Backspace)"
+          disabled={!parentOf(tab.path)}
+          onClick={() => navigate(parentOf(tab.path)!)}
+        >
           <ArrowUp size={15} />
         </button>
         <button className="icon-btn" title="Refresh" onClick={refresh}>
@@ -278,16 +584,57 @@ export default function FilesModule() {
             if (address.trim()) navigate(address.trim().replace(/\//g, "\\"));
           }}
         >
-          <input className="input input--mono" value={address} onChange={(e) => setAddress(e.target.value)} spellCheck={false} aria-label="Address" />
+          <input
+            className="input input--mono"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            spellCheck={false}
+            aria-label="Address"
+          />
         </form>
-        <input className="input files-filter" placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-        <button className="icon-btn" title="New folder" onClick={() => void newFolder()}>
+        <input
+          className="input files-filter"
+          placeholder="Filter…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        <button
+          className="icon-btn"
+          title="New folder"
+          onClick={() => void newFolder()}
+        >
           <FolderPlus size={15} />
         </button>
-        <button className="icon-btn" title={clipboard ? `Paste ${clipboard.paths.length} item(s) (Ctrl+V)` : "Clipboard empty"} disabled={!clipboard} onClick={() => void paste()}>
+        <button
+          className="icon-btn"
+          title={
+            clipboard
+              ? `Paste ${clipboard.paths.length} item(s) (Ctrl+V)`
+              : "Clipboard empty"
+          }
+          disabled={!clipboard}
+          onClick={() => void paste()}
+        >
           <ClipboardPaste size={15} />
         </button>
-        <button className="icon-btn" title={showHidden ? "Hide hidden files" : "Show hidden files"} aria-pressed={showHidden} onClick={() => setShowHidden((v) => !v)}>
+        <button
+          className="icon-btn"
+          title="Find identical files in this folder and its subfolders"
+          disabled={findingDups || !tab.path}
+          onClick={() => void findDuplicates()}
+        >
+          {findingDups ? (
+            <RefreshCw size={14} className="spin" />
+          ) : (
+            <Files size={14} />
+          )}
+        </button>
+        <button
+          className="icon-btn"
+          title={showHidden ? "Hide hidden files" : "Show hidden files"}
+          aria-pressed={showHidden}
+          onClick={() => setShowHidden((v) => !v)}
+        >
           {showHidden ? <Eye size={15} /> : <EyeOff size={15} />}
         </button>
       </div>
@@ -296,116 +643,262 @@ export default function FilesModule() {
         <aside className="files-side">
           <div className="label files-side__title">Places</div>
           {places.data?.places.map(([name, path]) => (
-            <button key={path} className="files-place" aria-current={tab.path === path ? "true" : undefined} onClick={() => navigate(path)}>
+            <button
+              key={path}
+              className="files-place"
+              aria-current={tab.path === path ? "true" : undefined}
+              onClick={() => navigate(path)}
+            >
               <Home size={13} /> {name}
             </button>
           ))}
           <div className="label files-side__title">Drives</div>
           {places.data?.drives.map((d) => (
-            <button key={d.path} className="files-place" aria-current={tab.path === d.path ? "true" : undefined} onClick={() => navigate(d.path)} title={d.label}>
+            <button
+              key={d.path}
+              className="files-place"
+              aria-current={tab.path === d.path ? "true" : undefined}
+              onClick={() => navigate(d.path)}
+              title={d.label}
+            >
               <HardDrive size={13} />
               <span className="truncate">{d.path}</span>
-              <span className="muted mono files-place__free">{formatBytes(d.freeBytes)} free</span>
+              <span className="muted mono files-place__free">
+                {formatBytes(d.freeBytes)} free
+              </span>
             </button>
           ))}
         </aside>
-        <ResizeHandle pane="files-side" of="prev" min={140} max={500} rest={320} />
+        <ResizeHandle
+          pane="files-side"
+          of="prev"
+          min={140}
+          max={500}
+          rest={320}
+        />
 
         <div className="files-main" tabIndex={0} ref={listRef}>
           {search && (
             <div className="files-banner">
-              {search.results.length} result(s) for “{search.query}” in {tab.path}
+              {search.results.length} result(s) for “{search.query}” in{" "}
+              {tab.path}
               {!search.complete && " (stopped early: limit reached)"}
-              <button className="btn btn--ghost btn--sm" onClick={() => setSearch(null)}>
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => setSearch(null)}
+              >
                 Clear search
               </button>
             </div>
           )}
           {clipboard && (
             <div className="files-banner files-banner--clip">
-              {clipboard.move ? "Cut" : "Copied"}: {clipboard.paths.length} item(s). Open a folder and paste (Ctrl+V).
-              <button className="btn btn--ghost btn--sm" onClick={() => setClipboard(null)}>
+              {clipboard.move ? "Cut" : "Copied"}: {clipboard.paths.length}{" "}
+              item(s). Open a folder and paste (Ctrl+V).
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => setClipboard(null)}
+              >
                 Clear
               </button>
             </div>
           )}
           {error && <div className="unavailable">{error}</div>}
-          <table className="table files-table">
-            <thead>
-              <tr>
-                <th onClick={() => sortBy("name")}>Name {sort.key === "name" && (sort.desc ? "▼" : "▲")}</th>
-                <th className="num" style={{ width: 110 }} onClick={() => sortBy("size")}>
-                  Size {sort.key === "size" && (sort.desc ? "▼" : "▲")}
-                </th>
-                <th style={{ width: 160 }} onClick={() => sortBy("modified")}>
-                  Modified {sort.key === "modified" && (sort.desc ? "▼" : "▲")}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((e) => {
-                const Icon = fileIcon(e);
-                return (
-                  <tr
-                    key={e.path}
-                    aria-selected={selected.has(e.path)}
-                    className={e.hidden ? "row--dim" : undefined}
-                    onClick={(ev) => click(e, ev)}
-                    onDoubleClick={() => openEntry(e)}
-                    onContextMenu={(ev) => {
-                      ev.preventDefault();
-                      if (!selected.has(e.path)) setSelected(new Set([e.path]));
-                      openMenu(ev.clientX, ev.clientY, actionsFor(e));
-                    }}
+          {dups && (
+            <Duplicates
+              root={dups.root}
+              report={dups.report}
+              onClose={() => setDups(null)}
+              onRemove={recycleDuplicates}
+            />
+          )}
+          {!dups && (
+            <table className="table files-table">
+              <thead>
+                <tr>
+                  <th onClick={() => sortBy("name")}>
+                    Name {sort.key === "name" && (sort.desc ? "▼" : "▲")}
+                  </th>
+                  <th
+                    className="num"
+                    style={{ width: 110 }}
+                    onClick={() => sortBy("size")}
                   >
-                    <td className="truncate" title={search ? e.path : e.name}>
-                      <Icon size={13} className={`files-icon${e.isDir ? " files-icon--dir" : ""}`} /> {search ? e.path : e.name}
-                    </td>
-                    <td className="num mono">{e.isDir ? "" : formatBytes(e.size)}</td>
-                    <td className="mono muted">{e.modified ? new Date(e.modified).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : ""}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {!error && shown.length === 0 && <div className="empty">{search ? "No matches." : "This folder is empty."}</div>}
+                    Size {sort.key === "size" && (sort.desc ? "▼" : "▲")}
+                  </th>
+                  <th style={{ width: 160 }} onClick={() => sortBy("modified")}>
+                    Modified{" "}
+                    {sort.key === "modified" && (sort.desc ? "▼" : "▲")}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((e) => {
+                  const Icon = fileIcon(e);
+                  return (
+                    <tr
+                      key={e.path}
+                      aria-selected={selected.has(e.path)}
+                      className={e.hidden ? "row--dim" : undefined}
+                      onClick={(ev) => click(e, ev)}
+                      onDoubleClick={() => openEntry(e)}
+                      onContextMenu={(ev) => {
+                        ev.preventDefault();
+                        if (!selected.has(e.path))
+                          setSelected(new Set([e.path]));
+                        openMenu(ev.clientX, ev.clientY, actionsFor(e));
+                      }}
+                    >
+                      <td className="truncate" title={search ? e.path : e.name}>
+                        <Icon
+                          size={13}
+                          className={`files-icon${e.isDir ? " files-icon--dir" : ""}`}
+                        />{" "}
+                        {search ? e.path : e.name}
+                      </td>
+                      <td className="num mono">
+                        {e.isDir ? "" : formatBytes(e.size)}
+                      </td>
+                      <td className="mono muted">
+                        {e.modified
+                          ? new Date(e.modified).toLocaleString([], {
+                              dateStyle: "short",
+                              timeStyle: "short",
+                            })
+                          : ""}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+          {!error && !dups && shown.length === 0 && (
+            <div className="empty">
+              {search ? "No matches." : "This folder is empty."}
+            </div>
+          )}
         </div>
 
-        <ResizeHandle pane="files-preview" of="next" min={180} max={900} rest={320} />
+        <ResizeHandle
+          pane="files-preview"
+          of="next"
+          min={180}
+          max={900}
+          rest={320}
+        />
         <aside className="files-preview">
           {selection.length > 1 ? (
             <div className="empty">
               {selection.length} items selected
-              <div className="muted">{formatBytes(selection.reduce((s, e) => s + (e.size ?? 0), 0))} in files</div>
+              <div className="muted">
+                {formatBytes(selection.reduce((s, e) => s + (e.size ?? 0), 0))}{" "}
+                in files
+              </div>
             </div>
           ) : !preview ? (
             <div className="empty muted">Select a file to preview it.</div>
           ) : (
             <>
-              <div className="files-preview__head truncate" title={preview.path}>
+              <div
+                className="files-preview__head truncate"
+                title={preview.path}
+              >
                 {preview.path.split("\\").pop()}
               </div>
-              {preview.data.kind === "image" && <img className="files-preview__img" src={preview.data.dataUrl} alt="" />}
+              {preview.data.kind === "image" && (
+                <img
+                  className="files-preview__img"
+                  src={preview.data.dataUrl}
+                  alt=""
+                />
+              )}
               {preview.data.kind === "text" && (
                 <pre className="files-preview__text" data-selectable>
                   {preview.data.text}
                   {preview.data.truncated && "\n… (preview truncated)"}
                 </pre>
               )}
-              {preview.data.kind === "none" && <div className="unavailable">No preview: {preview.data.reason}</div>}
+              {preview.data.kind === "none" && (
+                <div className="unavailable">
+                  No preview: {preview.data.reason}
+                </div>
+              )}
+              {preview.data.kind === "archive" && (
+                <>
+                  <div className="muted">
+                    {preview.data.listing.total} item(s),{" "}
+                    {formatBytes(preview.data.listing.unpackedBytes)} unpacked
+                    {preview.data.listing.encrypted && " · password-protected"}
+                  </div>
+                  <ul className="files-preview__text files-archive">
+                    {preview.data.listing.entries.map((e) => (
+                      <li key={e.name}>
+                        <span className="truncate">{e.name}</span>
+                        {!e.isDir && (
+                          <span className="muted mono">
+                            {formatBytes(e.size)}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                    {preview.data.listing.total >
+                      preview.data.listing.entries.length && (
+                      <li className="muted">
+                        … and{" "}
+                        {preview.data.listing.total -
+                          preview.data.listing.entries.length}{" "}
+                        more
+                      </li>
+                    )}
+                  </ul>
+                </>
+              )}
               <div className="files-preview__actions">
-                <button className="btn btn--sm" onClick={() => run("Could not open", () => api.files.open(preview.path))}>
+                <button
+                  className="btn btn--sm"
+                  onClick={() =>
+                    run("Could not open", () => api.files.open(preview.path))
+                  }
+                >
                   Open
                 </button>
+                {preview.data.kind === "archive" &&
+                  !preview.data.listing.encrypted && (
+                    <button
+                      className="btn btn--sm"
+                      title="Into a new folder next to the archive"
+                      onClick={() =>
+                        run("Could not extract", async () => {
+                          const r = await api.files.extract(preview.path);
+                          notify.success(
+                            `Extracted ${r.files} file(s)`,
+                            r.skipped
+                              ? `${r.skipped} entr(ies) pointed outside the folder and were skipped.`
+                              : r.folder,
+                          );
+                        })
+                      }
+                    >
+                      Extract here
+                    </button>
+                  )}
                 {preview.data.kind === "text" && (
-                  <button className="btn btn--sm" onClick={() => analyze(selection[0])} title="Attach this file to NEURAL; you review before sending">
+                  <button
+                    className="btn btn--sm"
+                    onClick={() => analyze(selection[0])}
+                    title="Attach this file to NEURAL; you review before sending"
+                  >
                     <BrainCircuit size={12} /> Analyze with AI
                   </button>
                 )}
               </div>
             </>
           )}
-          <p className="muted files-note">Archive browsing and duplicate detection are planned. No background indexing runs: search scans on demand.</p>
+          <p className="muted files-note">
+            ZIP archives open in this preview. No background indexing runs:
+            search and duplicates scan on demand.
+          </p>
         </aside>
       </div>
     </div>

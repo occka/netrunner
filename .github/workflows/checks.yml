@@ -1,0 +1,51 @@
+# The checks DEVELOPMENT.md asks for before a commit, on every pull request and
+# on main: typecheck, frontend tests and build, clippy and Rust tests. Windows
+# runners, because NETRUNNER is Windows-only and some tests call Windows APIs.
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
+      - run: npx vite build
+
+  rust:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+      # Tauri embeds the built frontend; an empty dist is enough to compile.
+      - name: Placeholder frontend
+        shell: pwsh
+        working-directory: .
+        run: New-Item -ItemType Directory -Force dist | Out-Null; Set-Content dist/index.html "<!doctype html>"
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test

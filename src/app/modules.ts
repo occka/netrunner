@@ -102,7 +102,7 @@ export const MODULES: ModuleDef[] = [
     phase: 4,
     group: "main",
     description: "Advanced file manager.",
-    planned: ["Archive browsing (zip/7z)", "Duplicate detection", "Opt-in indexing", "Thumbnail grid view"],
+    planned: ["7z and RAR archives", "Opt-in indexing", "Thumbnail grid view"],
     component: lazy(() => import("@/modules/files/FilesModule")),
   },
   {
@@ -113,7 +113,7 @@ export const MODULES: ModuleDef[] = [
     phase: 2,
     group: "main",
     description: "Game library and launcher integrations.",
-    planned: ["Per-game profiles and overlays", "More launchers (EA app, Ubisoft Connect, Battle.net)"],
+    planned: ["Per-game profiles and overlays", "More launchers (EA app, Battle.net, Xbox app)"],
     component: lazy(() => import("@/modules/games/GamesModule")),
   },
   {
@@ -212,7 +212,7 @@ export const MODULES: ModuleDef[] = [
     phase: 1,
     group: "utility",
     description: "Local application data.",
-    planned: ["Export / import", "Manual backups", "Data reset with confirmation"],
+    planned: ["Data reset with confirmation"],
     component: lazy(() => import("@/modules/storage/StorageModule")),
   },
   {

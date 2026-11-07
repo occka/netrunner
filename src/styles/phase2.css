@@ -735,3 +735,18 @@
 .flow__enabled {
   margin-right: auto;
 }
+
+/* ---------- STORAGE ---------- */
+.storage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.storage-backups .actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.storage-keep {
+  width: 70px;
+}

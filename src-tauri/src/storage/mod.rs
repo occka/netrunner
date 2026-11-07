@@ -1,5 +1,6 @@
 //! Local SQLite storage: connection handling and schema migrations.
 
+pub mod backups;
 mod db;
 mod migrations;
 mod repair;

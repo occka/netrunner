@@ -18,6 +18,8 @@ The first Rust build takes a few minutes (SQLite is compiled from source via `ru
 
 ## Checks before committing
 
+The same checks run on every pull request and on `main` (`.github/workflows/checks.yml`).
+
 ```bash
 npm run typecheck && npm test
 cd src-tauri && cargo test && cargo clippy --all-targets
@@ -57,7 +59,7 @@ Put `<ResizeHandle pane="name" of="prev" />` next to the panel (`next` when it i
 
 ## Adding a game source
 
-Implement a `fn x_games() -> (bool, Vec<Game>)` in `services/games.rs` (detected?, games), add it to `scan()`, and, if the launcher needs parameters, extend `launch_params`. Add the label in `modules/games/GamesModule.tsx`.
+Implement a `fn x_games() -> (bool, Vec<Game>)` in `services/games.rs` (detected?, games), add it to `scan()` (and to the source count in `system::smoke`), and, if the launcher needs parameters, extend `launch_params`. Read only what the launcher writes for itself, and keep games whose folder still exists: launchers keep metadata of uninstalled games. Add the label in `modules/games/GamesModule.tsx`.
 
 ## Adding a module
 

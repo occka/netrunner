@@ -62,6 +62,7 @@ export interface Places {
 export type FilePreview =
   | { kind: "text"; text: string; truncated: boolean }
   | { kind: "image"; dataUrl: string }
+  | { kind: "archive"; listing: { entries: { name: string; size: number; isDir: boolean }[]; total: number; unpackedBytes: number; encrypted: boolean } }
   | { kind: "none"; reason: string };
 
 export interface ChatState {

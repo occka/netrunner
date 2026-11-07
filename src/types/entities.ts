@@ -97,6 +97,15 @@ export interface ActivityEntry {
   message: string;
 }
 
+export interface DbBackup {
+  name: string;
+  path: string;
+  size: number;
+  /** Seconds since 1970. */
+  created: number;
+  kind: "manual" | "auto" | "migration" | "damaged" | "restore";
+}
+
 export interface AppInfo {
   version: string;
   dataDir: string;

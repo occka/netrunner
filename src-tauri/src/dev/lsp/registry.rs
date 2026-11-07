@@ -104,7 +104,9 @@ pub const SPECS: &[Spec] = &[
         args: &[],
         files: &[("cs", "csharp"), ("csx", "csharp")],
         version_args: Some(&["--version"]),
-        install: Some("dotnet tool install -g csharp-ls"),
+        // csharp-ls 0.21+ is built for .NET 10 only, and an older SDK fails with a
+        // misleading "DotnetToolSettings.xml not found". Pick what the SDK can run.
+        install: Some("$v=[int]((dotnet --version).Split('.')[0]); if ($v -ge 10) { dotnet tool install -g csharp-ls } elseif ($v -eq 9) { dotnet tool install -g csharp-ls --version 0.20.0 } else { dotnet tool install -g csharp-ls --version 0.16.0 }"),
         docs: "https://github.com/razzmatazz/csharp-language-server",
     },
     Spec {

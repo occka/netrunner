@@ -37,6 +37,15 @@
 
 The command policy is a safety net, not a sandbox: a confirmed command runs with your rights.
 
+## Data and files
+
+| Area | What it does |
+|---|---|
+| Backups and export | Copies of the whole database stay in the app's `backups` folder; an export is written only where the user chooses. Both contain settings, profiles, notes, NEURAL chats and browsing history, never passwords or tokens (those are in Windows Credential Manager) |
+| Restore and import | A file is checked before it is used, and only replaces the database at the next start, after the current one is backed up. Files from a newer NETRUNNER, damaged files and other SQLite files are refused |
+| ZIP archives | Entries that would leave the target folder (`..`, absolute paths, drive letters, alternate data streams, reserved names) are skipped; password-protected archives and archive bombs over 20 GB are refused. Nothing in an archive is run |
+| Duplicates | Only reads files; removal goes to the Recycle Bin, never removes every copy of a group, and is refused in Windows and program folders |
+
 ## Browser
 
 | Layer | What it does |
